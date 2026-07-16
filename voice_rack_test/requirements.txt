@@ -1,0 +1,12 @@
+numpy
+scipy
+pandas
+pyyaml
+plotly
+streamlit
+adafruit-blinka
+adafruit-circuitpython-pca9685
+adafruit-circuitpython-motor
+sounddevice
+matplotlib
+webrtcvad

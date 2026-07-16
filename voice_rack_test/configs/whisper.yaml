@@ -1,0 +1,1 @@
+sample_rate: 16000frame_ms: 30device: "plughw:2,0"# detection (UNCHANGED BEHAVIOUR)rms_threshold: 0.005entropy_threshold: 4.5decision_window: 10trigger_ratio: 0.6whisper_frames_required: 10cooldown_seconds: 10run_duration_seconds: 600   # 10 minutes

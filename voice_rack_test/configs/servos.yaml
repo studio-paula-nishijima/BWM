@@ -1,0 +1,10 @@
+servo:
+  channel: 0
+  frequency: 50
+
+  min_pulse: 800
+  max_pulse: 2200
+  home_pulse: 800
+
+motion:
+  default_speed: 800

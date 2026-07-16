@@ -1,0 +1,22 @@
+[Unit]
+Description=BWM Play Events
+After=local-fs.target
+
+[Service]
+Type=simple
+
+WorkingDirectory=/home/raspi/BWMTest/translation_release
+
+ExecStartPre=/bin/bash -c 'echo RUNNING > /run/play_events.state'
+
+ExecStart=/home/raspi/BWMTest/translation_release/translation_demo/bin/python /home/raspi/BWMTest/translation_release/play_events.py
+
+ExecStopPost=/bin/bash -c 'echo STOPPED > /run/play_events.state'
+
+TimeoutStopSec=10
+
+# IMPORTANT: no auto-restart
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

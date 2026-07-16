@@ -1,0 +1,35 @@
+project:
+
+  src_path: "src"
+
+files:
+
+  events_file: "events.npy"
+
+playback:
+
+  enable_date_filter: true
+
+  start_date: "2003-01-01"
+
+  end_date: "2017-12-31"
+
+  sleep_resolution: 0.001
+  
+  random_segment: true
+
+  segment_minutes: 10
+
+  renormalize_segment: false
+
+visualization:
+
+  density_window_default: 10.0
+
+safety:
+
+  max_duty_cycle: 0.6
+
+  cooldown_window: 10.0
+
+  max_continuous_on: 0.2

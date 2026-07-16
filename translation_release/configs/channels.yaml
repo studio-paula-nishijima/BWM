@@ -1,0 +1,78 @@
+
+
+channels:
+  solenoid_1:
+    csv_path: "/home/raspi/BWMTest/lamah_data/2_LamaH-CE_daily/D_gauges/2_timeseries/daily/ID_353.csv"
+    column: "qobs"
+    date_columns:
+
+      year: "YYYY"
+      month: "MM"
+      day: "DD"
+
+    start_date: "2000-01-01"
+    end_date: "2017-12-31"
+    threshold: 1.0
+    scaling: "linear"
+    frequency_shaping: "power"
+    frequency_gamma: 2.0
+
+    t_on: 0.15
+    freq_min: 0.1
+    freq_max: 2.0
+    
+    time_scale: 345600
+    
+    peak_preservation:
+      enabled: true
+      mode: "window_max"
+
+  solenoid_2:
+    csv_path: "/home/raspi/BWMTest/lamah_data/2_LamaH-CE_daily/D_gauges/2_timeseries/daily/ID_372.csv"
+    column: "qobs"
+    date_columns:
+
+      year: "YYYY"
+      month: "MM"
+      day: "DD"
+
+    start_date: "2000-01-01"
+    end_date: "2017-12-31"
+    threshold: 1.0
+    scaling: "linear"
+    frequency_shaping: "power"
+    frequency_gamma: 1.3
+    t_on: 0.15
+    freq_min: 0.25
+    freq_max: 3.5
+    
+    time_scale: 345600
+    
+    peak_preservation:
+      enabled: true
+      mode: "window_max"
+    
+  solenoid_3:
+    csv_path: "/home/raspi/BWMTest/lamah_data/2_LamaH-CE_daily/D_gauges/2_timeseries/daily/ID_714.csv"
+    column: "qobs"
+    date_columns:
+
+      year: "YYYY"
+      month: "MM"
+      day: "DD"
+
+    start_date: "2000-01-01"
+    end_date: "2017-12-31"
+    threshold: 1.0
+    scaling: "linear"
+    frequency_shaping: "power"
+    frequency_gamma: 1.3
+    t_on: 0.15
+    freq_min: 0.2
+    freq_max: 3.3
+    
+    time_scale: 345600
+    
+    peak_preservation:
+      enabled: true
+      mode: "window_max"

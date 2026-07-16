@@ -1,0 +1,14 @@
+# GPIO packages are installed via apt:
+#   sudo apt install python3-gpiozero python3-lgpio
+#
+# Create the venv with:
+#   python3 -m venv --system-site-packages translation_demo
+
+numpy
+pandas
+pyyaml
+plotly
+streamlit
+adafruit-blinka
+adafruit-circuitpython-pca9685
+adafruit-circuitpython-motor

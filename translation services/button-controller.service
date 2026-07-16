@@ -1,0 +1,16 @@
+[Unit]
+Description=BWM Button Controller
+After=local-fs.target
+
+[Service]
+Type=simple
+
+ExecStart=/home/raspi/BWMTest/translation_release/translation_demo/bin/python -u /home/raspi/BWMTest/translation_release/src/control/button_service.py
+
+Restart=always
+RestartSec=2
+
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

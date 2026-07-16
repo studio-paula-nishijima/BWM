@@ -1,0 +1,16 @@
+[Unit]
+Description=BWM Button Controller for voice rack
+After=local-fs.target
+
+[Service]
+Type=simple
+
+ExecStart=/home/raspi/BWMTest/voice_rack_test/voice_rack_venv/bin/python -u /home/raspi/BWMTest/voice_rack_test/src/control/button_service_voice_rack.py
+
+Restart=always
+RestartSec=2
+
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
