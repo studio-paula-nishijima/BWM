@@ -1,9 +1,11 @@
-# Windows
-Thumbs.db
-Desktop.ini
-
+# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
 *.log
+
+# Windows
+Thumbs.db
+Desktop.ini
+
