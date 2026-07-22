@@ -1,9 +1,13 @@
 # Python
 __pycache__/
 *.pyc
-.venv/
-venv/
+
 *.log
+
+# Virtual environments
+.venv/
+translation_venv/
+*_venv/
 
 # Windows
 Thumbs.db
