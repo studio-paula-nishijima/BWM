@@ -10,3 +10,4 @@ adafruit-circuitpython-motor
 sounddevice
 matplotlib
 webrtcvad
+soundfile
