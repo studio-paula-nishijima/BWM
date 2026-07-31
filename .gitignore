@@ -13,3 +13,5 @@ translation_venv/
 Thumbs.db
 Desktop.ini
 
+# 
+live_whisper_analysis_*.csv
