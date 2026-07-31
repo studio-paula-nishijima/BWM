@@ -2,7 +2,7 @@
 #   sudo apt install python3-gpiozero python3-lgpio
 #
 # Create the venv with:
-#   python3 -m venv --system-site-packages translation_demo
+#   python3 -m venv --system-site-packages translation_venv
 
 numpy
 pandas
