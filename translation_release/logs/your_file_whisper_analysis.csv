@@ -1,0 +1,1 @@
+frame,timestamp,is_whisper,trigger,raw_score,probability,rms,zcr,entropy,voicing,hnr,spectral_centroid,band_energy_low,band_energy_mid,band_energy_high,temporal_score,formant_score

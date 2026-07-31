@@ -22,17 +22,12 @@ class DetectionResult:
 
 
     # -----------------------------
-    # Current acoustic features
+    # acoustic features
     # -----------------------------
 
     rms: float = 0.0
     zcr: float = 0.0
     entropy: float = 0.0
-
-
-    # -----------------------------
-    # Future acoustic features
-    # -----------------------------
 
     voicing: float = 0.0
     hnr: float = 0.0
@@ -41,6 +36,10 @@ class DetectionResult:
     band_energy_low: float = 0.0
     band_energy_mid: float = 0.0
     band_energy_high: float = 0.0
+    
+    band_ratio_low: float = 0.0
+    band_ratio_mid: float = 0.0
+    band_ratio_high: float = 0.0
 
     temporal_score: float = 0.0
     formant_score: float = 0.0
