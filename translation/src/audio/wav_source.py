@@ -1,8 +1,13 @@
-import wave
+import time
+from pathlib import Path
+
 import numpy as np
+import soundfile as sf
+
+from .source import AudioSource, AudioFrame
 
 
-class WavSource:
+class WavSource(AudioSource):
 
     def __init__(
         self,
@@ -11,54 +16,98 @@ class WavSource:
         frame_size
     ):
 
-        self.filename = filename
+        self.filename = Path(filename)
         self.sample_rate = sample_rate
         self.frame_size = frame_size
 
-        self.wav = wave.open(
-            filename,
-            "rb"
+        self.audio = None
+        self.position = 0
+        self.frame_number = 0
+
+
+    def open(self):
+
+        audio, rate = sf.read(
+            self.filename,
+            dtype="float32"
         )
 
-        if self.wav.getnchannels() != 1:
+
+        if rate != self.sample_rate:
+
             raise ValueError(
-                "WAV must be mono"
+                f"WAV sample rate {rate}Hz "
+                f"does not match required "
+                f"{self.sample_rate}Hz"
             )
 
-        if self.wav.getsampwidth() != 2:
-            raise ValueError(
-                "WAV must be 16-bit PCM"
+
+        # Convert stereo to mono if required
+        if len(audio.shape) > 1:
+
+            audio = np.mean(
+                audio,
+                axis=1
             )
 
-        if self.wav.getframerate() != sample_rate:
-            raise ValueError(
-                f"WAV sample rate must be {sample_rate}Hz"
-            )
+
+        self.audio = audio
+        self.position = 0
+        self.frame_number = 0
 
 
     def read_frame(self):
 
-        data = self.wav.readframes(
-            self.frame_size
-        )
+        if self.audio is None:
 
-        if len(data) != self.frame_size * 2:
+            raise RuntimeError(
+                "WAV source not opened"
+            )
+
+
+        if self.position >= len(self.audio):
+
             return None
 
 
-        frame = (
-            np.frombuffer(
-                data,
-                dtype=np.int16
-            )
-            .astype(np.float32)
-            /
-            32768.0
+        end = (
+            self.position +
+            self.frame_size
         )
+
+
+        samples = self.audio[
+            self.position:end
+        ]
+
+
+        # Pad final frame so detector always receives
+        # exactly FRAME_SIZE samples
+        if len(samples) < self.frame_size:
+
+            samples = np.pad(
+                samples,
+                (
+                    0,
+                    self.frame_size - len(samples)
+                )
+            )
+
+
+        frame = AudioFrame(
+            samples=samples,
+            timestamp=time.time(),
+            frame_number=self.frame_number
+        )
+
+
+        self.position = end
+        self.frame_number += 1
+
 
         return frame
 
 
     def close(self):
 
-        self.wav.close()
+        self.audio = None

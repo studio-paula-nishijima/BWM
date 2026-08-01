@@ -25,3 +25,6 @@ ZCR_MIN = cfg["zcr_min"]
 ZCR_MAX = cfg["zcr_max"]
 
 ENTROPY_MIN = cfg["entropy_min"]
+
+BUFFER_SECONDS = cfg["audio_buffer"]["seconds"]
+BUFFER_ENABLED = cfg["audio_buffer"]["enabled"]
