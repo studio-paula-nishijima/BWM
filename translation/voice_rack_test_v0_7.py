@@ -25,14 +25,17 @@ import argparse
 # CONFIG
 # -----------------------------
 from configs.whisper import (
+
     SAMPLE_RATE,
     FRAME_MS,
     DEVICE,
 
     RMS_MIN,
     RMS_MAX,
+
     ZCR_MIN,
     ZCR_MAX,
+
     ENTROPY_MIN,
 
     DECISION_WINDOW,
@@ -41,13 +44,28 @@ from configs.whisper import (
     WHISPER_FRAMES_REQUIRED,
     COOLDOWN_SECONDS,
     RUN_DURATION_SECONDS,
+
+    PROCESSING_MODE,
+
+    SPEECH_DETECTOR_IMPLEMENTATION,
+    WHISPER_DETECTOR_IMPLEMENTATION,
+
+    BUFFER_SECONDS,
 )
 
 
 # -----------------------------
 # MODULES
 # -----------------------------
-from whisper.detector import WhisperDetector
+from whisper.detector import (
+    create_whisper_detector,
+    create_speech_detector,
+)
+
+from whisper.pipeline import (
+    DetectorPipeline,
+)
+
 
 from audio.wav_source import WavSource
 from audio.arecord_source import ArecordSource
@@ -56,9 +74,11 @@ from src.audio.ring_buffer import AudioRingBuffer
 from app_logging.csv_logger import WhisperCSVLogger
 
 
+
 # -----------------------------
 # AUDIO FRAME SIZE
 # -----------------------------
+
 FRAME_SIZE = int(
     SAMPLE_RATE *
     FRAME_MS /
@@ -66,9 +86,11 @@ FRAME_SIZE = int(
 )
 
 
+
 # -----------------------------
 # STATE
 # -----------------------------
+
 source = None
 
 start_time = None
@@ -79,15 +101,18 @@ whisper_count = 0
 
 csv_logger = None
 
+
 audio_buffer = AudioRingBuffer(
-    sample_rate=16000,
-    buffer_seconds=5,
+    sample_rate=SAMPLE_RATE,
+    buffer_seconds=BUFFER_SECONDS,
 )
+
 
 
 # -----------------------------
 # ARGUMENTS
 # -----------------------------
+
 def parse_arguments():
 
     parser = argparse.ArgumentParser()
@@ -102,9 +127,11 @@ def parse_arguments():
     return parser.parse_args()
 
 
+
 # -----------------------------
 # SHUTDOWN
 # -----------------------------
+
 def shutdown(*_):
 
     global source
@@ -117,6 +144,7 @@ def shutdown(*_):
     if source:
 
         try:
+
             source.close()
 
         except Exception:
@@ -128,6 +156,7 @@ def shutdown(*_):
     if csv_logger:
 
         try:
+
             csv_logger.close()
 
         except Exception:
@@ -140,6 +169,7 @@ def shutdown(*_):
     raise SystemExit
 
 
+
 signal.signal(
     signal.SIGINT,
     shutdown
@@ -150,10 +180,10 @@ signal.signal(
     shutdown
 )
 
-
 # -----------------------------
 # MAIN LOOP
 # -----------------------------
+
 def main():
 
     global source
@@ -166,9 +196,12 @@ def main():
 
 
     # -----------------------------
-    # DETECTOR
+    # DETECTORS
     # -----------------------------
-    detector = WhisperDetector(
+
+    whisper_detector = create_whisper_detector(
+
+        WHISPER_DETECTOR_IMPLEMENTATION,
 
         sample_rate=SAMPLE_RATE,
 
@@ -182,15 +215,44 @@ def main():
 
         decision_window=DECISION_WINDOW,
         trigger_ratio=TRIGGER_RATIO
+
+    )
+
+
+    speech_detector = None
+
+
+    if PROCESSING_MODE in (
+        "speech_gate",
+        "shadow"
+    ):
+
+        speech_detector = create_speech_detector(
+
+            SPEECH_DETECTOR_IMPLEMENTATION
+
+        )
+
+
+    detector = DetectorPipeline(
+
+        whisper_detector,
+
+        speech_detector,
+
+        PROCESSING_MODE
+
     )
 
 
     args = parse_arguments()
 
 
+
     # -----------------------------
     # LOG FILE
     # -----------------------------
+
     if args.wav:
 
         wav_path = Path(
@@ -226,9 +288,11 @@ def main():
     )
 
 
+
     # -----------------------------
     # AUDIO SOURCE
     # -----------------------------
+
     if args.wav:
 
         print(
@@ -243,6 +307,7 @@ def main():
             SAMPLE_RATE,
 
             FRAME_SIZE
+
         )
 
 
@@ -255,21 +320,30 @@ def main():
             SAMPLE_RATE,
 
             FRAME_SIZE
+
         )
 
 
     source.open()
 
 
+
     # -----------------------------
     # START
     # -----------------------------
+
     start_time = time.time()
 
 
     print(
         "Whisper detection running..."
     )
+
+
+    print(
+        f"Processing mode: {PROCESSING_MODE}"
+    )
+
 
     print(
         "No servo control enabled"
@@ -278,14 +352,17 @@ def main():
 
     try:
 
+
         while True:
 
 
             # -----------------------------
             # TIME LIMIT
             # -----------------------------
+
             if (
-                time.time() -
+                time.time()
+                -
                 start_time
                 >
                 RUN_DURATION_SECONDS
@@ -302,6 +379,7 @@ def main():
             # -----------------------------
             # AUDIO READ
             # -----------------------------
+
             audio_frame = (
                 source.read_frame()
             )
@@ -326,28 +404,40 @@ def main():
                 audio_frame.frame_number
             )
 
+
+
             # -----------------------------
             # RING BUFFER
             # -----------------------------
-            
-            audio_buffer.append(frame)
+
+            audio_buffer.append(
+                frame
+            )
+
+
 
             # -----------------------------
-            # WHISPER DETECTION
+            # DETECTION
             # -----------------------------
-            result = detector.classify(
+
+            pipeline_result = detector.process(
                 frame
+            )
+
+
+            speech_result = (
+                pipeline_result.speech
+            )
+
+
+            result = (
+                pipeline_result.whisper
             )
 
 
             is_whisper = (
                 result.is_whisper
             )
-
-
-            rms_v = result.rms
-            zcr_v = result.zcr
-            ent_v = result.entropy
 
 
 
@@ -373,7 +463,8 @@ def main():
             ):
 
                 if (
-                    now -
+                    now
+                    -
                     last_trigger_time
                     >
                     COOLDOWN_SECONDS
@@ -390,12 +481,10 @@ def main():
             # -----------------------------
             # LOGGING
             # -----------------------------
+
             csv_logger.log(
-
                 frame_number,
-
-                result,
-
+                pipeline_result,
                 triggered
             )
 
@@ -404,25 +493,32 @@ def main():
             # -----------------------------
             # DEBUG OUTPUT
             # -----------------------------
+
             print(
+            
+                f"SPEECH={speech_result.is_speech} "
+                f"SPEECH_PROB={speech_result.speech_probability:.2f} "
 
-                f"WHISPER={is_whisper} "
+                f"WHISPER={is_whisper} "            
+                f"COUNT={whisper_count} "            
+                f"SCORE={result.raw_score}/3 "            
+                f"PROB={result.whisper_probability:.2f} "            
+                f"RMS={result.rms:.4f} "            
+                f"ZCR={result.zcr:.3f} "            
+                f"ENT={result.entropy:.2f} "            
+                f"CENT={result.spectral_centroid:.1f} "            
+                f"LOW={result.band_energy_low:.3f} "            
+                f"MID={result.band_energy_mid:.3f} "            
+                f"HIGH={result.band_energy_high:.3f} "            
+                f"LR={result.band_ratio_low:.2f} "            
+                f"MR={result.band_ratio_mid:.2f} "            
+                f"HR={result.band_ratio_high:.2f} "            
+                f"TRIGGER={triggered}",
 
-                f"COUNT={whisper_count} "
-
-                f"SCORE={result.raw_score}/3 "
-
-                f"PROB={result.whisper_probability:.2f} "
-
-                f"RMS={rms_v:.4f} "
-
-                f"ZCR={zcr_v:.3f} "
-
-                f"ENT={ent_v:.2f} "
-
-                f"TRIGGER={triggered}"
-
+                "\n"
+            
             )
+
 
 
     except Exception:
@@ -430,6 +526,7 @@ def main():
         import traceback
 
         traceback.print_exc()
+
 
 
     finally:

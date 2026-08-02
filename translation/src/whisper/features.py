@@ -2,7 +2,7 @@ import numpy as np
 from scipy.signal import butter, lfilter
 
 
-class WhisperFeatures:
+class AudioFeatures:
     """
     Acoustic feature extraction.
 

@@ -3,7 +3,7 @@ from typing import Dict
 
 
 @dataclass
-class DetectionResult:
+class WhisperDetectionResult:
     """
     Container for a single analysed audio frame.
 
@@ -52,5 +52,22 @@ class DetectionResult:
     raw_score: int = 0
 
     feature_scores: Dict[str, float] = field(
+        default_factory=dict
+    )
+    
+@dataclass
+class SpeechDetectionResult:
+    """
+    Result from speech presence classification.
+
+    Answers:
+        "Is this human speech?"
+    """
+
+    is_speech: bool = False
+
+    speech_probability: float = 0.0
+
+    features: Dict[str, float] = field(
         default_factory=dict
     )
