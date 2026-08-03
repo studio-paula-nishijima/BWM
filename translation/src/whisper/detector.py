@@ -6,49 +6,16 @@ Separates speech detection and whisper detection
 while allowing interchangeable implementations.
 """
 
-from abc import ABC, abstractmethod
+
 
 from .models import (
     WhisperDetectionResult,
     SpeechDetectionResult
 )
 from .detectors.whisper_feature import FeatureWhisperDetector
-from .detectors.speech_custom import CustomSpeechDetector
+from .detectors.speech_feature import FeatureSpeechDetector
 
 
-
-# ============================================================
-# Base interfaces
-# ============================================================
-
-
-class WhisperDetector(ABC):
-    """
-    Interface for whisper classifiers.
-
-    Every whisper implementation must provide:
-
-        classify(frame) -> DetectionResult
-    """
-
-    @abstractmethod
-    def classify(self, frame):
-        pass
-
-
-
-class SpeechDetector(ABC):
-    """
-    Interface for speech presence classifiers.
-
-    Every speech implementation must provide:
-
-        classify(frame) -> SpeechDetectionResult
-    """
-
-    @abstractmethod
-    def classify(self, frame):
-        pass
 
 
 
@@ -85,7 +52,7 @@ def create_whisper_detector(
 
 
 def create_speech_detector(
-    implementation="custom",
+    implementation="feature",
     **kwargs
 ):
     """
@@ -93,17 +60,16 @@ def create_speech_detector(
 
     Future examples:
 
-        custom
+        feature
         silero
         webrtc
     """
 
-    if implementation == "custom":
+    if implementation == "feature":
 
-        return CustomSpeechDetector(
+        return FeatureSpeechDetector(
             **kwargs
         )
-
 
     raise ValueError(
         f"Unknown speech detector: {implementation}"

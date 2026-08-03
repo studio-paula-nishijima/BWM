@@ -34,9 +34,57 @@ PROCESSING_MODE = cfg.get(
 SPEECH_DETECTOR_IMPLEMENTATION = (
     cfg
     .get("speech_detector", {})
-    .get("implementation", "custom")
+    .get("implementation", "feature")
 )
 
+
+# -----------------------------
+# SPEECH FEATURES
+# -----------------------------
+
+speech_cfg = cfg.get(
+    "speech_detector",
+    {}
+)
+
+SPEECH_RMS_MIN = speech_cfg.get(
+    "rms_min",
+    0.003
+)
+
+SPEECH_RMS_MAX = speech_cfg.get(
+    "rms_max",
+    0.20
+)
+
+SPEECH_ZCR_MIN = speech_cfg.get(
+    "zcr_min",
+    0.02
+)
+
+SPEECH_ZCR_MAX = speech_cfg.get(
+    "zcr_max",
+    0.40
+)
+
+SPEECH_ENTROPY_MIN = speech_cfg.get(
+    "entropy_min",
+    3.0
+)
+
+SPEECH_CENTROID_MIN = speech_cfg.get(
+    "centroid_min",
+    300
+)
+
+SPEECH_CENTROID_MAX = speech_cfg.get(
+    "centroid_max",
+    4000
+)
+
+# -----------------------------
+# WHISPER FEATURES
+# -----------------------------
 
 WHISPER_DETECTOR_IMPLEMENTATION = (
     cfg

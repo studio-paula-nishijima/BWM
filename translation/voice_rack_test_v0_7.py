@@ -51,6 +51,17 @@ from configs.whisper import (
     WHISPER_DETECTOR_IMPLEMENTATION,
 
     BUFFER_SECONDS,
+    
+    SPEECH_RMS_MIN,
+    SPEECH_RMS_MAX,
+
+    SPEECH_ZCR_MIN,
+    SPEECH_ZCR_MAX,
+
+    SPEECH_ENTROPY_MIN,
+
+    SPEECH_CENTROID_MIN,
+    SPEECH_CENTROID_MAX,
 )
 
 
@@ -229,8 +240,21 @@ def main():
 
         speech_detector = create_speech_detector(
 
-            SPEECH_DETECTOR_IMPLEMENTATION
-
+            SPEECH_DETECTOR_IMPLEMENTATION,
+        
+            sample_rate=SAMPLE_RATE,
+        
+            rms_min=SPEECH_RMS_MIN,
+            rms_max=SPEECH_RMS_MAX,
+        
+            zcr_min=SPEECH_ZCR_MIN,
+            zcr_max=SPEECH_ZCR_MAX,
+        
+            entropy_min=SPEECH_ENTROPY_MIN,
+        
+            centroid_min=SPEECH_CENTROID_MIN,
+            centroid_max=SPEECH_CENTROID_MAX,
+        
         )
 
 
