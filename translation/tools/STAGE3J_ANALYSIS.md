@@ -13,7 +13,9 @@ Optional columns are `confidence`, `strength`, `speaker`, `distance`,
 `normal_speech`, `whisper`, and `uncertain`. Intervals are `[start, end)`;
 shared boundaries belong to the later interval. `uncertain` is retained in the
 derived frames but excluded from evaluation. Overlap warns by default and may
-be rejected with `--reject-overlaps`.
+be rejected with `--reject-overlaps`. For a single-WAV annotation file used
+through `--triplet`, `wav_file` may be omitted: the CLI adds the WAV filename
+in memory only, leaving the original annotation file unchanged.
 
 For one recording:
 

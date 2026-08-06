@@ -27,6 +27,13 @@ class LabelledWavAnalysisTests(unittest.TestCase):
             bad = self._csv(directory, "wav_file,start_seconds,end_seconds,label\na.wav,-1,2,other\n")
             with self.assertRaises(AnnotationValidationError): load_annotations(bad, directory)
 
+    def test_one_file_per_wav_annotations_can_use_a_transient_wav_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._csv(directory, "start_seconds,end_seconds,label\n0,.5,whisper\n")
+            with self.assertRaises(AnnotationValidationError): load_annotations(path, directory)
+            loaded = load_annotations(path, directory, default_wav_file="a.wav")
+            self.assertEqual(loaded.wav_file.iloc[0], "a.wav")
+
     def test_join_uses_half_open_boundaries_and_metadata(self):
         anns = pd.DataFrame({"wav_file":["a.wav", "a.wav"], "start_seconds":[0, .06], "end_seconds":[.06, .12], "label":["silence", "whisper"], "notes":["quiet", "soft"]})
         rows = pd.DataFrame({"frame":[0, 1, 2, 3], "rms":[1, 2, 3, 4]})
