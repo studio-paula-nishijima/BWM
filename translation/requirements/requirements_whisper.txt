@@ -11,3 +11,5 @@ sounddevice
 matplotlib
 webrtcvad
 soundfile
+torch==2.13.0
+torchaudio==2.11.0

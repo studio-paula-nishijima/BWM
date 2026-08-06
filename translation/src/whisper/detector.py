@@ -14,6 +14,7 @@ from .models import (
 )
 from .detectors.whisper_feature import FeatureWhisperDetector
 from .detectors.speech_feature import FeatureSpeechDetector
+from .detectors.speech_silero import SileroSpeechDetector
 
 
 
@@ -68,6 +69,11 @@ def create_speech_detector(
     if implementation == "feature":
 
         return FeatureSpeechDetector(
+            **kwargs
+        )
+    elif implementation == "silero":
+
+        return SileroSpeechDetector(
             **kwargs
         )
 
