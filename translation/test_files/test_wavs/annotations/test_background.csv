@@ -1,0 +1,3 @@
+start_seconds,end_seconds,label,confidence,notes
+0.00,0.20,background_noise,high,startup_click
+0.20,10.00,silence,medium,mostly studio silence occasional background sounds
