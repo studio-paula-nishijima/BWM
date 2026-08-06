@@ -61,6 +61,12 @@ class DetectorPipeline:
                 f"Unknown processing mode: {mode}"
             )
 
+    def reset(self):
+        """Reset stateful detectors at a real audio-stream boundary."""
+        for detector in (self.speech_detector, self.whisper_detector):
+            if detector is not None and hasattr(detector, "reset"):
+                detector.reset()
+
 
     def process(self, frame):
 

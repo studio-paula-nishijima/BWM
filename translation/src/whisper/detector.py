@@ -77,6 +77,12 @@ def create_speech_detector(
             **kwargs
         )
 
+    if implementation == "silero":
+
+        return SileroSpeechDetector(
+            **kwargs
+        )
+
     raise ValueError(
         f"Unknown speech detector: {implementation}"
     )

@@ -112,6 +112,8 @@ whisper_count = 0
 
 csv_logger = None
 
+detector = None
+
 
 audio_buffer = AudioRingBuffer(
     sample_rate=SAMPLE_RATE,
@@ -147,9 +149,13 @@ def shutdown(*_):
 
     global source
     global csv_logger
+    global detector
 
 
     print("\nShutdown...")
+
+    if detector:
+        detector.reset()
 
 
     if source:
@@ -204,6 +210,7 @@ def main():
 
     global last_trigger_time
     global whisper_count
+    global detector
 
 
     # -----------------------------
@@ -349,6 +356,10 @@ def main():
 
 
     source.open()
+
+    # A source open (including a new WAV replay or live-source restart) is a
+    # stream boundary, never an ordinary frame boundary.
+    detector.reset()
 
 
 

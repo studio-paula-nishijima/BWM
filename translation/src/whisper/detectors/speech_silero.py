@@ -1,146 +1,124 @@
-import torch
+"""Streaming Silero speech detector.
 
-from src.whisper.interfaces import SpeechDetector
-from src.whisper.models import SpeechDetectionResult
+The application supplies 30 ms (480 sample) frames, while Silero's 16 kHz
+streaming API consumes 512 samples.  This adapter joins source frames before
+calling Silero so that no artificial silence is introduced between frames.
+"""
+
+import logging
+
+import numpy as np
+
+from ..interfaces import SpeechDetector
+from ..models import SpeechDetectionResult
 
 
-class SileroSpeechDetector(SpeechDetector):
-
-    def __init__(self, **kwargs):
-
-        self.sample_rate = kwargs.get("sample_rate", 16000)
-        self.threshold = kwargs.get("threshold", 0.5)
-
-        if self.sample_rate != 16000:
-            raise ValueError(
-                f"SileroSpeechDetector requires a 16000 Hz sample rate "
-                f"(got {self.sample_rate})"
-            )
-import torch
-
-from src.whisper.interfaces import SpeechDetector
-from src.whisper.models import SpeechDetectionResult
+LOGGER = logging.getLogger(__name__)
 
 
 class SileroSpeechDetector(SpeechDetector):
+    """Adapt 480-sample pipeline frames to continuous 512-sample windows."""
 
-    def __init__(self, **kwargs):
+    WINDOW_SAMPLES = 512
 
-        self.sample_rate = kwargs.get(
-            "sample_rate",
-            16000
-        )
+    def __init__(
+        self,
+        sample_rate=16000,
+        threshold=0.5,
+        model=None,
+        model_loader=None,
+    ):
+        if sample_rate != 16000:
+            raise ValueError("SileroSpeechDetector currently requires 16000Hz audio")
 
-        self.threshold = kwargs.get(
-            "threshold",
-            0.5
-        )
+        self.sample_rate = sample_rate
+        self.threshold = threshold
+        self._torch = None
+        self.model = model if model is not None else self._load_model(model_loader)
+        self.reset()
 
-        if self.sample_rate != 16000:
-            raise ValueError(
-                "SileroSpeechDetector requires 16000Hz audio"
-            )
+    def _load_model(self, model_loader):
+        """Load one backend once; dependency injection keeps tests/network out of startup."""
+        if model_loader is not None:
+            return model_loader()
 
-
-        print("Loading Silero VAD model...")
+        try:
+            import torch
+        except ImportError as exc:
+            raise RuntimeError(
+                "Silero requires PyTorch. Install it before selecting "
+                "speech_detector.implementation: silero"
+            ) from exc
 
         torch.set_num_threads(1)
-
-        self.model, self.utils = torch.hub.load(
+        self._torch = torch
+        model, _utils = torch.hub.load(
             repo_or_dir="snakers4/silero-vad",
             model="silero_vad",
-            trust_repo=True,
             force_reload=False,
         )
+        return model
 
-        self.model.eval()
+    def reset(self):
+        """Start a fresh audio stream and clear Silero's recurrent state."""
+        self._samples = np.empty(0, dtype=np.float32)
+        self._latest_probability = None
+        if hasattr(self.model, "reset_states"):
+            self.model.reset_states()
 
-        print("Silero VAD loaded")
+    def _infer(self, samples):
+        if self._torch is None:
+            # Test/injected backends may intentionally accept raw NumPy arrays.
+            output = self.model(samples, self.sample_rate)
+        else:
+            tensor = self._torch.from_numpy(samples)
+            with self._torch.no_grad():
+                output = self.model(tensor, self.sample_rate)
 
+        if hasattr(output, "item"):
+            return float(output.item())
+        return float(output)
 
-    def classify(self, audio_frame):
+    def classify(self, frame):
+        """Classify all complete continuous Silero windows now available.
 
-        if not isinstance(audio_frame, torch.Tensor):
+        A call can process multiple windows if a future caller supplies a frame
+        larger than 512 samples.  The result represents the newest inference;
+        before the first complete window it explicitly reports a pending result.
+        """
+        samples = np.asarray(frame, dtype=np.float32)
+        if samples.ndim != 1:
+            raise ValueError("SileroSpeechDetector expects a mono 1-D NumPy array")
 
-            audio_frame = torch.from_numpy(
-                audio_frame
-            ).float()
+        self._samples = np.concatenate((self._samples, samples))
+        windows_processed = len(self._samples) // self.WINDOW_SAMPLES
 
+        for window_number in range(windows_processed):
+            start = window_number * self.WINDOW_SAMPLES
+            end = start + self.WINDOW_SAMPLES
+            window = self._samples[start:end]
+            self._latest_probability = self._infer(window)
 
-        # Ensure mono
-        if audio_frame.ndim > 1:
-            audio_frame = audio_frame.squeeze()
+        if windows_processed:
+            # Keep precisely the incomplete continuous tail for the next call.
+            # Copying releases the consumed prefix instead of retaining the full
+            # previous input array through a NumPy view.
+            self._samples = self._samples[
+                windows_processed * self.WINDOW_SAMPLES:
+            ].copy()
 
-
-        # Silero accepts:
-        # 512, 1024, 1536 samples @ 16kHz
-        #
-        # Pipeline currently provides:
-        # 1280 samples (80ms)
-        #
-        # Use nearest valid window:
-        #
-        # truncate to 1024 samples
-
-        if len(audio_frame) > 1024:
-
-            audio_frame = audio_frame[:1024]
-
-
-        elif len(audio_frame) < 512:
-
-            padded = torch.zeros(512)
-
-            padded[:len(audio_frame)] = audio_frame
-
-            audio_frame = padded
-
-
-        with torch.no_grad():
-
-            probability = self.model(
-                audio_frame,
-                self.sample_rate
-            ).item()
-
+        pending = self._latest_probability is None
+        probability = 0.0 if pending else self._latest_probability
+        features = {
+            "pending": pending,
+            "buffered_samples": len(self._samples),
+            "inference_ran": windows_processed > 0,
+            "windows_processed": windows_processed,
+        }
+        LOGGER.debug("Silero frame: %s", features)
 
         return SpeechDetectionResult(
-            is_speech=(
-                probability >= self.threshold
-            ),
+            is_speech=(not pending and probability >= self.threshold),
             speech_probability=probability,
+            features=features,
         )
-        print("Loading Silero VAD model...")
-
-        torch.set_num_threads(1)
-
-        self.model, _ = torch.hub.load(
-            repo_or_dir="snakers4/silero-vad",
-            model="silero_vad",
-            trust_repo=True,
-            force_reload=False,
-        )
-
-        self.model.eval()
-
-        print("Silero VAD loaded")
-
-    def detect(self, audio_frame):
-
-        if not isinstance(audio_frame, torch.Tensor):
-            audio_frame = torch.tensor(
-                audio_frame,
-                dtype=torch.float32,
-            )
-
-        with torch.no_grad():
-            speech_probability = self.model(
-                audio_frame,
-                self.sample_rate,
-            ).item()
-
-        return SpeechDetectionResult(
-            is_speech=speech_probability >= self.threshold,
-            speech_probability=speech_probability,
-        )
-        
