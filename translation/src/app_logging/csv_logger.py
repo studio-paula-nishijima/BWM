@@ -6,7 +6,12 @@ from datetime import datetime
 
 class WhisperCSVLogger:
 
-    def __init__(self, filename):
+    def __init__(
+        self,
+        filename,
+        processing_mode=None,
+        speech_detector_implementation=None,
+    ):
 
         self.filename = Path(filename)
 
@@ -27,11 +32,17 @@ class WhisperCSVLogger:
             self.file
         )
 
+        self.processing_mode = processing_mode
+        self.speech_detector_implementation = speech_detector_implementation
+
 
         self.writer.writerow([
 
             "frame",
             "timestamp",
+
+            "processing_mode",
+            "speech_detector_implementation",
 
             # -----------------------------
             # Speech detector
@@ -39,6 +50,7 @@ class WhisperCSVLogger:
 
             "is_speech",
             "speech_probability",
+            "speech_gate_open",
 
 
             # -----------------------------
@@ -46,6 +58,7 @@ class WhisperCSVLogger:
             # -----------------------------
 
             "is_whisper",
+            "whisper_processed",
             "trigger",
 
             "raw_score",
@@ -112,6 +125,10 @@ class WhisperCSVLogger:
 
             whisper = result.whisper
 
+            processing_mode = result.processing_mode
+            speech_gate_open = result.speech_gate_open
+            whisper_processed = result.whisper_processed
+
 
         # ---------------------------------
         # Legacy whisper-only result
@@ -122,6 +139,10 @@ class WhisperCSVLogger:
             speech = None
 
             whisper = result
+
+            processing_mode = self.processing_mode
+            speech_gate_open = True
+            whisper_processed = True
 
 
 
@@ -134,6 +155,9 @@ class WhisperCSVLogger:
             datetime.now()
             .isoformat(),
 
+            processing_mode,
+            self.speech_detector_implementation,
+
 
 
             # -----------------------------
@@ -143,15 +167,17 @@ class WhisperCSVLogger:
             (
                 speech.is_speech
                 if speech
-                else False
+                else None
             ),
 
 
             (
                 speech.speech_probability
                 if speech
-                else 0.0
+                else None
             ),
+
+            speech_gate_open,
 
 
 
@@ -160,6 +186,8 @@ class WhisperCSVLogger:
             # -----------------------------
 
             whisper.is_whisper,
+
+            whisper_processed,
 
             triggered,
 

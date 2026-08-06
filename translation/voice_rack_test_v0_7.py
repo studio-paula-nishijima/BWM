@@ -155,6 +155,26 @@ def shutdown(*_):
     print("\nShutdown...")
 
     if detector:
+        summary = detector.summary()
+        print(
+            "Run summary: "
+            f"frames={summary['total_frames']} "
+            f"speech_positive={summary['speech_positive_frames']} "
+            f"whisper_processed={summary['whisper_processed_frames']} "
+            f"gated_bypassed={summary['gated_bypassed_frames']} "
+            f"whisper_positive={summary['whisper_positive_frames']} "
+            f"triggers={summary['trigger_count']}"
+        )
+        if detector.mode == "shadow":
+            print(
+                "Shadow disagreement matrix: "
+                f"speech_false_whisper_true={summary['speech_false_whisper_true']} "
+                f"speech_true_whisper_false={summary['speech_true_whisper_false']} "
+                f"speech_true_whisper_true={summary['speech_true_whisper_true']} "
+                f"speech_false_whisper_false={summary['speech_false_whisper_false']}"
+            )
+
+    if detector:
         detector.reset()
 
 
@@ -310,7 +330,13 @@ def main():
 
 
     csv_logger = WhisperCSVLogger(
-        log_file
+        log_file,
+        processing_mode=PROCESSING_MODE,
+        speech_detector_implementation=(
+            SPEECH_DETECTOR_IMPLEMENTATION
+            if speech_detector is not None
+            else "none"
+        ),
     )
 
 
@@ -507,6 +533,8 @@ def main():
 
                     triggered = True
 
+                    detector.record_trigger()
+
                     last_trigger_time = now
 
                     whisper_count = 0
@@ -531,8 +559,10 @@ def main():
 
             print(
             
-                f"SPEECH={speech_result.is_speech} "
-                f"SPEECH_PROB={speech_result.speech_probability:.2f} "
+                f"SPEECH={speech_result.is_speech if speech_result else 'N/A'} "
+                f"SPEECH_PROB={(f'{speech_result.speech_probability:.2f}' if speech_result else 'N/A')} "
+                f"GATE={pipeline_result.speech_gate_open} "
+                f"WPROC={pipeline_result.whisper_processed} "
 
                 f"WHISPER={is_whisper} "            
                 f"COUNT={whisper_count} "            
