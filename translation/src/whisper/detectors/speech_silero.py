@@ -27,6 +27,7 @@ class SileroSpeechDetector(SpeechDetector):
         threshold=0.5,
         model=None,
         model_loader=None,
+        **_unused_kwargs,
     ):
         if sample_rate != 16000:
             raise ValueError("SileroSpeechDetector currently requires 16000Hz audio")

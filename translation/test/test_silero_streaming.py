@@ -35,6 +35,20 @@ class SileroStreamingTests(unittest.TestCase):
         self.model = RecordingSileroModel()
         self.detector = SileroSpeechDetector(model=self.model)
 
+    def test_accepts_feature_detector_options_passed_by_the_shared_factory(self):
+        detector = SileroSpeechDetector(
+            model=self.model,
+            rms_min=0.003,
+            rms_max=0.20,
+            zcr_min=0.02,
+            zcr_max=0.40,
+            entropy_min=3.0,
+            centroid_min=300,
+            centroid_max=4000,
+        )
+
+        self.assertIs(detector.model, self.model)
+
     def test_480_sample_frames_form_continuous_512_sample_windows(self):
         frames = [
             np.arange(
