@@ -1,0 +1,1 @@
+frame,timestamp,processing_mode,speech_detector_implementation,is_speech,speech_probability,speech_gate_open,is_whisper,whisper_processed,trigger,raw_score,whisper_probability,rms,zcr,entropy,voicing,hnr,spectral_centroid,band_energy_low,band_energy_mid,band_energy_high,temporal_score,formant_score

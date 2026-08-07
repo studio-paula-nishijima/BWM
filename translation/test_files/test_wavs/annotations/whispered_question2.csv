@@ -2,4 +2,4 @@ start_seconds,end_seconds,label,confidence,notes
 0.00,0.50,background_noise,high,startup_click click
 0.50,2.08,silence,medium,unintended voice
 2.08,8.68,whisper,high,
-8.68,10.00,silence,medium
+8.68,10.00,silence,medium,
