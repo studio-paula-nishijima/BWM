@@ -236,11 +236,11 @@ def main():
     global detector
 
     if (
-        WHISPER_CLASSIFIER_IMPLEMENTATION == "grouped_v1"
+        WHISPER_CLASSIFIER_IMPLEMENTATION in ("grouped_v1", "temporal_v1")
         and (PROCESSING_MODE == "direct" or SPEECH_DETECTOR_IMPLEMENTATION != "silero")
     ):
         raise RuntimeError(
-            "grouped_v1 requires processing_mode speech_gate/shadow and "
+            "Silero-evidence classifiers require processing_mode speech_gate/shadow and "
             "speech_detector.implementation: silero"
         )
 
@@ -276,7 +276,7 @@ def main():
     if PROCESSING_MODE in (
         "speech_gate",
         "shadow"
-    ):
+    ) or WHISPER_CLASSIFIER_IMPLEMENTATION in ("grouped_v1", "temporal_v1") or WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION in ("grouped_v1", "temporal_v1"):
 
         speech_detector = create_speech_detector(
 
@@ -548,7 +548,7 @@ def main():
             if (
                 whisper_count
                 >=
-                WHISPER_FRAMES_REQUIRED
+                (result.confirmation_frames or WHISPER_FRAMES_REQUIRED)
             ):
 
                 if (
@@ -600,6 +600,9 @@ def main():
                 f"GRP={result.group_count if result.group_count is not None else 'N/A'} "
                 f"EFF={result.effective_group_score if result.effective_group_score is not None else 'N/A'} "
                 f"HSIL={result.high_silero_normal_evidence if result.high_silero_normal_evidence is not None else 'N/A'} "
+                f"TMED={result.temporal_v1_silero_median if result.temporal_v1_silero_median is not None else 'N/A'} "
+                f"TLSTD={result.temporal_v1_low_proportion_std if result.temporal_v1_low_proportion_std is not None else 'N/A'} "
+                f"TRUN={result.temporal_v1_qualifying_run if result.temporal_v1_qualifying_run is not None else 'N/A'} "
                 f"CLASSIFIER={result.whisper_classifier_implementation or WHISPER_CLASSIFIER_IMPLEMENTATION} "
                 f"RMS={result.rms:.4f} "            
                 f"ZCR={result.zcr:.3f} "            

@@ -85,7 +85,7 @@ class DetectorPipeline:
                 f"Unknown processing mode: {mode}"
             )
         if mode == "direct" and any(getattr(detector, "requires_speech_evidence", False) for detector in (whisper_detector, comparison_whisper_detector)):
-            raise ValueError("grouped_v1 requires Silero evidence and cannot run in direct mode")
+            raise ValueError("Silero-evidence classifiers require speech_gate or shadow mode and cannot run in direct mode")
 
     def reset(self):
         """Reset stateful detectors at a real audio-stream boundary."""
@@ -155,14 +155,18 @@ class DetectorPipeline:
             comparison = self._classify(self.comparison_whisper_detector, frame, speech_result)
             if comparison.whisper_classifier_implementation == "grouped_v1":
                 whisper_result.grouped_v1_is_whisper = comparison.is_whisper
+            elif comparison.whisper_classifier_implementation == "temporal_v1":
+                whisper_result.temporal_v1_is_whisper = comparison.is_whisper
             else:
                 whisper_result.legacy_is_whisper = comparison.is_whisper
         if whisper_result.whisper_classifier_implementation is None:
             whisper_result.whisper_classifier_implementation = self.classifier_implementation
         if self.classifier_implementation == "legacy":
             whisper_result.legacy_is_whisper = whisper_result.is_whisper
-        else:
+        elif self.classifier_implementation == "grouped_v1":
             whisper_result.grouped_v1_is_whisper = whisper_result.is_whisper
+        elif self.classifier_implementation == "temporal_v1":
+            whisper_result.temporal_v1_is_whisper = whisper_result.is_whisper
 
 
         result = DetectorPipelineResult(

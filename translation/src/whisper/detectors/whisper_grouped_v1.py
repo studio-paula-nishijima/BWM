@@ -74,6 +74,12 @@ class GroupedV1WhisperDetector:
         raw = effective >= 2
         stage2 = self._candidate and raw
         self._stage2_count = self._stage2_count + 1 if stage2 else 0
+        analysis = {name: values.get(name) for name in (
+            "voicing", "hnr", "low_proportion_std", "mid_proportion_std", "high_proportion_std",
+            "zcr_std", "entropy_std", "spectral_flux", "cepstral_peak_prominence", "spectral_slope",
+            "spectral_rolloff", "spectral_flatness"
+        )}
+        analysis["spectral_centroid_std"] = values.get("centroid_std")
         return WhisperDetectionResult(
             is_whisper=stage2, raw_score=group_count, rms=values["rms"], zcr=values["zcr"], entropy=values["entropy"],
             spectral_centroid=values["centroid"], band_energy_low=low, band_energy_mid=mid, band_energy_high=high,
@@ -89,4 +95,5 @@ class GroupedV1WhisperDetector:
             group_count=group_count, effective_group_score=effective, grouped_v1_raw_is_whisper=raw,
             stage2_is_whisper=stage2, stage2_consecutive_count=self._stage2_count,
             grouped_v1_is_whisper=stage2, whisper_classifier_implementation="grouped_v1",
+            **analysis,
         )

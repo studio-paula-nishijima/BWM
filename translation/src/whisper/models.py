@@ -85,6 +85,32 @@ class WhisperDetectionResult:
     legacy_is_whisper: bool = None
     grouped_v1_is_whisper: bool = None
     whisper_classifier_implementation: str = None
+    confirmation_frames: int = None
+
+    # Stage 3L temporal_v1 decision observability.
+    temporal_v1_window_full: bool = None
+    temporal_v1_silero_median: float = None
+    temporal_v1_low_proportion_std: float = None
+    temporal_v1_silero_min_pass: bool = None
+    temporal_v1_silero_max_pass: bool = None
+    temporal_v1_low_proportion_std_pass: bool = None
+    temporal_v1_raw_is_whisper: bool = None
+    temporal_v1_is_whisper: bool = None
+    temporal_v1_qualifying_run: int = None
+
+    # Analysis-only Stage 3L acoustic/temporal observability.  ``None`` is
+    # used when history required by a measurement is unavailable.
+    low_proportion_std: float = None
+    mid_proportion_std: float = None
+    high_proportion_std: float = None
+    zcr_std: float = None
+    entropy_std: float = None
+    spectral_centroid_std: float = None
+    spectral_flux: float = None
+    spectral_rolloff: float = None
+    spectral_flatness: float = None
+    spectral_slope: float = None
+    cepstral_peak_prominence: float = None
 
     feature_scores: Dict[str, float] = field(
         default_factory=dict

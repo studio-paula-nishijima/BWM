@@ -25,8 +25,9 @@ whisper_detector:
 # Active whisper classifier options:
 # - legacy: existing RMS/ZCR/entropy classifier; retains whisper_probability.
 # - grouped_v1: Stage 1 low-Silero candidate state plus grouped feature evidence.
-#   Requires speech_detector.implementation: silero and speech_gate or shadow.
-# compare_implementation may be omitted, legacy, or grouped_v1. When present,
+# - temporal_v1: rolling Silero median plus low-band proportion variation.
+#   Both require speech_detector.implementation: silero and speech_gate or shadow.
+# compare_implementation may be omitted, legacy, grouped_v1, or temporal_v1. When present,
 # it is logged alongside the primary; it never drives trigger/actuation.
 # Classifier identity is deliberately independent of processing_mode.
 whisper_classifier:
@@ -42,6 +43,12 @@ whisper_classifier:
   silero_window_frames: 10
   high_silero_threshold: 0.50
   high_silero_required_frames: 3
+  # temporal_v1 only; analysis-only rolling statistics use this same window.
+  rolling_window_frames: 10
+  silero_median_min: 0.005
+  silero_median_max: 0.50
+  low_proportion_std_min: 0.05
+  confirmation_frames: 20
 
 # Legacy classifier smoothing settings; grouped_v1 keeps the existing external
 # whisper_frames_required trigger counter instead of using these as its score.

@@ -14,6 +14,7 @@ from .models import (
 )
 from .detectors.whisper_feature import FeatureWhisperDetector
 from .detectors.whisper_grouped_v1 import GroupedV1WhisperDetector
+from .detectors.whisper_temporal_v1 import TemporalV1WhisperDetector
 from .detectors.speech_feature import FeatureSpeechDetector
 from .detectors.speech_silero import SileroSpeechDetector
 
@@ -51,6 +52,8 @@ def create_whisper_detector(
         )
     if implementation == "grouped_v1":
         return GroupedV1WhisperDetector(**kwargs)
+    if implementation == "temporal_v1":
+        return TemporalV1WhisperDetector(**kwargs)
 
 
     raise ValueError(

@@ -43,15 +43,6 @@ class FeatureWhisperDetector:
     
         values = self.features.extract(frame)
         
-        print(
-            "DETECTOR INPUT:",
-            type(frame),
-            frame.shape,
-            frame[:5],
-            "min=", frame.min(),
-            "max=", frame.max()
-        )
-    
         rms = values["rms"]
         zcr = values["zcr"]
         entropy = values["entropy"]
@@ -111,6 +102,7 @@ class FeatureWhisperDetector:
     
             # New observational features only
             spectral_centroid=values["centroid"],
+            voicing=values["voicing"], hnr=values["hnr"],
     
             band_energy_low=values["band_low"],
             band_energy_mid=values["band_mid"],
@@ -121,10 +113,20 @@ class FeatureWhisperDetector:
             band_ratio_high=values["ratio_high"],
     
             raw_score=score,
+            total_band_energy=values["total_band_energy"],
+            low_proportion=values["low_proportion"], mid_proportion=values["mid_proportion"], high_proportion=values["high_proportion"],
+            low_proportion_std=values["low_proportion_std"], mid_proportion_std=values["mid_proportion_std"], high_proportion_std=values["high_proportion_std"],
+            zcr_std=values["zcr_std"], entropy_std=values["entropy_std"], spectral_centroid_std=values["centroid_std"],
+            spectral_flux=values["spectral_flux"], cepstral_peak_prominence=values["cepstral_peak_prominence"],
+            spectral_slope=values["spectral_slope"], spectral_rolloff=values["spectral_rolloff"], spectral_flatness=values["spectral_flatness"],
     
             feature_scores=feature_scores
         )
     
     
         return result
+
+    def reset(self):
+        self.temporal.reset()
+        self.features.reset()
     

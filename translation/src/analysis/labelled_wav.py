@@ -242,6 +242,22 @@ def evaluation_summary(frames, full_pipeline=False):
     return pd.DataFrame(rows)
 
 
+def qualifying_run_summary(frames, column="temporal_v1_raw_is_whisper"):
+    """Return each labelled segment's maximum consecutive qualifying-frame run."""
+    if column not in frames:
+        return pd.DataFrame(columns=["wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label", "max_qualifying_run"])
+    rows = []
+    labelled = frames.loc[frames.annotation_label.notna()]
+    for keys, segment in labelled.groupby(["wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label"], dropna=False):
+        flags = segment[column].astype(str).str.lower().eq("true").to_numpy()
+        run = maximum = 0
+        for flag in flags:
+            run = run + 1 if flag else 0
+            maximum = max(maximum, run)
+        rows.append(dict(zip(["wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label"], keys), max_qualifying_run=maximum))
+    return pd.DataFrame(rows)
+
+
 def analyse_triplets(triplets, output_dir, frame_seconds=0.03, weighting="frame", full_pipeline=False, reject_overlaps=False):
     """Analyse iterable of (wav_path, log_path, annotation_path) and write the four exports."""
     all_frames = []
@@ -256,8 +272,10 @@ def analyse_triplets(triplets, output_dir, frame_seconds=0.03, weighting="frame"
     summaries = feature_summary(frames, weighting)
     separation = feature_separation(frames, weighting, full_pipeline)
     evaluation = evaluation_summary(frames, full_pipeline)
+    qualifying_runs = qualifying_run_summary(frames)
     frames.to_csv(output / "labelled_frames.csv", index=False)
     summaries.to_csv(output / "feature_summary.csv", index=False)
     separation.to_csv(output / "feature_separation.csv", index=False)
     evaluation.to_csv(output / "evaluation_summary.csv", index=False)
-    return {"labelled_frames": frames, "feature_summary": summaries, "feature_separation": separation, "evaluation_summary": evaluation}
+    qualifying_runs.to_csv(output / "qualifying_run_summary.csv", index=False)
+    return {"labelled_frames": frames, "feature_summary": summaries, "feature_separation": separation, "evaluation_summary": evaluation, "qualifying_run_summary": qualifying_runs}

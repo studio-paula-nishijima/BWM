@@ -92,6 +92,8 @@ class WhisperCSVLogger:
 
             "temporal_score",
             "formant_score",
+            "low_proportion_std", "mid_proportion_std", "high_proportion_std", "zcr_std", "entropy_std", "spectral_centroid_std", "spectral_flux", "cepstral_peak_prominence", "spectral_slope", "spectral_rolloff", "spectral_flatness",
+            "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run", "confirmation_frames",
 
         ])
 
@@ -199,7 +201,6 @@ class WhisperCSVLogger:
 
             triggered,
 
-
             whisper.raw_score,
 
             whisper.whisper_probability,
@@ -245,6 +246,12 @@ class WhisperCSVLogger:
             whisper.temporal_score,
 
             whisper.formant_score,
+            *[getattr(whisper, name, None) for name in (
+                "low_proportion_std", "mid_proportion_std", "high_proportion_std", "zcr_std", "entropy_std", "spectral_centroid_std", "spectral_flux", "cepstral_peak_prominence", "spectral_slope", "spectral_rolloff", "spectral_flatness",
+            )],
+            *[getattr(whisper, name, None) for name in (
+                "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run", "confirmation_frames",
+            )],
 
         ])
 
