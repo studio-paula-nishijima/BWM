@@ -3,14 +3,15 @@ frame_ms: 30
 device: "plughw:2,0"
 
 # direct runs only legacy; grouped_v1 requires Silero evidence.
-processing_mode: speech_gate
+processing_mode: shadow
 
 speech_detector:
   implementation: silero
   threshold: 0.5
 
 whisper_detector:
-  implementation: feature
+  implementation: grouped_v1
+  compare implementation: legacy
 
 # Classifier identity is deliberately independent of processing_mode.
 whisper_classifier:
