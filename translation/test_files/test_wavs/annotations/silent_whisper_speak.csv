@@ -1,0 +1,7 @@
+start_seconds,end_seconds,label,confidence,notes
+0.00,0.20,background_noise,high,startup_click
+0.20,2.80,silence,high,studio_tone
+2.80,5.50,whisper,high,
+5.50,6.40,silence,medium,speech_pause
+6.40,9.64,normal_speech,high,
+9.64,10.00,silence,high,studio_tone

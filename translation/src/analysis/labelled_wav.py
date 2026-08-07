@@ -38,13 +38,18 @@ def wav_duration_seconds(path):
         return handle.getnframes() / float(handle.getframerate())
 
 
-def load_annotations(path, wav_root=None, reject_overlaps=False):
+def load_annotations(path, wav_root=None, reject_overlaps=False, default_wav_file=None):
     """Load and validate an interval CSV without modifying it.
 
     Intervals use half-open semantics: ``[start_seconds, end_seconds)``.  This
     makes a frame on a shared boundary belong to the following segment.
     """
     annotations = pd.read_csv(path)
+    # A one-file-per-recording annotation CSV can omit wav_file when its caller
+    # supplies the recording name.  This is a convenience only; it is added to
+    # the in-memory derived table and never written back to the source CSV.
+    if "wav_file" not in annotations.columns and default_wav_file is not None:
+        annotations.insert(0, "wav_file", Path(default_wav_file).name)
     missing = REQUIRED_COLUMNS - set(annotations.columns)
     if missing:
         raise AnnotationValidationError("Missing required columns: " + ", ".join(sorted(missing)))
@@ -233,7 +238,9 @@ def analyse_triplets(triplets, output_dir, frame_seconds=0.03, weighting="frame"
     all_frames = []
     for wav_path, log_path, annotation_path in triplets:
         wav_path = Path(wav_path)
-        anns = load_annotations(annotation_path, wav_root=wav_path.parent, reject_overlaps=reject_overlaps)
+        anns = load_annotations(annotation_path, wav_root=wav_path.parent,
+                                reject_overlaps=reject_overlaps,
+                                default_wav_file=wav_path.name)
         all_frames.append(join_frames_to_annotations(pd.read_csv(log_path), anns, wav_path.name, frame_seconds))
     frames = pd.concat(all_frames, ignore_index=True) if all_frames else pd.DataFrame()
     output = Path(output_dir); output.mkdir(parents=True, exist_ok=True)
