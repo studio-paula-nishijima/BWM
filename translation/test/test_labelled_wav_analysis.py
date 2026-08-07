@@ -88,5 +88,12 @@ class LabelledWavAnalysisTests(unittest.TestCase):
         self.assertIn("[[", row.confusion_matrix)
         self.assertTrue(np.isfinite(row.candidate_threshold))
 
+    def test_feature_separation_handles_extreme_feature_ranges(self):
+        frames = self._frames()
+        frames["band_energy"] = [0., 0., 0., 1e300, np.inf, np.nan]
+        separation = feature_separation(frames, "frame")
+        row = separation[(separation.comparison == "whisper_vs_normal_speech") & (separation.feature == "band_energy")].iloc[0]
+        self.assertTrue(np.isfinite(row.distribution_overlap))
+
 
 if __name__ == "__main__": unittest.main()

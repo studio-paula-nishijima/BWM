@@ -174,6 +174,8 @@ def _separation_rows(data, positive_labels, comparison, stage, weighting):
             work = work.groupby(["wav_file", "annotation_start_seconds", "annotation_end_seconds", "positive"], dropna=False)[feature].mean().reset_index()
             subset, ys = work[[feature]], work.positive.to_numpy()
         values = subset[feature].to_numpy(dtype=float)
+        finite = np.isfinite(values)
+        values, ys = values[finite], ys[finite]
         if len(values) < 2 or not ys.any() or ys.all():
             continue
         positive, negative = values[ys], values[~ys]
@@ -194,9 +196,16 @@ def _separation_rows(data, positive_labels, comparison, stage, weighting):
             candidate = (f1, threshold, precision, recall, tn, fp, fn, tp)
             if best is None or candidate[0] > best[0]: best = candidate
         # overlap coefficient estimated as shared histogram mass (documented in output).
-        bins = np.histogram_bin_edges(values, bins="auto")
-        hp, _ = np.histogram(positive, bins=bins, density=True); hn, _ = np.histogram(negative, bins=bins, density=True)
-        overlap = float(np.minimum(hp, hn).sum() * np.diff(bins).mean()) if len(bins) > 1 else np.nan
+        # ``auto`` can derive an impractically tiny width when a mostly-flat
+        # feature has an outlier, producing millions of bins.  A bounded
+        # count keeps this descriptive overlap metric safe for raw logs.
+        if values.min() == values.max():
+            overlap = 1.0
+        else:
+            bin_count = min(32, max(2, int(np.sqrt(len(values)))))
+            bins = np.linspace(values.min(), values.max(), bin_count + 1)
+            hp, _ = np.histogram(positive, bins=bins, density=True); hn, _ = np.histogram(negative, bins=bins, density=True)
+            overlap = float(np.minimum(hp, hn).sum() * np.diff(bins).mean())
         rows.append({"stage": stage, "comparison": comparison, "feature": feature, "weighting": weighting,
                      "median_difference": median_difference, "effect_size": effect, "roc_auc": auc,
                      "distribution_overlap": overlap, "overlap_measure": "shared_histogram_mass",
