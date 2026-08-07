@@ -2,17 +2,32 @@ sample_rate: 16000
 frame_ms: 30
 device: "plughw:2,0"
 
-# direct runs only legacy; grouped_v1 requires Silero evidence.
+# Processing modes:
+# - direct: runs the primary legacy classifier without a speech detector.
+#           grouped_v1 is rejected because it requires real Silero evidence.
+# - speech_gate: the speech detector gates legacy whisper processing.
+# - shadow: runs speech and whisper classifiers every frame; speech does not
+#           suppress the primary whisper decision. Recommended for analysis.
 processing_mode: shadow
 
+# Speech detector backends:
+# - silero: streaming Silero VAD at 16 kHz. Required by grouped_v1.
+# - feature: legacy threshold-based speech detector (legacy-only use).
 speech_detector:
   implementation: silero
   threshold: 0.5
 
+# Compatibility-only legacy detector setting. The active classifier is selected
+# below by whisper_classifier.implementation; leave this as feature.
 whisper_detector:
-  implementation: grouped_v1
-  compare implementation: legacy
+  implementation: feature
 
+# Active whisper classifier options:
+# - legacy: existing RMS/ZCR/entropy classifier; retains whisper_probability.
+# - grouped_v1: Stage 1 low-Silero candidate state plus grouped feature evidence.
+#   Requires speech_detector.implementation: silero and speech_gate or shadow.
+# compare_implementation may be omitted, legacy, or grouped_v1. When present,
+# it is logged alongside the primary; it never drives trigger/actuation.
 # Classifier identity is deliberately independent of processing_mode.
 whisper_classifier:
   implementation: grouped_v1
@@ -28,8 +43,12 @@ whisper_classifier:
   high_silero_threshold: 0.50
   high_silero_required_frames: 3
 
+# Legacy classifier smoothing settings; grouped_v1 keeps the existing external
+# whisper_frames_required trigger counter instead of using these as its score.
 decision_window: 10
 trigger_ratio: 0.6
+
+# Existing trigger/cooldown settings; unchanged by classifier selection.
 whisper_frames_required: 10
 cooldown_seconds: 7
 run_duration_seconds: 600
@@ -42,5 +61,7 @@ zcr_max: 0.3
 entropy_min: 4.5
 
 audio_buffer:
+  # enabled: retain recent frames in the application ring buffer.
+  # seconds: buffer duration in seconds.
   enabled: true
   seconds: 5
