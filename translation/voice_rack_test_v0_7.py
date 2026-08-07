@@ -49,6 +49,9 @@ from configs.whisper import (
 
     SPEECH_DETECTOR_IMPLEMENTATION,
     WHISPER_DETECTOR_IMPLEMENTATION,
+    WHISPER_CLASSIFIER_SETTINGS,
+    WHISPER_CLASSIFIER_IMPLEMENTATION,
+    WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION,
 
     BUFFER_SECONDS,
     
@@ -232,6 +235,15 @@ def main():
     global whisper_count
     global detector
 
+    if (
+        WHISPER_CLASSIFIER_IMPLEMENTATION == "grouped_v1"
+        and (PROCESSING_MODE == "direct" or SPEECH_DETECTOR_IMPLEMENTATION != "silero")
+    ):
+        raise RuntimeError(
+            "grouped_v1 requires processing_mode speech_gate/shadow and "
+            "speech_detector.implementation: silero"
+        )
+
 
     # -----------------------------
     # DETECTORS
@@ -239,7 +251,7 @@ def main():
 
     whisper_detector = create_whisper_detector(
 
-        WHISPER_DETECTOR_IMPLEMENTATION,
+        WHISPER_CLASSIFIER_IMPLEMENTATION,
 
         sample_rate=SAMPLE_RATE,
 
@@ -252,7 +264,8 @@ def main():
         entropy_min=ENTROPY_MIN,
 
         decision_window=DECISION_WINDOW,
-        trigger_ratio=TRIGGER_RATIO
+        trigger_ratio=TRIGGER_RATIO,
+        **WHISPER_CLASSIFIER_SETTINGS
 
     )
 
@@ -285,13 +298,26 @@ def main():
         )
 
 
+    comparison_whisper_detector = None
+    if WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION:
+        comparison_whisper_detector = create_whisper_detector(
+            WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION,
+            sample_rate=SAMPLE_RATE,
+            rms_min=RMS_MIN, rms_max=RMS_MAX, zcr_min=ZCR_MIN,
+            zcr_max=ZCR_MAX, entropy_min=ENTROPY_MIN,
+            decision_window=DECISION_WINDOW, trigger_ratio=TRIGGER_RATIO,
+            **WHISPER_CLASSIFIER_SETTINGS
+        )
+
     detector = DetectorPipeline(
 
         whisper_detector,
 
         speech_detector,
 
-        PROCESSING_MODE
+        PROCESSING_MODE,
+        comparison_whisper_detector=comparison_whisper_detector,
+        classifier_implementation=WHISPER_CLASSIFIER_IMPLEMENTATION,
 
     )
 
@@ -337,6 +363,7 @@ def main():
             if speech_detector is not None
             else "none"
         ),
+        whisper_classifier_implementation=WHISPER_CLASSIFIER_IMPLEMENTATION,
     )
 
 
@@ -404,6 +431,7 @@ def main():
     print(
         f"Processing mode: {PROCESSING_MODE}"
     )
+    print(f"Whisper classifier: {WHISPER_CLASSIFIER_IMPLEMENTATION}")
 
 
     print(
@@ -568,6 +596,11 @@ def main():
                 f"COUNT={whisper_count} "            
                 f"SCORE={result.raw_score}/3 "            
                 f"PROB={result.whisper_probability:.2f} "            
+                f"CAND={result.stage1_candidate if result.stage1_candidate is not None else 'N/A'} "
+                f"GRP={result.group_count if result.group_count is not None else 'N/A'} "
+                f"EFF={result.effective_group_score if result.effective_group_score is not None else 'N/A'} "
+                f"HSIL={result.high_silero_normal_evidence if result.high_silero_normal_evidence is not None else 'N/A'} "
+                f"CLASSIFIER={result.whisper_classifier_implementation or WHISPER_CLASSIFIER_IMPLEMENTATION} "
                 f"RMS={result.rms:.4f} "            
                 f"ZCR={result.zcr:.3f} "            
                 f"ENT={result.entropy:.2f} "            

@@ -92,6 +92,18 @@ WHISPER_DETECTOR_IMPLEMENTATION = (
     .get("implementation", "feature")
 )
 
+WHISPER_CLASSIFIER_CONFIG = cfg.get("whisper_classifier", {})
+WHISPER_CLASSIFIER_IMPLEMENTATION = WHISPER_CLASSIFIER_CONFIG.get(
+    "implementation", "legacy"
+)
+WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION = WHISPER_CLASSIFIER_CONFIG.get(
+    "compare_implementation"
+)
+WHISPER_CLASSIFIER_SETTINGS = {
+    key: value for key, value in WHISPER_CLASSIFIER_CONFIG.items()
+    if key not in {"implementation", "compare_implementation"}
+}
+
 
 
 # -----------------------------

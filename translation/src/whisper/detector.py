@@ -13,6 +13,7 @@ from .models import (
     SpeechDetectionResult
 )
 from .detectors.whisper_feature import FeatureWhisperDetector
+from .detectors.whisper_grouped_v1 import GroupedV1WhisperDetector
 from .detectors.speech_feature import FeatureSpeechDetector
 from .detectors.speech_silero import SileroSpeechDetector
 
@@ -39,11 +40,17 @@ def create_whisper_detector(
         transformer
     """
 
-    if implementation == "feature":
-
+    if implementation in ("feature", "legacy"):
+        allowed = {
+            key: value for key, value in kwargs.items()
+            if key in {"sample_rate", "rms_min", "rms_max", "zcr_min", "zcr_max",
+                       "entropy_min", "decision_window", "trigger_ratio"}
+        }
         return FeatureWhisperDetector(
-            **kwargs
+            **allowed
         )
+    if implementation == "grouped_v1":
+        return GroupedV1WhisperDetector(**kwargs)
 
 
     raise ValueError(

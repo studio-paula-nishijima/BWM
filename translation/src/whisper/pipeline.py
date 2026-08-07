@@ -50,11 +50,15 @@ class DetectorPipeline:
         self,
         whisper_detector,
         speech_detector=None,
-        mode="direct"
+        mode="direct",
+        comparison_whisper_detector=None,
+        classifier_implementation="legacy"
     ):
 
         self.whisper_detector = whisper_detector
         self.speech_detector = speech_detector
+        self.comparison_whisper_detector = comparison_whisper_detector
+        self.classifier_implementation = classifier_implementation
 
         self.mode = mode
 
@@ -80,10 +84,12 @@ class DetectorPipeline:
             raise ValueError(
                 f"Unknown processing mode: {mode}"
             )
+        if mode == "direct" and any(getattr(detector, "requires_speech_evidence", False) for detector in (whisper_detector, comparison_whisper_detector)):
+            raise ValueError("grouped_v1 requires Silero evidence and cannot run in direct mode")
 
     def reset(self):
         """Reset stateful detectors at a real audio-stream boundary."""
-        for detector in (self.speech_detector, self.whisper_detector):
+        for detector in (self.speech_detector, self.whisper_detector, self.comparison_whisper_detector):
             if detector is not None and hasattr(detector, "reset"):
                 detector.reset()
 
@@ -97,10 +103,11 @@ class DetectorPipeline:
         # Speech stage
         # ---------------------------------
 
+        needs_speech = any(getattr(detector, "requires_speech_evidence", False) for detector in (self.whisper_detector, self.comparison_whisper_detector))
         if self.mode in (
             "speech_gate",
             "shadow"
-        ):
+        ) or needs_speech:
 
             if self.speech_detector is None:
                 raise RuntimeError(
@@ -119,14 +126,14 @@ class DetectorPipeline:
         speech_gate_open = self.mode != "speech_gate"
         whisper_processed = True
 
-        if self.mode == "speech_gate":
+        if self.mode == "speech_gate" and not getattr(self.whisper_detector, "requires_speech_evidence", False):
 
             speech_gate_open = speech_result.is_speech
 
             if speech_gate_open:
 
                 whisper_result = (
-                    self.whisper_detector.classify(frame)
+                    self._classify(self.whisper_detector, frame, speech_result)
                 )
 
             else:
@@ -141,8 +148,21 @@ class DetectorPipeline:
             # shadow
 
             whisper_result = (
-                self.whisper_detector.classify(frame)
+                self._classify(self.whisper_detector, frame, speech_result)
             )
+
+        if self.comparison_whisper_detector is not None:
+            comparison = self._classify(self.comparison_whisper_detector, frame, speech_result)
+            if comparison.whisper_classifier_implementation == "grouped_v1":
+                whisper_result.grouped_v1_is_whisper = comparison.is_whisper
+            else:
+                whisper_result.legacy_is_whisper = comparison.is_whisper
+        if whisper_result.whisper_classifier_implementation is None:
+            whisper_result.whisper_classifier_implementation = self.classifier_implementation
+        if self.classifier_implementation == "legacy":
+            whisper_result.legacy_is_whisper = whisper_result.is_whisper
+        else:
+            whisper_result.grouped_v1_is_whisper = whisper_result.is_whisper
 
 
         result = DetectorPipelineResult(
@@ -154,6 +174,12 @@ class DetectorPipeline:
         )
         self._record_result(result)
         return result
+
+    @staticmethod
+    def _classify(detector, frame, speech_result):
+        if getattr(detector, "requires_speech_evidence", False):
+            return detector.classify(frame, speech_result=speech_result)
+        return detector.classify(frame)
 
     def _record_result(self, result):
         """Accumulate run-level observability without affecting decisions."""

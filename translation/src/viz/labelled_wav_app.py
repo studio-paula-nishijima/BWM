@@ -61,6 +61,9 @@ visible = st.multiselect("Feature traces", features, default=features[:3])
 if visible:
     feature_fig = go.Figure()
     for column in visible: feature_fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column], name=column))
+    # Keep this panel aligned with the decision panel above: both now use the
+    # same explicit zoom range instead of Plotly independently padding data.
+    feature_fig.update_layout(xaxis_range=[start, finish])
     st.plotly_chart(feature_fig, use_container_width=True)
 st.subheader("Annotations in view")
 columns = [c for c in ["annotation_label", "annotation_start_seconds", "annotation_end_seconds", *[f"annotation_{x}" for x in OPTIONAL_COLUMNS]] if c in view]

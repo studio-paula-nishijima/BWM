@@ -11,6 +11,7 @@ class WhisperCSVLogger:
         filename,
         processing_mode=None,
         speech_detector_implementation=None,
+        whisper_classifier_implementation=None,
     ):
 
         self.filename = Path(filename)
@@ -34,6 +35,7 @@ class WhisperCSVLogger:
 
         self.processing_mode = processing_mode
         self.speech_detector_implementation = speech_detector_implementation
+        self.whisper_classifier_implementation = whisper_classifier_implementation
 
 
         self.writer.writerow([
@@ -63,6 +65,12 @@ class WhisperCSVLogger:
 
             "raw_score",
             "whisper_probability",
+            "stage1_silero_threshold", "stage1_silero_low_pass", "stage1_enter_count", "stage1_exit_count", "stage1_candidate",
+            "zcr_threshold", "zcr_pass", "centroid_threshold", "centroid_pass", "group_a_pass",
+            "entropy_threshold", "group_b_pass", "total_band_energy", "low_proportion", "mid_proportion", "high_proportion", "low_proportion_threshold", "group_c_pass",
+            "silero_rolling_median", "high_silero_threshold", "high_silero_raw", "high_silero_count", "high_silero_normal_evidence", "silero_penalty",
+            "group_count", "effective_group_score", "grouped_v1_raw_is_whisper", "stage2_is_whisper", "stage2_consecutive_count",
+            "legacy_is_whisper", "grouped_v1_is_whisper", "whisper_classifier_implementation", "final_trigger",
 
 
             # -----------------------------
@@ -195,6 +203,16 @@ class WhisperCSVLogger:
             whisper.raw_score,
 
             whisper.whisper_probability,
+            *[getattr(whisper, name, None) for name in (
+                "stage1_silero_threshold", "stage1_silero_low_pass", "stage1_enter_count", "stage1_exit_count", "stage1_candidate",
+                "zcr_threshold", "zcr_pass", "centroid_threshold", "centroid_pass", "group_a_pass", "entropy_threshold", "group_b_pass",
+                "total_band_energy", "low_proportion", "mid_proportion", "high_proportion", "low_proportion_threshold", "group_c_pass",
+                "silero_rolling_median", "high_silero_threshold", "high_silero_raw", "high_silero_count", "high_silero_normal_evidence", "silero_penalty",
+                "group_count", "effective_group_score", "grouped_v1_raw_is_whisper", "stage2_is_whisper", "stage2_consecutive_count",
+                "legacy_is_whisper", "grouped_v1_is_whisper",
+            )],
+            getattr(whisper, "whisper_classifier_implementation", None) or self.whisper_classifier_implementation,
+            triggered,
 
 
 
