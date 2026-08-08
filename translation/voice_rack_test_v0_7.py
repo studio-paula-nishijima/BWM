@@ -51,6 +51,7 @@ from configs.whisper import (
     SPEECH_DETECTOR_IMPLEMENTATION,
     SPEECH_DETECTOR_COMPARE_IMPLEMENTATION,
     SPEECH_WEBRTC_AGGRESSIVENESS,
+    SPEECH_WEBRTC_COMPARE_AGGRESSIVENESS_MODES,
     WHISPER_DETECTOR_IMPLEMENTATION,
     WHISPER_CLASSIFIER_SETTINGS,
     WHISPER_CLASSIFIER_IMPLEMENTATION,
@@ -281,7 +282,7 @@ def main():
 
 
     speech_detector = None
-    comparison_speech_detector = None
+    comparison_speech_detectors = {}
 
 
     if PROCESSING_MODE in (
@@ -308,11 +309,12 @@ def main():
         
         )
         if SPEECH_DETECTOR_COMPARE_IMPLEMENTATION:
-            comparison_speech_detector = create_speech_detector(
-                SPEECH_DETECTOR_COMPARE_IMPLEMENTATION,
-                sample_rate=SAMPLE_RATE,
-                aggressiveness=SPEECH_WEBRTC_AGGRESSIVENESS,
-            )
+            for aggressiveness in SPEECH_WEBRTC_COMPARE_AGGRESSIVENESS_MODES:
+                comparison_speech_detectors[aggressiveness] = create_speech_detector(
+                    SPEECH_DETECTOR_COMPARE_IMPLEMENTATION,
+                    sample_rate=SAMPLE_RATE,
+                    aggressiveness=aggressiveness,
+                )
 
 
     comparison_whisper_detector = None
@@ -334,7 +336,7 @@ def main():
 
         PROCESSING_MODE,
         comparison_whisper_detector=comparison_whisper_detector,
-        comparison_speech_detector=comparison_speech_detector,
+        comparison_speech_detectors=comparison_speech_detectors,
         classifier_implementation=WHISPER_CLASSIFIER_IMPLEMENTATION,
 
     )
@@ -385,6 +387,7 @@ def main():
             else "none"
         ),
         comparison_speech_detector_implementation=SPEECH_DETECTOR_COMPARE_IMPLEMENTATION,
+        comparison_speech_modes=SPEECH_WEBRTC_COMPARE_AGGRESSIVENESS_MODES,
         whisper_classifier_implementation=WHISPER_CLASSIFIER_IMPLEMENTATION,
     )
 

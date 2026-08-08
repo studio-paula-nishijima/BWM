@@ -18,7 +18,7 @@ shadow:
 
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Optional
 
 from .models import (
     WhisperDetectionResult,
@@ -36,6 +36,7 @@ class DetectorPipelineResult:
     # deliberately distinct from a detector result saying ``is_speech=False``.
     speech: Optional[SpeechDetectionResult]
     speech_comparison: Optional[SpeechDetectionResult]
+    speech_comparisons: Dict[int, SpeechDetectionResult]
 
     whisper: WhisperDetectionResult
 
@@ -54,6 +55,7 @@ class DetectorPipeline:
         mode="direct",
         comparison_whisper_detector=None,
         comparison_speech_detector=None,
+        comparison_speech_detectors=None,
         classifier_implementation="legacy"
     ):
 
@@ -61,6 +63,9 @@ class DetectorPipeline:
         self.speech_detector = speech_detector
         self.comparison_whisper_detector = comparison_whisper_detector
         self.comparison_speech_detector = comparison_speech_detector
+        self.comparison_speech_detectors = dict(comparison_speech_detectors or {})
+        if comparison_speech_detector is not None and not self.comparison_speech_detectors:
+            self.comparison_speech_detectors[getattr(comparison_speech_detector, "aggressiveness", 0)] = comparison_speech_detector
         self.classifier_implementation = classifier_implementation
 
         self.mode = mode
@@ -94,7 +99,7 @@ class DetectorPipeline:
 
     def reset(self):
         """Reset stateful detectors at a real audio-stream boundary."""
-        for detector in (self.speech_detector, self.comparison_speech_detector, self.whisper_detector, self.comparison_whisper_detector):
+        for detector in (self.speech_detector, *self.comparison_speech_detectors.values(), self.whisper_detector, self.comparison_whisper_detector):
             if detector is not None and hasattr(detector, "reset"):
                 detector.reset()
 
@@ -122,9 +127,11 @@ class DetectorPipeline:
             speech_result = (
                 self.speech_detector.classify(frame)
             )
-            speech_comparison = self.comparison_speech_detector.classify(frame) if self.comparison_speech_detector is not None else None
+            speech_comparisons = {mode: detector.classify(frame) for mode, detector in self.comparison_speech_detectors.items()}
+            speech_comparison = speech_comparisons.get(1) or next(iter(speech_comparisons.values()), None)
         else:
             speech_comparison = None
+            speech_comparisons = {}
 
 
         # ---------------------------------
@@ -180,6 +187,7 @@ class DetectorPipeline:
         result = DetectorPipelineResult(
             speech=speech_result,
             speech_comparison=speech_comparison,
+            speech_comparisons=speech_comparisons,
             whisper=whisper_result,
             processing_mode=self.mode,
             speech_gate_open=speech_gate_open,

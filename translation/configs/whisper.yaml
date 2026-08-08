@@ -23,6 +23,7 @@ speech_detector:
   threshold: 0.5
   compare_implementation: webrtc
   aggressiveness: 1
+  compare_aggressiveness_modes: [0, 1, 2]
 
 # Compatibility-only legacy detector setting. The active classifier is selected
 # below by whisper_classifier.implementation; leave this as feature.

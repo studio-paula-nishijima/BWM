@@ -12,6 +12,7 @@ class WhisperCSVLogger:
         processing_mode=None,
         speech_detector_implementation=None,
         comparison_speech_detector_implementation=None,
+        comparison_speech_modes=(),
         whisper_classifier_implementation=None,
     ):
 
@@ -37,6 +38,7 @@ class WhisperCSVLogger:
         self.processing_mode = processing_mode
         self.speech_detector_implementation = speech_detector_implementation
         self.comparison_speech_detector_implementation = comparison_speech_detector_implementation
+        self.comparison_speech_modes = tuple(comparison_speech_modes)
         self.whisper_classifier_implementation = whisper_classifier_implementation
 
 
@@ -100,6 +102,7 @@ class WhisperCSVLogger:
             "formant_score",
             "low_proportion_std", "mid_proportion_std", "high_proportion_std", "zcr_std", "entropy_std", "spectral_centroid_std", "spectral_flux", "cepstral_peak_prominence", "spectral_slope", "spectral_rolloff", "spectral_flatness",
             "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run", "confirmation_frames",
+            *[column for mode in self.comparison_speech_modes for column in (f"webrtc_mode_{mode}_evaluated", f"webrtc_mode_{mode}_is_speech")],
 
         ])
 
@@ -139,6 +142,7 @@ class WhisperCSVLogger:
 
             speech = result.speech
             speech_comparison = result.speech_comparison
+            speech_comparisons = result.speech_comparisons
 
             whisper = result.whisper
 
@@ -155,6 +159,7 @@ class WhisperCSVLogger:
 
             speech = None
             speech_comparison = None
+            speech_comparisons = {}
 
             whisper = result
 
@@ -263,6 +268,10 @@ class WhisperCSVLogger:
             )],
             *[getattr(whisper, name, None) for name in (
                 "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run", "confirmation_frames",
+            )],
+            *[value for mode in self.comparison_speech_modes for value in (
+                bool(speech_comparisons.get(mode) and speech_comparisons[mode].features.get("evaluated", False)),
+                speech_comparisons[mode].is_speech if mode in speech_comparisons else None,
             )],
 
         ])

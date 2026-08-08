@@ -51,6 +51,7 @@ speech_cfg = cfg.get(
 
 SPEECH_DETECTOR_COMPARE_IMPLEMENTATION = speech_cfg.get("compare_implementation")
 SPEECH_WEBRTC_AGGRESSIVENESS = speech_cfg.get("aggressiveness", 1)
+SPEECH_WEBRTC_COMPARE_AGGRESSIVENESS_MODES = speech_cfg.get("compare_aggressiveness_modes", [SPEECH_WEBRTC_AGGRESSIVENESS])
 
 SPEECH_RMS_MIN = speech_cfg.get(
     "rms_min",

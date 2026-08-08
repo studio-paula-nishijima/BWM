@@ -1,6 +1,8 @@
 import sys
 import types
 import unittest
+import csv
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +21,7 @@ from whisper.detector import create_speech_detector
 from whisper.detectors.speech_webrtc import WebRTCSpeechDetector
 from whisper.models import SpeechDetectionResult, WhisperDetectionResult
 from whisper.pipeline import DetectorPipeline
+from app_logging.csv_logger import WhisperCSVLogger
 
 
 class RecordingVad:
@@ -62,6 +65,24 @@ class WebRTCVadTests(unittest.TestCase):
         self.assertTrue(result.speech_comparison.is_speech)
         self.assertEqual(primary.calls, 1)
         self.assertEqual(comparison.calls, 1)
+
+    def test_multiple_comparison_modes_share_the_frame_without_gating_authority(self):
+        primary, whisper = Speech(False), Whisper()
+        mode_zero, mode_two = Speech(True), Speech(True)
+        pipeline = DetectorPipeline(
+            whisper, primary, mode="speech_gate",
+            comparison_speech_detectors={0: mode_zero, 2: mode_two},
+        )
+        result = pipeline.process(np.zeros(480, dtype=np.float32))
+        self.assertFalse(result.speech_gate_open)
+        self.assertEqual(set(result.speech_comparisons), {0, 2})
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "comparison.csv"
+            logger = WhisperCSVLogger(path, comparison_speech_modes=(0, 2))
+            logger.log(0, result, False); logger.close()
+            with path.open(newline="") as handle: row = next(csv.DictReader(handle))
+        self.assertEqual(row["webrtc_mode_0_is_speech"], "True")
+        self.assertEqual(row["webrtc_mode_2_is_speech"], "True")
 
     def test_temporal_evidence_rejects_non_silero_primary(self):
         temporal = types.SimpleNamespace(requires_speech_evidence=True)
