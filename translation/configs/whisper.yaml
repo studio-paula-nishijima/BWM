@@ -38,8 +38,8 @@ whisper_detector:
 # it is logged alongside the primary; it never drives trigger/actuation.
 # Classifier identity is deliberately independent of processing_mode.
 whisper_classifier:
-  implementation: grouped_v1
-  compare_implementation: legacy
+  implementation: temporal_v1
+  compare_implementation: grouped_v1
   stage1_silero_probability_min: 0.005
   stage1_enter_consecutive_frames: 3
   stage1_exit_consecutive_frames: 10

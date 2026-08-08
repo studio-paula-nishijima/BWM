@@ -1,0 +1,7 @@
+stage,full_pipeline,frame_count,tp,fp,fn,tn,precision,recall,f1
+speech,False,1670,102,1.0,611,956.0,0.9902912621359223,0.14305750350631136,0.25
+whisper,False,713,466,32.0,122,93.0,0.9357429718875502,0.7925170068027211,0.858195211786372
+webrtc_whisper_recall,False,588,424,,164,,,0.7210884353741497,
+webrtc_normal_speech_recall,False,125,109,,16,,,0.872,
+webrtc_silence_false_speech,False,912,15,,897,,,0.01644736842105263,
+webrtc_background_false_speech,False,45,35,,10,,,0.7777777777777778,
