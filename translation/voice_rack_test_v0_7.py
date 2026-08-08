@@ -352,6 +352,7 @@ def main():
 
     selected_analysis_tag = args.analysis_tag if args.analysis_tag is not None else ANALYSIS_FILENAME_TAG
     analysis_tag = f"_{selected_analysis_tag}" if selected_analysis_tag else ""
+    log_directory = Path("logs") / selected_analysis_tag if selected_analysis_tag else Path("logs")
 
     if args.wav:
 
@@ -360,7 +361,7 @@ def main():
         )
 
         log_file = (
-            Path("logs")
+            log_directory
             /
             f"{wav_path.stem}{analysis_tag}_whisper_analysis.csv"
         )
@@ -372,7 +373,7 @@ def main():
         )
 
         log_file = (
-            Path("logs")
+            log_directory
             /
             f"live{analysis_tag}_whisper_analysis_{timestamp}.csv"
         )
