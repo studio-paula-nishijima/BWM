@@ -10,7 +10,8 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from analysis.labelled_wav import (AnnotationValidationError, evaluation_summary,
-    feature_separation, feature_summary, join_frames_to_annotations, load_annotations)
+    feature_separation, feature_summary, join_frames_to_annotations, load_annotations,
+    qualifying_run_summary)
 
 
 class LabelledWavAnalysisTests(unittest.TestCase):
@@ -63,8 +64,32 @@ class LabelledWavAnalysisTests(unittest.TestCase):
         self.assertEqual(full[full.stage == "whisper_vs_normal_speech"].iloc[0].frame_count, 4)
 
     def test_evaluation_names_both_whisper_scopes_and_segment_metrics(self):
-        result = evaluation_summary(self._frames())
+        frames = self._frames()
+        frames["temporal_v1_raw_is_whisper"] = False
+        frames["temporal_v1_qualifying_run"] = 0
+        frames["confirmation_requirement"] = 24
+        frames["trigger"] = False
+        result = evaluation_summary(frames)
         self.assertTrue({"whisper_vs_normal_speech", "whisper_vs_all_non_whisper", "whisper_sustained_segment", "whisper_trigger_segment"}.issubset(set(result.stage)))
+
+    def test_cross_boundary_run_is_not_an_independent_non_whisper_sustained_event(self):
+        frames = pd.DataFrame({
+            "wav_file": ["a.wav"] * 9,
+            "annotation_start_seconds": [0, 0] + [.1] * 7,
+            "annotation_end_seconds": [.1, .1] + [.2] * 7,
+            "annotation_label": ["whisper", "whisper"] + ["background_noise"] * 7,
+            "temporal_v1_raw_is_whisper": [True] * 9,
+            "temporal_v1_qualifying_run": list(range(13, 22)),
+            "confirmation_requirement": [15] * 9,
+            "trigger": [False] * 9,
+        })
+        summary = qualifying_run_summary(frames)
+        background = summary[summary.annotation_label == "background_noise"].iloc[0]
+        self.assertTrue(background.cross_boundary_continuation)
+        self.assertEqual(background.cross_boundary_frame_count, 7)
+        self.assertFalse(background.segment_local_sustained)
+        sustained = evaluation_summary(frames).query("stage == 'whisper_sustained_segment'").iloc[0]
+        self.assertEqual(sustained.fp, 0)
 
     def test_direct_mode_blank_speech_fields_and_weighting(self):
         frames = self._frames().drop(columns=["whisper_processed"]).copy()

@@ -26,5 +26,14 @@ remain unchanged.
 `analysis_full` logs the mode-0 debounce state on every frame. Its continuous
 confirmation fields distinguish the configured assisted requirement (15),
 fallback requirement (24), and the currently applicable requirement. The
-`trigger_route` is populated only on a threshold-crossing frame as
-`webrtc_assisted` or `temporal_fallback`.
+`threshold_crossing_route` is populated only on a threshold-crossing frame as
+`webrtc_assisted` or `temporal_fallback`. `trigger_route` is populated only
+when that crossing emits a final trigger; suppressed crossings carry
+`trigger_suppression_reason` (currently `cooldown`).
+
+`qualifying_run_summary` preserves detector continuity across WAV frames while
+also reporting `max_segment_local_qualifying_run`. A sustained live run that
+enters an annotation segment from its predecessor is marked
+`cross_boundary_continuation` with its carried-frame count; it is not counted
+as an independent non-whisper sustained event. Annotation boundaries never
+reset the live detector.

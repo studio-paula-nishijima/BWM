@@ -237,25 +237,51 @@ def _metric_row(stage, evaluation_unit, scope, truth, prediction, valid, full_pi
             "f1": 2*tp/(2*tp+fp+fn) if 2*tp+fp+fn else np.nan}
 
 
-def _segment_trigger_metrics(frames, full_pipeline):
-    """Evaluate sustained evidence and emitted triggers once per annotation segment."""
+def _segment_run_rows(frames, column="temporal_v1_raw_is_whisper"):
+    """Summarise live and analysis-local qualifying runs by annotation segment.
+
+    The detector deliberately does not reset at annotation boundaries.  This
+    helper therefore derives a second, local run counter solely for analysis,
+    allowing a carried-over live run to be reported rather than mistaken for a
+    new non-whisper event.
+    """
     required = {"wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label"}
-    if not required.issubset(frames.columns):
-        return []
+    if column not in frames or not required.issubset(frames.columns):
+        return pd.DataFrame()
     labelled = frames.loc[frames.annotation_label.notna() & ~frames.annotation_label.isin(EXCLUDED_LABELS)].copy()
     rows = []
     for keys, segment in labelled.groupby(["wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label"], dropna=False):
-        qualifying = pd.to_numeric(segment.get("temporal_v1_qualifying_run", pd.Series(np.nan, index=segment.index)), errors="coerce")
+        flags = _truthy_column(segment, column, default=False).to_numpy()
+        local_runs = []
+        local_run = 0
+        for flag in flags:
+            local_run = local_run + 1 if flag else 0
+            local_runs.append(local_run)
+        local_runs = pd.Series(local_runs, index=segment.index)
+        qualifying = pd.to_numeric(segment.get("temporal_v1_qualifying_run", local_runs), errors="coerce")
         requirement = pd.to_numeric(segment.get("confirmation_requirement", pd.Series(np.nan, index=segment.index)), errors="coerce")
-        rows.append({"annotation_label": keys[-1],
-                     "sustained": bool((qualifying >= requirement).fillna(False).any()),
-                     "trigger": bool(_truthy_column(segment, "trigger", default=False).any())})
-    segments = pd.DataFrame(rows)
+        live_sustained = (qualifying >= requirement).fillna(False)
+        local_sustained = (local_runs >= requirement).fillna(False)
+        rows.append(dict(zip(["wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label"], keys),
+                         max_qualifying_run=int(local_runs.max()) if len(local_runs) else 0,
+                         max_segment_local_qualifying_run=int(local_runs.max()) if len(local_runs) else 0,
+                         max_live_qualifying_run=int(qualifying.max()) if qualifying.notna().any() else 0,
+                         sustained_at_requirement=bool(live_sustained.any()),
+                         segment_local_sustained=bool(local_sustained.any()),
+                         cross_boundary_continuation=bool((live_sustained & ~local_sustained).any()),
+                         cross_boundary_frame_count=int((live_sustained & ~local_sustained).sum()),
+                         trigger=bool(_truthy_column(segment, "trigger", default=False).any())))
+    return pd.DataFrame(rows)
+
+
+def _segment_trigger_metrics(frames, full_pipeline):
+    """Evaluate local sustained evidence and emitted triggers per segment."""
+    segments = _segment_run_rows(frames)
     if segments.empty:
         return []
     truth = segments.annotation_label.eq("whisper")
     return [
-        _metric_row("whisper_sustained_segment", "annotation_segment", "whisper_vs_all_non_whisper", truth, segments.sustained,
+        _metric_row("whisper_sustained_segment", "annotation_segment", "whisper_vs_all_non_whisper", truth, segments.segment_local_sustained,
                     pd.Series(True, index=segments.index), full_pipeline),
         _metric_row("whisper_trigger_segment", "annotation_segment", "whisper_vs_all_non_whisper", truth, segments.trigger,
                     pd.Series(True, index=segments.index), full_pipeline),
@@ -295,19 +321,8 @@ def evaluation_summary(frames, full_pipeline=False):
 
 
 def qualifying_run_summary(frames, column="temporal_v1_raw_is_whisper"):
-    """Return each labelled segment's maximum consecutive qualifying-frame run."""
-    if column not in frames:
-        return pd.DataFrame(columns=["wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label", "max_qualifying_run"])
-    rows = []
-    labelled = frames.loc[frames.annotation_label.notna()]
-    for keys, segment in labelled.groupby(["wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label"], dropna=False):
-        flags = segment[column].astype(str).str.lower().eq("true").to_numpy()
-        run = maximum = 0
-        for flag in flags:
-            run = run + 1 if flag else 0
-            maximum = max(maximum, run)
-        rows.append(dict(zip(["wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label"], keys), max_qualifying_run=maximum))
-    return pd.DataFrame(rows)
+    """Return live, local, and cross-boundary qualifying-run evidence."""
+    return _segment_run_rows(frames, column)
 
 
 def analyse_triplets(triplets, output_dir, frame_seconds=0.03, weighting="frame", full_pipeline=False, reject_overlaps=False, analysis_tag=None):

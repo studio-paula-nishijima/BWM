@@ -119,7 +119,9 @@ class WhisperDetectionResult:
     temporal_candidate: bool = None
     temporal_qualifying_run: int = None
     confirmation_requirement: int = None
+    threshold_crossing_route: str = None
     trigger_route: str = None
+    trigger_suppression_reason: str = None
     assisted_confirmation_requirement: int = None
     fallback_confirmation_requirement: int = None
 

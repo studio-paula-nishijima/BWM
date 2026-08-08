@@ -598,7 +598,9 @@ def main():
             result.assisted_confirmation_requirement = profile_decision.assisted_confirmation_requirement
             result.fallback_confirmation_requirement = profile_decision.fallback_confirmation_requirement
             result.confirmation_requirement = profile_decision.confirmation_requirement
-            result.trigger_route = profile_decision.trigger_route
+            result.threshold_crossing_route = profile_decision.trigger_route
+            result.trigger_route = None
+            result.trigger_suppression_reason = None
 
 
 
@@ -611,6 +613,11 @@ def main():
                 triggered = True
                 detector.record_trigger()
                 last_trigger_time = now
+                result.trigger_route = profile_decision.trigger_route
+            elif profile_decision.trigger:
+                # A threshold crossing is still logged, but it is not an
+                # emitted trigger while the actuator cooldown is active.
+                result.trigger_suppression_reason = "cooldown"
 
 
 
@@ -650,6 +657,7 @@ def main():
                 f"TLSTD={result.temporal_v1_low_proportion_std if result.temporal_v1_low_proportion_std is not None else 'N/A'} "
                 f"TRUN={result.temporal_v1_qualifying_run if result.temporal_v1_qualifying_run is not None else 'N/A'} "
                 f"WASSIST={result.webrtc_assist_open if result.webrtc_assist_open is not None else 'N/A'} "
+                f"CROSS={result.threshold_crossing_route or 'N/A'} "
                 f"ROUTE={result.trigger_route or 'N/A'} "
                 f"CLASSIFIER={result.whisper_classifier_implementation or WHISPER_CLASSIFIER_IMPLEMENTATION} "
                 f"RMS={result.rms:.4f} "            
