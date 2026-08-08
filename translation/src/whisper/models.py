@@ -112,6 +112,17 @@ class WhisperDetectionResult:
     spectral_slope: float = None
     cepstral_peak_prominence: float = None
 
+    detector_profile: str = None
+    webrtc_assist_open: bool = None
+    webrtc_assist_enter_count: int = None
+    webrtc_assist_exit_count: int = None
+    temporal_candidate: bool = None
+    temporal_qualifying_run: int = None
+    confirmation_requirement: int = None
+    trigger_route: str = None
+    assisted_confirmation_requirement: int = None
+    fallback_confirmation_requirement: int = None
+
     feature_scores: Dict[str, float] = field(
         default_factory=dict
     )

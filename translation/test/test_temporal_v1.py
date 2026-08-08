@@ -45,7 +45,7 @@ class TemporalV1Tests(unittest.TestCase):
     def detector(self, sequence, **kwargs):
         d = TemporalV1WhisperDetector(rolling_window_frames=3, **kwargs)
         iterator = iter(sequence)
-        def extract(_):
+        def extract(_, **_kwargs):
             result = values(next(iterator))
             # Match the detector's rolling statistic without relying on FFTs.
             history = getattr(extract, "history", []) + [result["low_proportion"]]
@@ -77,6 +77,12 @@ class TemporalV1Tests(unittest.TestCase):
         first, second = self.detector([0.0, .2, 0.0]), self.detector([0.0, .2, 0.0])
         self.classify(first, .1)
         self.assertFalse(self.classify(second, .1).temporal_v1_window_full)
+
+    def test_profile_lower_bound_accepts_0_0025_and_uses_population_std(self):
+        d = self.detector([0.0, 0.2, 0.0], silero_median_min=.0025)
+        for _ in range(3): result = self.classify(d, .0025)
+        self.assertTrue(result.temporal_v1_raw_is_whisper)
+        self.assertAlmostEqual(result.temporal_v1_low_proportion_std, np.std([0.0, 0.2, 0.0], ddof=0))
 
     def test_reset_and_pipeline_use_one_speech_result_per_frame(self):
         d = self.detector([0.0, .2, 0.0, 0.0, .2, 0.0])
@@ -118,7 +124,7 @@ class TemporalV1Tests(unittest.TestCase):
             with path.open(newline="") as handle:
                 row = next(csv.DictReader(handle))
         self.assertEqual(row["temporal_v1_raw_is_whisper"], "True")
-        self.assertEqual(row["confirmation_frames"], "20")
+        self.assertNotIn("confirmation_frames", row)
 
 
 if __name__ == "__main__":

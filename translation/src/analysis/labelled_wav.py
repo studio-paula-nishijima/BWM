@@ -225,20 +225,60 @@ def feature_separation(frames, weighting="frame", full_pipeline=False):
     return pd.DataFrame(rows)
 
 
+def _metric_row(stage, evaluation_unit, scope, truth, prediction, valid, full_pipeline=False):
+    """Return a named binary metric row without hiding its comparison scope."""
+    y = truth[valid].to_numpy(dtype=bool)
+    p = prediction[valid].astype(str).str.lower().eq("true").to_numpy()
+    tp, fp = int((p & y).sum()), int((p & ~y).sum())
+    fn, tn = int((~p & y).sum()), int((~p & ~y).sum())
+    return {"stage": stage, "evaluation_unit": evaluation_unit, "comparison_scope": scope,
+            "full_pipeline": full_pipeline, "frame_count": int(valid.sum()), "tp": tp, "fp": fp, "fn": fn, "tn": tn,
+            "precision": tp/(tp+fp) if tp+fp else np.nan, "recall": tp/(tp+fn) if tp+fn else np.nan,
+            "f1": 2*tp/(2*tp+fp+fn) if 2*tp+fp+fn else np.nan}
+
+
+def _segment_trigger_metrics(frames, full_pipeline):
+    """Evaluate sustained evidence and emitted triggers once per annotation segment."""
+    required = {"wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label"}
+    if not required.issubset(frames.columns):
+        return []
+    labelled = frames.loc[frames.annotation_label.notna() & ~frames.annotation_label.isin(EXCLUDED_LABELS)].copy()
+    rows = []
+    for keys, segment in labelled.groupby(["wav_file", "annotation_start_seconds", "annotation_end_seconds", "annotation_label"], dropna=False):
+        qualifying = pd.to_numeric(segment.get("temporal_v1_qualifying_run", pd.Series(np.nan, index=segment.index)), errors="coerce")
+        requirement = pd.to_numeric(segment.get("confirmation_requirement", pd.Series(np.nan, index=segment.index)), errors="coerce")
+        rows.append({"annotation_label": keys[-1],
+                     "sustained": bool((qualifying >= requirement).fillna(False).any()),
+                     "trigger": bool(_truthy_column(segment, "trigger", default=False).any())})
+    segments = pd.DataFrame(rows)
+    if segments.empty:
+        return []
+    truth = segments.annotation_label.eq("whisper")
+    return [
+        _metric_row("whisper_sustained_segment", "annotation_segment", "whisper_vs_all_non_whisper", truth, segments.sustained,
+                    pd.Series(True, index=segments.index), full_pipeline),
+        _metric_row("whisper_trigger_segment", "annotation_segment", "whisper_vs_all_non_whisper", truth, segments.trigger,
+                    pd.Series(True, index=segments.index), full_pipeline),
+    ]
+
+
 def evaluation_summary(frames, full_pipeline=False):
     rows = []
     labels = frames.annotation_label
-    for stage, truth, prediction, subset in [
-        ("speech", labels.isin(["normal_speech", "whisper"]), frames.get("is_speech"), labels.isin(["normal_speech", "whisper", "silence", "background_noise"])),
-        ("whisper", labels.eq("whisper"), frames.get("is_whisper"), labels.isin(["whisper", "normal_speech"]) & (pd.Series(True, index=frames.index) if full_pipeline else _truthy_column(frames, "whisper_processed"))),
-    ]:
-        if prediction is None: continue
-        valid = subset & labels.notna() & ~labels.isin(EXCLUDED_LABELS) & prediction.notna()
-        y, p = truth[valid].to_numpy(), prediction[valid].astype(str).str.lower().eq("true").to_numpy()
-        tp, fp, fn, tn = int((p & y).sum()), int((p & ~y).sum()), int((~p & y).sum()), int((~p & ~y).sum())
-        rows.append({"stage": stage, "full_pipeline": full_pipeline, "frame_count": int(valid.sum()), "tp": tp, "fp": fp, "fn": fn, "tn": tn,
-                     "precision": tp/(tp+fp) if tp+fp else np.nan, "recall": tp/(tp+fn) if tp+fn else np.nan,
-                     "f1": 2*tp/(2*tp+fp+fn) if 2*tp+fp+fn else np.nan})
+    all_labels = labels.isin(["whisper", "normal_speech", "silence", "background_noise"])
+    if frames.get("is_speech") is not None:
+        valid = all_labels & frames.is_speech.notna()
+        rows.append(_metric_row("speech_vs_non_speech", "frame", "speech_vs_non_speech",
+                                labels.isin(["normal_speech", "whisper"]), frames.is_speech, valid, full_pipeline))
+    if frames.get("is_whisper") is not None:
+        processed = pd.Series(True, index=frames.index) if full_pipeline else _truthy_column(frames, "whisper_processed")
+        for stage, scope, subset in (
+            ("whisper_vs_normal_speech", "whisper_vs_normal_speech", labels.isin(["whisper", "normal_speech"])),
+            ("whisper_vs_all_non_whisper", "whisper_vs_all_non_whisper", all_labels),
+        ):
+            valid = subset & processed & frames.is_whisper.notna()
+            rows.append(_metric_row(stage, "frame", scope, labels.eq("whisper"), frames.is_whisper, valid, full_pipeline))
+    rows.extend(_segment_trigger_metrics(frames, full_pipeline))
     comparison_columns = [("webrtc", frames.get("comparison_speech_is_speech"))]
     comparison_columns += [(f"webrtc_mode_{mode}", frames.get(f"webrtc_mode_{mode}_is_speech")) for mode in range(4)]
     for backend, comparison in comparison_columns:
@@ -248,7 +288,7 @@ def evaluation_summary(frames, full_pipeline=False):
                              ("webrtc_silence_false_speech", labels.eq("silence")), ("webrtc_background_false_speech", labels.eq("background_noise"))):
             valid = truth & labels.notna() & ~labels.isin(EXCLUDED_LABELS) & comparison.notna()
             positives = comparison[valid].astype(str).str.lower().eq("true")
-            rows.append({"stage": f"{backend}_{label.removeprefix('webrtc_')}", "full_pipeline": full_pipeline, "frame_count": int(valid.sum()),
+            rows.append({"stage": f"{backend}_{label.removeprefix('webrtc_')}", "evaluation_unit": "frame", "comparison_scope": label, "full_pipeline": full_pipeline, "frame_count": int(valid.sum()),
                          "tp": int(positives.sum()), "fp": np.nan, "fn": int((~positives).sum()), "tn": np.nan,
                          "precision": np.nan, "recall": float(positives.mean()) if len(positives) else np.nan, "f1": np.nan})
     return pd.DataFrame(rows)
@@ -281,8 +321,8 @@ def analyse_triplets(triplets, output_dir, frame_seconds=0.03, weighting="frame"
         all_frames.append(join_frames_to_annotations(pd.read_csv(log_path), anns, wav_path.name, frame_seconds))
     frames = pd.concat(all_frames, ignore_index=True) if all_frames else pd.DataFrame()
     output = Path(output_dir); output.mkdir(parents=True, exist_ok=True)
-    summaries = feature_summary(frames, weighting)
-    separation = feature_separation(frames, weighting, full_pipeline)
+    summaries = pd.concat([feature_summary(frames, mode) for mode in ("frame", "segment")], ignore_index=True)
+    separation = pd.concat([feature_separation(frames, mode, full_pipeline) for mode in ("frame", "segment")], ignore_index=True)
     evaluation = evaluation_summary(frames, full_pipeline)
     qualifying_runs = qualifying_run_summary(frames)
     suffix = f"_{analysis_tag}" if analysis_tag else ""

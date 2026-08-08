@@ -2,6 +2,41 @@ sample_rate: 16000
 frame_ms: 30
 device: "plughw:2,0"
 
+# Independent of processing_mode and classifier selection.
+detector_profile: webrtc_assisted_temporal
+detector_profiles:
+  webrtc_assisted_temporal:
+    silero_median_min: 0.0025
+    silero_median_max: 0.5
+    rolling_window_frames: 10
+    low_proportion_std_min: 0.05
+    webrtc_enabled: true
+    webrtc_aggressiveness: 0
+    webrtc_enter_frames: 10
+    webrtc_exit_frames: 10
+    assisted_confirmation_frames: 15
+    fallback_confirmation_frames: 24
+  temporal_only:
+    silero_median_min: 0.0025
+    silero_median_max: 0.5
+    rolling_window_frames: 10
+    low_proportion_std_min: 0.05
+    fallback_confirmation_frames: 24
+  analysis_full:
+    silero_median_min: 0.0025
+    silero_median_max: 0.5
+    rolling_window_frames: 10
+    low_proportion_std_min: 0.05
+    webrtc_aggressiveness: 0
+    webrtc_enter_frames: 10
+    webrtc_exit_frames: 10
+    assisted_confirmation_frames: 15
+    fallback_confirmation_frames: 24
+
+live_diagnostic_logging:
+  enabled: false
+  max_frames: 0
+
 # Appended to analysis CSV filenames by default; --analysis-tag overrides it.
 analysis_filename_tag: "3L"
 
@@ -53,7 +88,7 @@ whisper_classifier:
   high_silero_required_frames: 3
   # temporal_v1 only; analysis-only rolling statistics use this same window.
   rolling_window_frames: 10
-  silero_median_min: 0.005
+  silero_median_min: 0.005  # Historical/default temporal_v1 setting; profiles override to 0.0025.
   silero_median_max: 0.50
   low_proportion_std_min: 0.05
   confirmation_frames: 20

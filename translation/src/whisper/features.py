@@ -216,7 +216,7 @@ class AudioFeatures:
     # Complete feature extraction
     # -----------------------------
 
-    def extract(self, frame):
+    def extract(self, frame, analysis_full=True):
 
         filtered = self.bandpass(frame)
 
@@ -224,7 +224,6 @@ class AudioFeatures:
         power = spectrum ** 2
         freqs = np.fft.rfftfreq(len(filtered), d=1.0 / self.sample_rate)
         spectrum_total = spectrum.sum()
-        centroid = float(np.sum(freqs * spectrum) / spectrum_total) if spectrum_total else 0.0
 
         def energy(low, high):
             return float(power[(freqs >= low) & (freqs < high)].sum())
@@ -249,18 +248,28 @@ class AudioFeatures:
         low_proportion = low_energy / total_band_energy
         mid_proportion = mid_energy / total_band_energy
         high_proportion = high_energy / total_band_energy
+        self._history["low_proportion"].append(low_proportion)
+        window_full = len(self._history["low_proportion"]) == self.rolling_window_frames
+        low_std = float(np.std(self._history["low_proportion"], ddof=0)) if window_full else None
+        if not analysis_full:
+            return {
+                "band_low": low_energy, "band_mid": mid_energy, "band_high": high_energy,
+                "ratio_low": low_ratio, "ratio_mid": mid_ratio, "ratio_high": high_ratio,
+                "total_band_energy": total_band_energy, "low_proportion": low_proportion,
+                "mid_proportion": mid_proportion, "high_proportion": high_proportion,
+                "rolling_window_full": window_full, "low_proportion_std": low_std,
+            }
+
+        centroid = float(np.sum(freqs * spectrum) / spectrum_total) if spectrum_total else 0.0
         zcr = self.zcr(filtered)
         entropy = -np.sum((power / (power.sum() + 1e-9)) * np.log(power / (power.sum() + 1e-9) + 1e-9))
-
         normalised = spectrum / (spectrum_total + 1e-12)
         flux = None if self._previous_normalised_spectrum is None else float(np.sum((normalised - self._previous_normalised_spectrum) ** 2))
         self._previous_normalised_spectrum = normalised
-        rolling_values = {"low_proportion": low_proportion, "mid_proportion": mid_proportion,
-                          "high_proportion": high_proportion, "zcr": zcr, "entropy": entropy, "centroid": centroid}
-        for name, value in rolling_values.items():
+        for name, value in {"mid_proportion": mid_proportion, "high_proportion": high_proportion,
+                            "zcr": zcr, "entropy": entropy, "centroid": centroid}.items():
             self._history[name].append(value)
-        window_full = len(self._history["low_proportion"]) == self.rolling_window_frames
-        rolling_std = {name: (float(np.std(values)) if window_full else None) for name, values in self._history.items()}
+        rolling_std = {name: (float(np.std(values, ddof=0)) if len(values) == self.rolling_window_frames else None) for name, values in self._history.items()}
 
         cumulative = np.cumsum(power)
         rolloff_index = int(np.searchsorted(cumulative, 0.85 * power.sum())) if power.sum() else 0
@@ -295,7 +304,7 @@ class AudioFeatures:
             "mid_proportion": mid_proportion,
             "high_proportion": high_proportion,
             "rolling_window_full": window_full,
-            "low_proportion_std": rolling_std["low_proportion"],
+            "low_proportion_std": low_std,
             "mid_proportion_std": rolling_std["mid_proportion"],
             "high_proportion_std": rolling_std["high_proportion"],
             "zcr_std": rolling_std["zcr"],

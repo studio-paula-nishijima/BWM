@@ -54,6 +54,7 @@ class DetectorPipeline:
         speech_detector=None,
         mode="direct",
         comparison_whisper_detector=None,
+        comparison_whisper_detectors=None,
         comparison_speech_detector=None,
         comparison_speech_detectors=None,
         classifier_implementation="legacy"
@@ -62,6 +63,12 @@ class DetectorPipeline:
         self.whisper_detector = whisper_detector
         self.speech_detector = speech_detector
         self.comparison_whisper_detector = comparison_whisper_detector
+        self.comparison_whisper_detectors = dict(comparison_whisper_detectors or {})
+        if comparison_whisper_detector is not None:
+            self.comparison_whisper_detectors.setdefault(
+                getattr(comparison_whisper_detector, "whisper_classifier_implementation", "comparison"),
+                comparison_whisper_detector,
+            )
         self.comparison_speech_detector = comparison_speech_detector
         self.comparison_speech_detectors = dict(comparison_speech_detectors or {})
         if comparison_speech_detector is not None and not self.comparison_speech_detectors:
@@ -92,14 +99,15 @@ class DetectorPipeline:
             raise ValueError(
                 f"Unknown processing mode: {mode}"
             )
-        if mode == "direct" and any(getattr(detector, "requires_speech_evidence", False) for detector in (whisper_detector, comparison_whisper_detector)):
+        all_whisper_detectors = (whisper_detector, *self.comparison_whisper_detectors.values())
+        if mode == "direct" and any(getattr(detector, "requires_speech_evidence", False) for detector in all_whisper_detectors):
             raise ValueError("Silero-evidence classifiers require speech_gate or shadow mode and cannot run in direct mode")
-        if any(getattr(detector, "requires_speech_evidence", False) for detector in (whisper_detector, comparison_whisper_detector)) and getattr(speech_detector, "speech_backend", None) == "webrtc":
+        if any(getattr(detector, "requires_speech_evidence", False) for detector in all_whisper_detectors) and getattr(speech_detector, "speech_backend", None) == "webrtc":
             raise ValueError("grouped_v1 and temporal_v1 require a primary Silero speech detector")
 
     def reset(self):
         """Reset stateful detectors at a real audio-stream boundary."""
-        for detector in (self.speech_detector, *self.comparison_speech_detectors.values(), self.whisper_detector, self.comparison_whisper_detector):
+        for detector in (self.speech_detector, *self.comparison_speech_detectors.values(), self.whisper_detector, *self.comparison_whisper_detectors.values()):
             if detector is not None and hasattr(detector, "reset"):
                 detector.reset()
 
@@ -113,7 +121,7 @@ class DetectorPipeline:
         # Speech stage
         # ---------------------------------
 
-        needs_speech = any(getattr(detector, "requires_speech_evidence", False) for detector in (self.whisper_detector, self.comparison_whisper_detector))
+        needs_speech = any(getattr(detector, "requires_speech_evidence", False) for detector in (self.whisper_detector, *self.comparison_whisper_detectors.values()))
         if self.mode in (
             "speech_gate",
             "shadow"
@@ -166,8 +174,8 @@ class DetectorPipeline:
                 self._classify(self.whisper_detector, frame, speech_result)
             )
 
-        if self.comparison_whisper_detector is not None:
-            comparison = self._classify(self.comparison_whisper_detector, frame, speech_result)
+        for comparison_detector in self.comparison_whisper_detectors.values():
+            comparison = self._classify(comparison_detector, frame, speech_result)
             if comparison.whisper_classifier_implementation == "grouped_v1":
                 whisper_result.grouped_v1_is_whisper = comparison.is_whisper
             elif comparison.whisper_classifier_implementation == "temporal_v1":

@@ -57,10 +57,14 @@ class LabelledWavAnalysisTests(unittest.TestCase):
     def test_uncertain_excluded_and_bypassed_whisper_excluded_by_default(self):
         frames = self._frames()
         result = evaluation_summary(frames)
-        whisper = result[result.stage == "whisper"].iloc[0]
+        whisper = result[result.stage == "whisper_vs_normal_speech"].iloc[0]
         self.assertEqual(whisper.frame_count, 3)  # one whisper bypassed, uncertain excluded
         full = evaluation_summary(frames, full_pipeline=True)
-        self.assertEqual(full[full.stage == "whisper"].iloc[0].frame_count, 4)
+        self.assertEqual(full[full.stage == "whisper_vs_normal_speech"].iloc[0].frame_count, 4)
+
+    def test_evaluation_names_both_whisper_scopes_and_segment_metrics(self):
+        result = evaluation_summary(self._frames())
+        self.assertTrue({"whisper_vs_normal_speech", "whisper_vs_all_non_whisper", "whisper_sustained_segment", "whisper_trigger_segment"}.issubset(set(result.stage)))
 
     def test_direct_mode_blank_speech_fields_and_weighting(self):
         frames = self._frames().drop(columns=["whisper_processed"]).copy()
@@ -69,7 +73,7 @@ class LabelledWavAnalysisTests(unittest.TestCase):
         segment_summary = feature_summary(frames, "segment")
         self.assertEqual(set(frame_summary.weighting), {"frame"})
         self.assertEqual(set(segment_summary.weighting), {"segment"})
-        self.assertEqual(evaluation_summary(frames).query("stage == 'speech'").iloc[0].frame_count, 0)
+        self.assertEqual(evaluation_summary(frames).query("stage == 'speech_vs_non_speech'").iloc[0].frame_count, 0)
 
     def test_segment_weighting_does_not_allow_long_segments_to_dominate(self):
         frames = pd.DataFrame({"wav_file": ["a.wav"] * 5,

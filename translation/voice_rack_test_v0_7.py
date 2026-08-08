@@ -30,6 +30,9 @@ from configs.whisper import (
     FRAME_MS,
     DEVICE,
     ANALYSIS_FILENAME_TAG,
+    DETECTOR_PROFILE,
+    DETECTOR_PROFILES,
+    LIVE_DIAGNOSTIC_LOGGING,
 
     RMS_MIN,
     RMS_MAX,
@@ -83,6 +86,7 @@ from whisper.detector import (
 from whisper.pipeline import (
     DetectorPipeline,
 )
+from whisper.profiles import PROFILE_NAMES, TemporalProfilePolicy
 
 
 from audio.wav_source import WavSource
@@ -150,6 +154,8 @@ def parse_arguments():
         default=None,
         help="Optional filename tag for analysis logs, e.g. 3L",
     )
+    parser.add_argument("--detector-profile", choices=PROFILE_NAMES, default=None)
+    parser.add_argument("--processing-mode", choices=("direct", "speech_gate", "shadow"), default=None)
 
     return parser.parse_args()
 
@@ -246,9 +252,19 @@ def main():
     global whisper_count
     global detector
 
+    args = parse_arguments()
+    detector_profile = args.detector_profile or DETECTOR_PROFILE
+    profile_settings = dict(DETECTOR_PROFILES.get(detector_profile, {}))
+    if detector_profile not in PROFILE_NAMES:
+        raise RuntimeError("Unknown detector profile; choose " + ", ".join(PROFILE_NAMES))
+    resolved_processing_mode = args.processing_mode or PROCESSING_MODE
+    classifier_implementation = "temporal_v1"
+    comparison_implementation = WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION if detector_profile == "analysis_full" else None
+    profile_policy = TemporalProfilePolicy(detector_profile, profile_settings)
+    temporal_settings = {**WHISPER_CLASSIFIER_SETTINGS, **profile_settings, "analysis_full": detector_profile == "analysis_full"}
+
     if (
-        WHISPER_CLASSIFIER_IMPLEMENTATION in ("grouped_v1", "temporal_v1")
-        and (PROCESSING_MODE == "direct" or SPEECH_DETECTOR_IMPLEMENTATION != "silero")
+        resolved_processing_mode == "direct" or SPEECH_DETECTOR_IMPLEMENTATION != "silero"
     ):
         raise RuntimeError(
             "Silero-evidence classifiers require processing_mode speech_gate/shadow and "
@@ -262,7 +278,7 @@ def main():
 
     whisper_detector = create_whisper_detector(
 
-        WHISPER_CLASSIFIER_IMPLEMENTATION,
+        classifier_implementation,
 
         sample_rate=SAMPLE_RATE,
 
@@ -276,7 +292,7 @@ def main():
 
         decision_window=DECISION_WINDOW,
         trigger_ratio=TRIGGER_RATIO,
-        **WHISPER_CLASSIFIER_SETTINGS
+        **temporal_settings,
 
     )
 
@@ -285,10 +301,7 @@ def main():
     comparison_speech_detectors = {}
 
 
-    if PROCESSING_MODE in (
-        "speech_gate",
-        "shadow"
-    ) or WHISPER_CLASSIFIER_IMPLEMENTATION in ("grouped_v1", "temporal_v1") or WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION in ("grouped_v1", "temporal_v1"):
+    if True:
 
         speech_detector = create_speech_detector(
 
@@ -308,8 +321,12 @@ def main():
             centroid_max=SPEECH_CENTROID_MAX,
         
         )
-        if SPEECH_DETECTOR_COMPARE_IMPLEMENTATION:
-            for aggressiveness in SPEECH_WEBRTC_COMPARE_AGGRESSIVENESS_MODES:
+        if detector_profile == "webrtc_assisted_temporal":
+            comparison_speech_detectors[profile_settings["webrtc_aggressiveness"]] = create_speech_detector(
+                "webrtc", sample_rate=SAMPLE_RATE, aggressiveness=profile_settings["webrtc_aggressiveness"]
+            )
+        elif detector_profile == "analysis_full":
+            for aggressiveness in sorted(set(SPEECH_WEBRTC_COMPARE_AGGRESSIVENESS_MODES + [3])):
                 comparison_speech_detectors[aggressiveness] = create_speech_detector(
                     SPEECH_DETECTOR_COMPARE_IMPLEMENTATION,
                     sample_rate=SAMPLE_RATE,
@@ -317,15 +334,23 @@ def main():
                 )
 
 
-    comparison_whisper_detector = None
-    if WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION:
-        comparison_whisper_detector = create_whisper_detector(
-            WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION,
+    comparison_whisper_detectors = {}
+    if comparison_implementation:
+        comparison_whisper_detectors[comparison_implementation] = create_whisper_detector(
+            comparison_implementation,
             sample_rate=SAMPLE_RATE,
             rms_min=RMS_MIN, rms_max=RMS_MAX, zcr_min=ZCR_MIN,
             zcr_max=ZCR_MAX, entropy_min=ENTROPY_MIN,
             decision_window=DECISION_WINDOW, trigger_ratio=TRIGGER_RATIO,
             **WHISPER_CLASSIFIER_SETTINGS
+        )
+    if detector_profile == "analysis_full" and "legacy" not in comparison_whisper_detectors:
+        comparison_whisper_detectors["legacy"] = create_whisper_detector(
+            "legacy",
+            sample_rate=SAMPLE_RATE,
+            rms_min=RMS_MIN, rms_max=RMS_MAX, zcr_min=ZCR_MIN,
+            zcr_max=ZCR_MAX, entropy_min=ENTROPY_MIN,
+            decision_window=DECISION_WINDOW, trigger_ratio=TRIGGER_RATIO,
         )
 
     detector = DetectorPipeline(
@@ -334,23 +359,23 @@ def main():
 
         speech_detector,
 
-        PROCESSING_MODE,
-        comparison_whisper_detector=comparison_whisper_detector,
+        resolved_processing_mode,
+        comparison_whisper_detectors=comparison_whisper_detectors,
         comparison_speech_detectors=comparison_speech_detectors,
-        classifier_implementation=WHISPER_CLASSIFIER_IMPLEMENTATION,
+        classifier_implementation=classifier_implementation,
 
     )
-
-
-    args = parse_arguments()
-
 
 
     # -----------------------------
     # LOG FILE
     # -----------------------------
 
-    selected_analysis_tag = args.analysis_tag if args.analysis_tag is not None else ANALYSIS_FILENAME_TAG
+    selected_analysis_tag = (
+        args.analysis_tag
+        if args.analysis_tag is not None
+        else f"{ANALYSIS_FILENAME_TAG}_{detector_profile}" if ANALYSIS_FILENAME_TAG else detector_profile
+    )
     analysis_tag = f"_{selected_analysis_tag}" if selected_analysis_tag else ""
     log_directory = Path("logs") / selected_analysis_tag if selected_analysis_tag else Path("logs")
 
@@ -379,6 +404,7 @@ def main():
         )
 
 
+    logging_enabled = bool(args.wav or detector_profile == "analysis_full" or LIVE_DIAGNOSTIC_LOGGING.get("enabled", False))
     csv_logger = WhisperCSVLogger(
         log_file,
         processing_mode=PROCESSING_MODE,
@@ -387,14 +413,15 @@ def main():
             if speech_detector is not None
             else "none"
         ),
-        comparison_speech_detector_implementation=SPEECH_DETECTOR_COMPARE_IMPLEMENTATION,
-        comparison_speech_modes=SPEECH_WEBRTC_COMPARE_AGGRESSIVENESS_MODES,
-        whisper_classifier_implementation=WHISPER_CLASSIFIER_IMPLEMENTATION,
-    )
+        comparison_speech_detector_implementation="webrtc" if comparison_speech_detectors else None,
+        comparison_speech_modes=tuple(comparison_speech_detectors),
+        whisper_classifier_implementation=classifier_implementation,
+        detector_profile=detector_profile,
+    ) if logging_enabled else None
 
 
     print(
-        f"Logging to: {log_file}"
+        f"Logging to: {log_file}" if logging_enabled else "Diagnostic CSV logging disabled"
     )
 
 
@@ -439,6 +466,7 @@ def main():
     # A source open (including a new WAV replay or live-source restart) is a
     # stream boundary, never an ordinary frame boundary.
     detector.reset()
+    profile_policy.reset()
 
 
 
@@ -455,9 +483,15 @@ def main():
 
 
     print(
-        f"Processing mode: {PROCESSING_MODE}"
+        f"Detector profile: {detector_profile}\nProcessing mode: {resolved_processing_mode}"
     )
-    print(f"Whisper classifier: {WHISPER_CLASSIFIER_IMPLEMENTATION}")
+    print(f"Whisper classifier: {classifier_implementation}")
+    if detector_profile == "webrtc_assisted_temporal":
+        print(f"Trigger policy: WebRTC assist {profile_settings['assisted_confirmation_frames']} frames; temporal fallback {profile_settings['fallback_confirmation_frames']} frames")
+        print(f"WebRTC debounce: enter {profile_settings['webrtc_enter_frames']} / exit {profile_settings['webrtc_exit_frames']} frames")
+    else:
+        print(f"Trigger policy: temporal only, {profile_settings['fallback_confirmation_frames']} frames")
+    print(f"Temporal window: {profile_settings['rolling_window_frames']} frames; Silero median range: {profile_settings['silero_median_min']}–{profile_settings['silero_median_max']}; low-proportion std minimum: {profile_settings['low_proportion_std_min']}")
 
 
     print(
@@ -550,19 +584,21 @@ def main():
             )
 
 
-            is_whisper = (
-                result.is_whisper
-            )
-
-
-
-            if is_whisper:
-
-                whisper_count += 1
-
-            else:
-
-                whisper_count = 0
+            is_whisper = result.is_whisper
+            # Mode 0 is the configured assisted gate and is always present for
+            # both the assisted and analysis_full profiles.
+            assist_result = pipeline_result.speech_comparisons.get(profile_settings.get("webrtc_aggressiveness", 0))
+            profile_decision = profile_policy.update(result, assist_result)
+            result.detector_profile = detector_profile
+            result.webrtc_assist_open = profile_decision.webrtc_assist_open
+            result.webrtc_assist_enter_count = profile_decision.webrtc_enter_count
+            result.webrtc_assist_exit_count = profile_decision.webrtc_exit_count
+            result.temporal_candidate = result.temporal_v1_raw_is_whisper
+            result.temporal_qualifying_run = result.temporal_v1_qualifying_run
+            result.assisted_confirmation_requirement = profile_decision.assisted_confirmation_requirement
+            result.fallback_confirmation_requirement = profile_decision.fallback_confirmation_requirement
+            result.confirmation_requirement = profile_decision.confirmation_requirement
+            result.trigger_route = profile_decision.trigger_route
 
 
 
@@ -571,27 +607,10 @@ def main():
             now = time.time()
 
 
-            if (
-                whisper_count
-                >=
-                (result.confirmation_frames or WHISPER_FRAMES_REQUIRED)
-            ):
-
-                if (
-                    now
-                    -
-                    last_trigger_time
-                    >
-                    COOLDOWN_SECONDS
-                ):
-
-                    triggered = True
-
-                    detector.record_trigger()
-
-                    last_trigger_time = now
-
-                    whisper_count = 0
+            if profile_decision.trigger and now - last_trigger_time > COOLDOWN_SECONDS:
+                triggered = True
+                detector.record_trigger()
+                last_trigger_time = now
 
 
 
@@ -599,11 +618,12 @@ def main():
             # LOGGING
             # -----------------------------
 
-            csv_logger.log(
-                frame_number,
-                pipeline_result,
-                triggered
-            )
+            if csv_logger:
+                csv_logger.log(frame_number, pipeline_result, triggered)
+                max_log_frames = LIVE_DIAGNOSTIC_LOGGING.get("max_frames", 0)
+                if not args.wav and detector_profile != "analysis_full" and max_log_frames and frame_number + 1 >= max_log_frames:
+                    csv_logger.close()
+                    csv_logger = None
 
 
 
@@ -619,7 +639,7 @@ def main():
                 f"WPROC={pipeline_result.whisper_processed} "
 
                 f"WHISPER={is_whisper} "            
-                f"COUNT={whisper_count} "            
+                f"COUNT={result.temporal_v1_qualifying_run if result.temporal_v1_qualifying_run is not None else 0} "
                 f"SCORE={result.raw_score}/3 "            
                 f"PROB={result.whisper_probability:.2f} "            
                 f"CAND={result.stage1_candidate if result.stage1_candidate is not None else 'N/A'} "
@@ -629,6 +649,8 @@ def main():
                 f"TMED={result.temporal_v1_silero_median if result.temporal_v1_silero_median is not None else 'N/A'} "
                 f"TLSTD={result.temporal_v1_low_proportion_std if result.temporal_v1_low_proportion_std is not None else 'N/A'} "
                 f"TRUN={result.temporal_v1_qualifying_run if result.temporal_v1_qualifying_run is not None else 'N/A'} "
+                f"WASSIST={result.webrtc_assist_open if result.webrtc_assist_open is not None else 'N/A'} "
+                f"ROUTE={result.trigger_route or 'N/A'} "
                 f"CLASSIFIER={result.whisper_classifier_implementation or WHISPER_CLASSIFIER_IMPLEMENTATION} "
                 f"RMS={result.rms:.4f} "            
                 f"ZCR={result.zcr:.3f} "            

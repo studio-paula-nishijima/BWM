@@ -18,7 +18,8 @@ def main():
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--analysis-tag", help="Optional filename tag for exports, e.g. 3L_webrtc")
     parser.add_argument("--frame-seconds", type=float, default=0.03)
-    parser.add_argument("--weighting", choices=("frame", "segment"), default="frame")
+    parser.add_argument("--weighting", choices=("frame", "segment"), default="frame",
+                        help="Retained for compatibility; exports always include both frame and segment weighting.")
     parser.add_argument("--full-pipeline", action="store_true", help="include bypassed whisper frames in whisper evaluation")
     parser.add_argument("--reject-overlaps", action="store_true")
     args = parser.parse_args()

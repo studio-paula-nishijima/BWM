@@ -13,6 +13,7 @@ class WhisperCSVLogger:
         speech_detector_implementation=None,
         comparison_speech_detector_implementation=None,
         comparison_speech_modes=(),
+        detector_profile=None,
         whisper_classifier_implementation=None,
     ):
 
@@ -39,6 +40,7 @@ class WhisperCSVLogger:
         self.speech_detector_implementation = speech_detector_implementation
         self.comparison_speech_detector_implementation = comparison_speech_detector_implementation
         self.comparison_speech_modes = tuple(comparison_speech_modes)
+        self.detector_profile = detector_profile
         self.whisper_classifier_implementation = whisper_classifier_implementation
 
 
@@ -48,6 +50,7 @@ class WhisperCSVLogger:
             "timestamp",
 
             "processing_mode",
+            "detector_profile",
             "speech_detector_implementation",
             "comparison_speech_detector_implementation",
 
@@ -101,8 +104,9 @@ class WhisperCSVLogger:
             "temporal_score",
             "formant_score",
             "low_proportion_std", "mid_proportion_std", "high_proportion_std", "zcr_std", "entropy_std", "spectral_centroid_std", "spectral_flux", "cepstral_peak_prominence", "spectral_slope", "spectral_rolloff", "spectral_flatness",
-            "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run", "confirmation_frames",
+            "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run",
             *[column for mode in self.comparison_speech_modes for column in (f"webrtc_mode_{mode}_evaluated", f"webrtc_mode_{mode}_is_speech")],
+            "webrtc_assist_open", "webrtc_assist_enter_count", "webrtc_assist_exit_count", "temporal_candidate", "temporal_qualifying_run", "assisted_confirmation_requirement", "fallback_confirmation_requirement", "confirmation_requirement", "trigger_route",
 
         ])
 
@@ -179,6 +183,7 @@ class WhisperCSVLogger:
             .isoformat(),
 
             processing_mode,
+            getattr(whisper, "detector_profile", None) or self.detector_profile,
             self.speech_detector_implementation,
             self.comparison_speech_detector_implementation,
 
@@ -267,12 +272,13 @@ class WhisperCSVLogger:
                 "low_proportion_std", "mid_proportion_std", "high_proportion_std", "zcr_std", "entropy_std", "spectral_centroid_std", "spectral_flux", "cepstral_peak_prominence", "spectral_slope", "spectral_rolloff", "spectral_flatness",
             )],
             *[getattr(whisper, name, None) for name in (
-                "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run", "confirmation_frames",
+                "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run",
             )],
             *[value for mode in self.comparison_speech_modes for value in (
                 bool(speech_comparisons.get(mode) and speech_comparisons[mode].features.get("evaluated", False)),
                 speech_comparisons[mode].is_speech if mode in speech_comparisons else None,
             )],
+            *[getattr(whisper, name, None) for name in ("webrtc_assist_open", "webrtc_assist_enter_count", "webrtc_assist_exit_count", "temporal_candidate", "temporal_qualifying_run", "assisted_confirmation_requirement", "fallback_confirmation_requirement", "confirmation_requirement", "trigger_route")],
 
         ])
 
