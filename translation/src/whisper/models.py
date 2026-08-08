@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Optional
 
 
 @dataclass
@@ -127,7 +127,8 @@ class SpeechDetectionResult:
 
     is_speech: bool = False
 
-    speech_probability: float = 0.0
+    # ``None`` means a backend has no continuous probability (WebRTC VAD).
+    speech_probability: Optional[float] = 0.0
 
     features: Dict[str, float] = field(
         default_factory=dict

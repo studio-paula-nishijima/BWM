@@ -9,7 +9,7 @@ adafruit-circuitpython-pca9685
 adafruit-circuitpython-motor
 sounddevice
 matplotlib
-webrtcvad
+webrtcvad-wheels==2.0.14
 soundfile
 torch==2.13.0
 torchaudio==2.11.0

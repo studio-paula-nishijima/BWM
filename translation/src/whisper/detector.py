@@ -17,6 +17,7 @@ from .detectors.whisper_grouped_v1 import GroupedV1WhisperDetector
 from .detectors.whisper_temporal_v1 import TemporalV1WhisperDetector
 from .detectors.speech_feature import FeatureSpeechDetector
 from .detectors.speech_silero import SileroSpeechDetector
+from .detectors.speech_webrtc import WebRTCSpeechDetector
 
 
 
@@ -86,12 +87,8 @@ def create_speech_detector(
         return SileroSpeechDetector(
             **kwargs
         )
-
-    if implementation == "silero":
-
-        return SileroSpeechDetector(
-            **kwargs
-        )
+    elif implementation == "webrtc":
+        return WebRTCSpeechDetector(**kwargs)
 
     raise ValueError(
         f"Unknown speech detector: {implementation}"

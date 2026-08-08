@@ -239,6 +239,15 @@ def evaluation_summary(frames, full_pipeline=False):
         rows.append({"stage": stage, "full_pipeline": full_pipeline, "frame_count": int(valid.sum()), "tp": tp, "fp": fp, "fn": fn, "tn": tn,
                      "precision": tp/(tp+fp) if tp+fp else np.nan, "recall": tp/(tp+fn) if tp+fn else np.nan,
                      "f1": 2*tp/(2*tp+fp+fn) if 2*tp+fp+fn else np.nan})
+    comparison = frames.get("comparison_speech_is_speech")
+    if comparison is not None:
+        for label, truth in (("webrtc_whisper_recall", labels.eq("whisper")), ("webrtc_normal_speech_recall", labels.eq("normal_speech")),
+                             ("webrtc_silence_false_speech", labels.eq("silence")), ("webrtc_background_false_speech", labels.eq("background_noise"))):
+            valid = truth & labels.notna() & ~labels.isin(EXCLUDED_LABELS) & comparison.notna()
+            positives = comparison[valid].astype(str).str.lower().eq("true")
+            rows.append({"stage": label, "full_pipeline": full_pipeline, "frame_count": int(valid.sum()),
+                         "tp": int(positives.sum()), "fp": np.nan, "fn": int((~positives).sum()), "tn": np.nan,
+                         "precision": np.nan, "recall": float(positives.mean()) if len(positives) else np.nan, "f1": np.nan})
     return pd.DataFrame(rows)
 
 

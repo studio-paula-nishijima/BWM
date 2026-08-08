@@ -20,6 +20,7 @@ class SileroSpeechDetector(SpeechDetector):
     """Adapt 480-sample pipeline frames to continuous 512-sample windows."""
 
     WINDOW_SAMPLES = 512
+    provides_silero_probability = True
 
     def __init__(
         self,

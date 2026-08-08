@@ -11,6 +11,7 @@ class WhisperCSVLogger:
         filename,
         processing_mode=None,
         speech_detector_implementation=None,
+        comparison_speech_detector_implementation=None,
         whisper_classifier_implementation=None,
     ):
 
@@ -35,6 +36,7 @@ class WhisperCSVLogger:
 
         self.processing_mode = processing_mode
         self.speech_detector_implementation = speech_detector_implementation
+        self.comparison_speech_detector_implementation = comparison_speech_detector_implementation
         self.whisper_classifier_implementation = whisper_classifier_implementation
 
 
@@ -45,6 +47,7 @@ class WhisperCSVLogger:
 
             "processing_mode",
             "speech_detector_implementation",
+            "comparison_speech_detector_implementation",
 
             # -----------------------------
             # Speech detector
@@ -53,6 +56,9 @@ class WhisperCSVLogger:
             "is_speech",
             "speech_probability",
             "speech_gate_open",
+            "comparison_speech_evaluated",
+            "comparison_speech_is_speech",
+            "comparison_speech_aggressiveness",
 
 
             # -----------------------------
@@ -132,6 +138,7 @@ class WhisperCSVLogger:
         if hasattr(result, "speech"):
 
             speech = result.speech
+            speech_comparison = result.speech_comparison
 
             whisper = result.whisper
 
@@ -147,6 +154,7 @@ class WhisperCSVLogger:
         else:
 
             speech = None
+            speech_comparison = None
 
             whisper = result
 
@@ -167,6 +175,7 @@ class WhisperCSVLogger:
 
             processing_mode,
             self.speech_detector_implementation,
+            self.comparison_speech_detector_implementation,
 
 
 
@@ -188,6 +197,9 @@ class WhisperCSVLogger:
             ),
 
             speech_gate_open,
+            bool(speech_comparison and speech_comparison.features.get("evaluated", False)),
+            speech_comparison.is_speech if speech_comparison else None,
+            speech_comparison.features.get("aggressiveness") if speech_comparison else None,
 
 
 

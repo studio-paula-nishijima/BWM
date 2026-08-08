@@ -48,6 +48,8 @@ from configs.whisper import (
     PROCESSING_MODE,
 
     SPEECH_DETECTOR_IMPLEMENTATION,
+    SPEECH_DETECTOR_COMPARE_IMPLEMENTATION,
+    SPEECH_WEBRTC_AGGRESSIVENESS,
     WHISPER_DETECTOR_IMPLEMENTATION,
     WHISPER_CLASSIFIER_SETTINGS,
     WHISPER_CLASSIFIER_IMPLEMENTATION,
@@ -138,6 +140,13 @@ def parse_arguments():
         type=str,
         default=None,
         help="Analyse WAV file instead of live microphone"
+    )
+
+    parser.add_argument(
+        "--analysis-tag",
+        type=str,
+        default=None,
+        help="Optional filename tag for analysis logs, e.g. 3L",
     )
 
     return parser.parse_args()
@@ -271,6 +280,7 @@ def main():
 
 
     speech_detector = None
+    comparison_speech_detector = None
 
 
     if PROCESSING_MODE in (
@@ -296,6 +306,12 @@ def main():
             centroid_max=SPEECH_CENTROID_MAX,
         
         )
+        if SPEECH_DETECTOR_COMPARE_IMPLEMENTATION:
+            comparison_speech_detector = create_speech_detector(
+                SPEECH_DETECTOR_COMPARE_IMPLEMENTATION,
+                sample_rate=SAMPLE_RATE,
+                aggressiveness=SPEECH_WEBRTC_AGGRESSIVENESS,
+            )
 
 
     comparison_whisper_detector = None
@@ -317,6 +333,7 @@ def main():
 
         PROCESSING_MODE,
         comparison_whisper_detector=comparison_whisper_detector,
+        comparison_speech_detector=comparison_speech_detector,
         classifier_implementation=WHISPER_CLASSIFIER_IMPLEMENTATION,
 
     )
@@ -330,6 +347,8 @@ def main():
     # LOG FILE
     # -----------------------------
 
+    analysis_tag = f"_{args.analysis_tag}" if args.analysis_tag else ""
+
     if args.wav:
 
         wav_path = Path(
@@ -339,7 +358,7 @@ def main():
         log_file = (
             Path("logs")
             /
-            f"{wav_path.stem}_whisper_analysis.csv"
+            f"{wav_path.stem}{analysis_tag}_whisper_analysis.csv"
         )
 
     else:
@@ -351,7 +370,7 @@ def main():
         log_file = (
             Path("logs")
             /
-            f"live_whisper_analysis_{timestamp}.csv"
+            f"live{analysis_tag}_whisper_analysis_{timestamp}.csv"
         )
 
 
@@ -363,6 +382,7 @@ def main():
             if speech_detector is not None
             else "none"
         ),
+        comparison_speech_detector_implementation=SPEECH_DETECTOR_COMPARE_IMPLEMENTATION,
         whisper_classifier_implementation=WHISPER_CLASSIFIER_IMPLEMENTATION,
     )
 

@@ -35,6 +35,7 @@ class DetectorPipelineResult:
     # None means the configured mode did not run a speech detector.  This is
     # deliberately distinct from a detector result saying ``is_speech=False``.
     speech: Optional[SpeechDetectionResult]
+    speech_comparison: Optional[SpeechDetectionResult]
 
     whisper: WhisperDetectionResult
 
@@ -52,12 +53,14 @@ class DetectorPipeline:
         speech_detector=None,
         mode="direct",
         comparison_whisper_detector=None,
+        comparison_speech_detector=None,
         classifier_implementation="legacy"
     ):
 
         self.whisper_detector = whisper_detector
         self.speech_detector = speech_detector
         self.comparison_whisper_detector = comparison_whisper_detector
+        self.comparison_speech_detector = comparison_speech_detector
         self.classifier_implementation = classifier_implementation
 
         self.mode = mode
@@ -86,10 +89,12 @@ class DetectorPipeline:
             )
         if mode == "direct" and any(getattr(detector, "requires_speech_evidence", False) for detector in (whisper_detector, comparison_whisper_detector)):
             raise ValueError("Silero-evidence classifiers require speech_gate or shadow mode and cannot run in direct mode")
+        if any(getattr(detector, "requires_speech_evidence", False) for detector in (whisper_detector, comparison_whisper_detector)) and getattr(speech_detector, "speech_backend", None) == "webrtc":
+            raise ValueError("grouped_v1 and temporal_v1 require a primary Silero speech detector")
 
     def reset(self):
         """Reset stateful detectors at a real audio-stream boundary."""
-        for detector in (self.speech_detector, self.whisper_detector, self.comparison_whisper_detector):
+        for detector in (self.speech_detector, self.comparison_speech_detector, self.whisper_detector, self.comparison_whisper_detector):
             if detector is not None and hasattr(detector, "reset"):
                 detector.reset()
 
@@ -117,6 +122,9 @@ class DetectorPipeline:
             speech_result = (
                 self.speech_detector.classify(frame)
             )
+            speech_comparison = self.comparison_speech_detector.classify(frame) if self.comparison_speech_detector is not None else None
+        else:
+            speech_comparison = None
 
 
         # ---------------------------------
@@ -171,6 +179,7 @@ class DetectorPipeline:
 
         result = DetectorPipelineResult(
             speech=speech_result,
+            speech_comparison=speech_comparison,
             whisper=whisper_result,
             processing_mode=self.mode,
             speech_gate_open=speech_gate_open,

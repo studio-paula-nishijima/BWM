@@ -13,9 +13,13 @@ processing_mode: shadow
 # Speech detector backends:
 # - silero: streaming Silero VAD at 16 kHz. Required by grouped_v1.
 # - feature: legacy threshold-based speech detector (legacy-only use).
+# - webrtc: WebRTC VAD Boolean speech detector. Modes 0--3; 1 is the
+#   conservative high-recall default for quiet/whisper evaluation.
 speech_detector:
   implementation: silero
   threshold: 0.5
+  compare_implementation: webrtc
+  aggressiveness: 1
 
 # Compatibility-only legacy detector setting. The active classifier is selected
 # below by whisper_classifier.implementation; leave this as feature.

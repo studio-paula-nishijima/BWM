@@ -47,6 +47,9 @@ speech_cfg = cfg.get(
     {}
 )
 
+SPEECH_DETECTOR_COMPARE_IMPLEMENTATION = speech_cfg.get("compare_implementation")
+SPEECH_WEBRTC_AGGRESSIVENESS = speech_cfg.get("aggressiveness", 1)
+
 SPEECH_RMS_MIN = speech_cfg.get(
     "rms_min",
     0.003
@@ -91,6 +94,7 @@ WHISPER_DETECTOR_IMPLEMENTATION = (
     .get("whisper_detector", {})
     .get("implementation", "feature")
 )
+SPEECH_DETECTOR_COMPARE_IMPLEMENTATION = speech_cfg.get("compare_implementation")
 
 WHISPER_CLASSIFIER_CONFIG = cfg.get("whisper_classifier", {})
 WHISPER_CLASSIFIER_IMPLEMENTATION = WHISPER_CLASSIFIER_CONFIG.get(
