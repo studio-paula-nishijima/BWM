@@ -29,6 +29,7 @@ from configs.whisper import (
     SAMPLE_RATE,
     FRAME_MS,
     DEVICE,
+    ANALYSIS_FILENAME_TAG,
 
     RMS_MIN,
     RMS_MAX,
@@ -347,7 +348,8 @@ def main():
     # LOG FILE
     # -----------------------------
 
-    analysis_tag = f"_{args.analysis_tag}" if args.analysis_tag else ""
+    selected_analysis_tag = args.analysis_tag if args.analysis_tag is not None else ANALYSIS_FILENAME_TAG
+    analysis_tag = f"_{selected_analysis_tag}" if selected_analysis_tag else ""
 
     if args.wav:
 

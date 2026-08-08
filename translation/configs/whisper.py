@@ -19,6 +19,8 @@ FRAME_MS = cfg["frame_ms"]
 
 DEVICE = cfg["device"]
 
+ANALYSIS_FILENAME_TAG = cfg.get("analysis_filename_tag", "")
+
 
 
 # -----------------------------

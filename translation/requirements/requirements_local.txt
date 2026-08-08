@@ -1,0 +1,10 @@
+# Development dependencies for a Windows/macOS workstation.
+#
+# This mirrors requirements_translation.txt, but supplies gpiozero through pip
+# rather than Raspberry Pi OS's apt packages.  It is intentionally separate
+# from the Pi requirements: GPIO, I2C, ALSA, and USB microphone access are
+# hardware/OS concerns, not portable Python dependencies.
+
+-r requirements_translation.txt
+gpiozero
+

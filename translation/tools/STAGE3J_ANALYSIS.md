@@ -30,6 +30,11 @@ python tools/analyse_labelled_wavs.py --manifest analysis_manifest.csv --output-
 streamlit run src/viz/labelled_wav_app.py
 ```
 
+Pass `--analysis-tag 3L_webrtc` to append that tag to every export filename,
+for example `labelled_frames_3L_webrtc.csv` and
+`evaluation_summary_3L_webrtc.csv`. Without a tag, the existing filenames are
+unchanged.
+
 The application logs a wall-clock `timestamp`; it is deliberately not used as
 audio time. The tool prefers an explicit elapsed-time column and otherwise
 derives time as `frame * 0.03` because WAV processing uses 480 samples at

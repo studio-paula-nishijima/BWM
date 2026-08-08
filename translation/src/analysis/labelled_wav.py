@@ -267,7 +267,7 @@ def qualifying_run_summary(frames, column="temporal_v1_raw_is_whisper"):
     return pd.DataFrame(rows)
 
 
-def analyse_triplets(triplets, output_dir, frame_seconds=0.03, weighting="frame", full_pipeline=False, reject_overlaps=False):
+def analyse_triplets(triplets, output_dir, frame_seconds=0.03, weighting="frame", full_pipeline=False, reject_overlaps=False, analysis_tag=None):
     """Analyse iterable of (wav_path, log_path, annotation_path) and write the four exports."""
     all_frames = []
     for wav_path, log_path, annotation_path in triplets:
@@ -282,9 +282,10 @@ def analyse_triplets(triplets, output_dir, frame_seconds=0.03, weighting="frame"
     separation = feature_separation(frames, weighting, full_pipeline)
     evaluation = evaluation_summary(frames, full_pipeline)
     qualifying_runs = qualifying_run_summary(frames)
-    frames.to_csv(output / "labelled_frames.csv", index=False)
-    summaries.to_csv(output / "feature_summary.csv", index=False)
-    separation.to_csv(output / "feature_separation.csv", index=False)
-    evaluation.to_csv(output / "evaluation_summary.csv", index=False)
-    qualifying_runs.to_csv(output / "qualifying_run_summary.csv", index=False)
+    suffix = f"_{analysis_tag}" if analysis_tag else ""
+    frames.to_csv(output / f"labelled_frames{suffix}.csv", index=False)
+    summaries.to_csv(output / f"feature_summary{suffix}.csv", index=False)
+    separation.to_csv(output / f"feature_separation{suffix}.csv", index=False)
+    evaluation.to_csv(output / f"evaluation_summary{suffix}.csv", index=False)
+    qualifying_runs.to_csv(output / f"qualifying_run_summary{suffix}.csv", index=False)
     return {"labelled_frames": frames, "feature_summary": summaries, "feature_separation": separation, "evaluation_summary": evaluation, "qualifying_run_summary": qualifying_runs}

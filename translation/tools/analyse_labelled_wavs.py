@@ -2,6 +2,7 @@
 """Run offline Stage 3J analysis for one or many WAV/log/annotation triplets."""
 import argparse
 import csv
+import re
 import sys
 from pathlib import Path
 
@@ -15,6 +16,7 @@ def main():
                         help="repeat for each recording")
     parser.add_argument("--manifest", help="CSV with wav_file,log_file,annotation_file columns")
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--analysis-tag", help="Optional filename tag for exports, e.g. 3L_webrtc")
     parser.add_argument("--frame-seconds", type=float, default=0.03)
     parser.add_argument("--weighting", choices=("frame", "segment"), default="frame")
     parser.add_argument("--full-pipeline", action="store_true", help="include bypassed whisper frames in whisper evaluation")
@@ -30,8 +32,10 @@ def main():
             for row in csv.DictReader(source):
                 triplets.append((row["wav_file"], row["log_file"], row["annotation_file"]))
     if not triplets: parser.error("provide at least one --triplet or --manifest")
+    if args.analysis_tag and not re.fullmatch(r"[A-Za-z0-9_.-]+", args.analysis_tag):
+        parser.error("--analysis-tag may contain only letters, digits, dots, underscores, and hyphens")
     results = analyse_triplets(triplets, args.output_dir, args.frame_seconds, args.weighting,
-                               args.full_pipeline, args.reject_overlaps)
+                               args.full_pipeline, args.reject_overlaps, args.analysis_tag)
     for name, table in results.items(): print(f"{name}: {len(table)} rows")
 
 

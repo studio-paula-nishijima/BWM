@@ -2,6 +2,9 @@ sample_rate: 16000
 frame_ms: 30
 device: "plughw:2,0"
 
+# Appended to analysis CSV filenames by default; --analysis-tag overrides it.
+analysis_filename_tag: "3L"
+
 # Processing modes:
 # - direct: runs the primary legacy classifier without a speech detector.
 #           grouped_v1 is rejected because it requires real Silero evidence.
