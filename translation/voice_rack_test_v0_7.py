@@ -159,6 +159,7 @@ def parse_arguments():
         default=None,
         help="Optional filename tag for analysis logs, e.g. 3L",
     )
+    parser.add_argument("--enable-live-logging", action="store_true", help="Enable diagnostic CSV logging for this live run without changing configuration")
     parser.add_argument("--detector-profile", choices=PROFILE_NAMES, default=None)
     parser.add_argument("--processing-mode", choices=("direct", "speech_gate", "shadow"), default=None)
     actuation_group = parser.add_mutually_exclusive_group()
@@ -426,7 +427,7 @@ def main():
         )
 
 
-    logging_enabled = bool(args.wav or detector_profile == "analysis_full" or LIVE_DIAGNOSTIC_LOGGING.get("enabled", False))
+    logging_enabled = bool(args.wav or args.enable_live_logging or detector_profile == "analysis_full" or LIVE_DIAGNOSTIC_LOGGING.get("enabled", False))
     csv_logger = WhisperCSVLogger(
         log_file,
         processing_mode=PROCESSING_MODE,
