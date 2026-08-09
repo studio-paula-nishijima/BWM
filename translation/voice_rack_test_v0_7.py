@@ -94,6 +94,9 @@ from audio.arecord_source import ArecordSource
 from src.audio.ring_buffer import AudioRingBuffer
 
 from app_logging.csv_logger import WhisperCSVLogger
+from actuation.runtime import resolve_actuation_enabled, request_for_emitted_trigger
+from actuation.servo_controller import ServoActuationController
+from configs.servos import CHANNEL, FREQUENCY, MIN_PULSE, MAX_PULSE, HOME_PULSE
 
 
 
@@ -124,6 +127,7 @@ whisper_count = 0
 csv_logger = None
 
 detector = None
+actuation_controller = None
 
 
 audio_buffer = AudioRingBuffer(
@@ -156,6 +160,9 @@ def parse_arguments():
     )
     parser.add_argument("--detector-profile", choices=PROFILE_NAMES, default=None)
     parser.add_argument("--processing-mode", choices=("direct", "speech_gate", "shadow"), default=None)
+    actuation_group = parser.add_mutually_exclusive_group()
+    actuation_group.add_argument("--enable-actuation", action="store_true", help="Enable physical servo actuation (WAV opt-in)")
+    actuation_group.add_argument("--no-actuation", action="store_true", help="Run without initialising servo hardware")
 
     return parser.parse_args()
 
@@ -170,6 +177,7 @@ def shutdown(*_):
     global source
     global csv_logger
     global detector
+    global actuation_controller
 
 
     print("\nShutdown...")
@@ -196,6 +204,13 @@ def shutdown(*_):
 
     if detector:
         detector.reset()
+
+    if actuation_controller:
+        try:
+            actuation_controller.shutdown()
+        except Exception:
+            import traceback
+            traceback.print_exc()
 
 
     if source:
@@ -251,8 +266,10 @@ def main():
     global last_trigger_time
     global whisper_count
     global detector
+    global actuation_controller
 
     args = parse_arguments()
+    actuation_enabled = resolve_actuation_enabled(wav_path=args.wav, enable_actuation=args.enable_actuation, no_actuation=args.no_actuation)
     detector_profile = args.detector_profile or DETECTOR_PROFILE
     profile_settings = dict(DETECTOR_PROFILES.get(detector_profile, {}))
     if detector_profile not in PROFILE_NAMES:
@@ -417,6 +434,7 @@ def main():
         comparison_speech_modes=tuple(comparison_speech_detectors),
         whisper_classifier_implementation=classifier_implementation,
         detector_profile=detector_profile,
+        actuation_enabled=actuation_enabled,
     ) if logging_enabled else None
 
 
@@ -468,6 +486,18 @@ def main():
     detector.reset()
     profile_policy.reset()
 
+    if actuation_enabled:
+        actuation_config = {"channel": CHANNEL, "frequency": FREQUENCY, "min_pulse": MIN_PULSE, "max_pulse": MAX_PULSE, "home_pulse": HOME_PULSE, "cooldown_seconds": COOLDOWN_SECONDS}
+        try:
+            actuation_controller = ServoActuationController(actuation_config)
+        except Exception as exc:
+            try: source.close()
+            except Exception: pass
+            if csv_logger:
+                try: csv_logger.close()
+                except Exception: pass
+            raise RuntimeError("Actuation initialisation failed. Check PCA9685/I2C/servo dependencies, or rerun with --no-actuation to test detection without hardware.") from exc
+
 
 
     # -----------------------------
@@ -485,6 +515,8 @@ def main():
     print(
         f"Detector profile: {detector_profile}\nProcessing mode: {resolved_processing_mode}"
     )
+    print(f"Audio source: {'WAV' if args.wav else 'live'}")
+    print(f"Actuation: {'enabled' if actuation_enabled else 'disabled'}")
     print(f"Whisper classifier: {classifier_implementation}")
     if detector_profile == "webrtc_assisted_temporal":
         print(f"Trigger policy: WebRTC assist {profile_settings['assisted_confirmation_frames']} frames; temporal fallback {profile_settings['fallback_confirmation_frames']} frames")
@@ -492,11 +524,6 @@ def main():
     else:
         print(f"Trigger policy: temporal only, {profile_settings['fallback_confirmation_frames']} frames")
     print(f"Temporal window: {profile_settings['rolling_window_frames']} frames; Silero median range: {profile_settings['silero_median_min']}–{profile_settings['silero_median_max']}; low-proportion std minimum: {profile_settings['low_proportion_std_min']}")
-
-
-    print(
-        "No servo control enabled"
-    )
 
 
     try:
@@ -619,6 +646,13 @@ def main():
                 # emitted trigger while the actuator cooldown is active.
                 result.trigger_suppression_reason = "cooldown"
 
+            actuation_result = request_for_emitted_trigger(emitted_trigger=triggered, controller=actuation_controller)
+            if actuation_result:
+                if actuation_result["started"]:
+                    print(f"ACTUATION: started sequence {actuation_result['sequence']}")
+                else:
+                    print(f"ACTUATION: suppressed ({actuation_result['suppression_reason']})")
+
 
 
             # -----------------------------
@@ -626,7 +660,7 @@ def main():
             # -----------------------------
 
             if csv_logger:
-                csv_logger.log(frame_number, pipeline_result, triggered)
+                csv_logger.log(frame_number, pipeline_result, triggered, actuation_result)
                 max_log_frames = LIVE_DIAGNOSTIC_LOGGING.get("max_frames", 0)
                 if not args.wav and detector_profile != "analysis_full" and max_log_frames and frame_number + 1 >= max_log_frames:
                     csv_logger.close()

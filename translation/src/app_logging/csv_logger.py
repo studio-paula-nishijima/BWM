@@ -15,6 +15,7 @@ class WhisperCSVLogger:
         comparison_speech_modes=(),
         detector_profile=None,
         whisper_classifier_implementation=None,
+        actuation_enabled=False,
     ):
 
         self.filename = Path(filename)
@@ -42,6 +43,7 @@ class WhisperCSVLogger:
         self.comparison_speech_modes = tuple(comparison_speech_modes)
         self.detector_profile = detector_profile
         self.whisper_classifier_implementation = whisper_classifier_implementation
+        self.actuation_enabled = actuation_enabled
 
 
         self.writer.writerow([
@@ -107,6 +109,7 @@ class WhisperCSVLogger:
             "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run",
             *[column for mode in self.comparison_speech_modes for column in (f"webrtc_mode_{mode}_evaluated", f"webrtc_mode_{mode}_is_speech")],
             "webrtc_assist_open", "webrtc_assist_enter_count", "webrtc_assist_exit_count", "temporal_candidate", "temporal_qualifying_run", "assisted_confirmation_requirement", "fallback_confirmation_requirement", "confirmation_requirement", "threshold_crossing_route", "trigger_route", "trigger_suppression_reason",
+            "actuation_enabled", "actuation_requested", "actuation_started", "actuation_suppression_reason",
 
         ])
 
@@ -116,7 +119,8 @@ class WhisperCSVLogger:
         self,
         frame_number,
         result,
-        triggered
+        triggered,
+        actuation_result=None,
     ):
 
         """
@@ -279,6 +283,10 @@ class WhisperCSVLogger:
                 speech_comparisons[mode].is_speech if mode in speech_comparisons else None,
             )],
             *[getattr(whisper, name, None) for name in ("webrtc_assist_open", "webrtc_assist_enter_count", "webrtc_assist_exit_count", "temporal_candidate", "temporal_qualifying_run", "assisted_confirmation_requirement", "fallback_confirmation_requirement", "confirmation_requirement", "threshold_crossing_route", "trigger_route", "trigger_suppression_reason")],
+            self.actuation_enabled,
+            actuation_result.get("requested") if actuation_result else False,
+            actuation_result.get("started") if actuation_result else False,
+            actuation_result.get("suppression_reason") if actuation_result else None,
 
         ])
 
