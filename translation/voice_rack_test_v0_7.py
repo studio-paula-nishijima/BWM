@@ -128,6 +128,7 @@ csv_logger = None
 
 detector = None
 actuation_controller = None
+run_configuration_summary = None
 
 
 audio_buffer = AudioRingBuffer(
@@ -178,9 +179,12 @@ def shutdown(*_):
     global csv_logger
     global detector
     global actuation_controller
+    global run_configuration_summary
 
 
     print("\nShutdown...")
+    if run_configuration_summary:
+        print("Run configuration recap:\n" + run_configuration_summary)
 
     if detector:
         summary = detector.summary()
@@ -267,6 +271,7 @@ def main():
     global whisper_count
     global detector
     global actuation_controller
+    global run_configuration_summary
 
     args = parse_arguments()
     actuation_enabled = resolve_actuation_enabled(wav_path=args.wav, enable_actuation=args.enable_actuation, no_actuation=args.no_actuation)
@@ -512,18 +517,21 @@ def main():
     )
 
 
-    print(
-        f"Detector profile: {detector_profile}\nProcessing mode: {resolved_processing_mode}"
-    )
-    print(f"Audio source: {'WAV' if args.wav else 'live'}")
-    print(f"Actuation: {'enabled' if actuation_enabled else 'disabled'}")
-    print(f"Whisper classifier: {classifier_implementation}")
+    run_configuration_summary = "\n".join((
+        f"Detector profile: {detector_profile}", f"Processing mode: {resolved_processing_mode}",
+        f"Audio source: {'WAV' if args.wav else 'live'}", f"Actuation: {'enabled' if actuation_enabled else 'disabled'}",
+        f"Whisper classifier: {classifier_implementation}",
+    ))
+    print(run_configuration_summary)
     if detector_profile == "webrtc_assisted_temporal":
         print(f"Trigger policy: WebRTC assist {profile_settings['assisted_confirmation_frames']} frames; temporal fallback {profile_settings['fallback_confirmation_frames']} frames")
         print(f"WebRTC debounce: enter {profile_settings['webrtc_enter_frames']} / exit {profile_settings['webrtc_exit_frames']} frames")
+        run_configuration_summary += f"\nTrigger policy: WebRTC assist {profile_settings['assisted_confirmation_frames']} frames; temporal fallback {profile_settings['fallback_confirmation_frames']} frames\nWebRTC debounce: enter {profile_settings['webrtc_enter_frames']} / exit {profile_settings['webrtc_exit_frames']} frames"
     else:
         print(f"Trigger policy: temporal only, {profile_settings['fallback_confirmation_frames']} frames")
+        run_configuration_summary += f"\nTrigger policy: temporal only, {profile_settings['fallback_confirmation_frames']} frames"
     print(f"Temporal window: {profile_settings['rolling_window_frames']} frames; Silero median range: {profile_settings['silero_median_min']}–{profile_settings['silero_median_max']}; low-proportion std minimum: {profile_settings['low_proportion_std_min']}")
+    run_configuration_summary += f"\nTemporal window: {profile_settings['rolling_window_frames']} frames; Silero median range: {profile_settings['silero_median_min']}–{profile_settings['silero_median_max']}; low-proportion std minimum: {profile_settings['low_proportion_std_min']}"
 
 
     try:
