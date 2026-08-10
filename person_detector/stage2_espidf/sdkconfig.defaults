@@ -1,0 +1,21 @@
+# XIAO ESP32S3 Sense: QIO flash with 8 MB octal PSRAM.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+
+# The XIAO ESP32S3 Sense has 8 MB flash. The Stage 2 model and application
+# are larger than the standard factory app partition, so use our 4 MB layout.
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# The XIAO camera is stable with normal PSRAM frame-buffer transfers. Avoid
+# the optional PSRAM-DMA path, which can corrupt JPEG capture on this board.
+# CONFIG_CAMERA_PSRAM_DMA is not set
+
+# Keep the ready-made model in flash as read-only data; no SD card is required.
+CONFIG_PEDESTRIAN_DETECT_MODEL_IN_FLASH_RODATA=y

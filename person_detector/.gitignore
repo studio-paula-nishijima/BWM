@@ -1,0 +1,6 @@
+.pio/
+wifi_credentials.h
+stage2_espidf/build/
+stage2_espidf/managed_components/
+stage2_espidf/sdkconfig
+stage2_espidf/sdkconfig.old
