@@ -19,9 +19,22 @@ def _waveform(path):
         return np.linspace(0, len(samples) / source.getframerate(), len(samples)), samples
 
 
-st.set_page_config(layout="wide", page_title="Labelled WAV analysis")
-st.title("Stage 3J: Labelled WAV detector analysis")
-st.caption("Frame-weighted results treat correlated 30 ms frames as individual observations. Use segment weighting when each annotated interval should have equal influence.")
+DISPLAY_NAMES = {
+    "speech_gate_open": "Primary speech processing gate",
+    "webrtc_assist_open": "WebRTC assist state",
+    "comparison_speech_is_speech": "WebRTC VAD result",
+    "is_whisper": "Classifier whisper decision",
+    "threshold_crossing_route": "Policy confirmation route reached",
+    "trigger_route": "Detector trigger emitted via",
+    "trigger_suppression_reason": "Detector trigger not emitted: reason",
+    "trigger": "Detector emitted trigger",
+    "actuation_started": "Servo sequence started",
+    "actuation_suppression_reason": "Servo request not started: reason",
+}
+
+st.set_page_config(layout="wide", page_title="Detector analysis")
+st.title("Labelled WAV detector analysis")
+st.caption("Presentation names use the current detector/policy/actuation architecture. Older CSVs remain supported; fields absent from earlier schemas are shown as not recorded.")
 frames_path = Path(st.sidebar.text_input("labelled_frames.csv", "labelled_frames.csv"))
 if not frames_path.exists():
     st.info("Run tools/analyse_labelled_wavs.py first, then enter its labelled_frames.csv path.")
@@ -50,12 +63,20 @@ if wav_candidate.exists():
 for _, segment in data[["annotation_label", "annotation_start_seconds", "annotation_end_seconds", "annotation_confidence", "annotation_notes"]].dropna(subset=["annotation_label"]).drop_duplicates().iterrows():
     fig.add_vrect(x0=segment.annotation_start_seconds, x1=segment.annotation_end_seconds, opacity=.18,
                   annotation_text=f"{segment.annotation_label}: {segment.get('annotation_notes', '')}")
-for column, title in (("speech_probability", "speech probability"), ("whisper_probability", "whisper probability"), ("raw_score", "whisper score")):
+for column, title in (("speech_probability", "primary speech probability"), ("whisper_probability", "classifier whisper probability"), ("raw_score", "classifier score")):
     if column in view: fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column], name=title, yaxis="y2"))
-for column, title in (("is_speech", "speech decision"), ("speech_gate_open", "gate open"), ("whisper_processed", "whisper processed"), ("is_whisper", "whisper decision"), ("trigger", "trigger")):
+for column, title in (("is_speech", "primary speech decision"), ("speech_gate_open", DISPLAY_NAMES["speech_gate_open"]), ("webrtc_assist_open", DISPLAY_NAMES["webrtc_assist_open"]), ("whisper_processed", "classifier processed"), ("is_whisper", DISPLAY_NAMES["is_whisper"]), ("trigger", DISPLAY_NAMES["trigger"]), ("actuation_started", DISPLAY_NAMES["actuation_started"])):
     if column in view: fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column].astype(str).str.lower().eq("true").astype(int), name=title, mode="markers"))
 fig.update_layout(xaxis_range=[start, finish], yaxis2=dict(overlaying="y", side="right"), height=600)
 st.plotly_chart(fig, use_container_width=True)
+st.subheader("Detector, policy, and actuation events")
+event_columns = ["frame_time_seconds", "threshold_crossing_route", "trigger_route", "trigger_suppression_reason", "actuation_requested", "actuation_started", "actuation_suppression_reason"]
+event_columns = [column for column in event_columns if column in view]
+if event_columns:
+    events = view[event_columns].dropna(how="all", subset=[column for column in event_columns if column != "frame_time_seconds"])
+    st.dataframe(events.rename(columns=DISPLAY_NAMES), use_container_width=True)
+else:
+    st.info("This legacy CSV does not record policy-route or actuation events.")
 features = feature_columns(view)
 visible = st.multiselect("Feature traces", features, default=features[:3])
 if visible:
