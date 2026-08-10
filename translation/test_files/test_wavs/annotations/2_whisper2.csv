@@ -1,0 +1,4 @@
+start_seconds,end_seconds,label,confidence,notes
+0.00,0.20,background_noise,high,startup_click
+0.20,2.38,silence,high,
+2.38,10.00,whisper,high,some pauses 0.5m
