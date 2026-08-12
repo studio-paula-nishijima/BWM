@@ -73,25 +73,42 @@ for _, segment in data[["annotation_label", "annotation_start_seconds", "annotat
                   annotation_text=f"{segment.annotation_label}: {segment.get('annotation_notes', '')}")
 for column, title in (("speech_probability", "primary speech probability"), ("whisper_probability", "classifier whisper probability"), ("raw_score", "classifier score")):
     if column in view: fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column], name=title, yaxis="y2"))
-for column, title in (("is_speech", "primary speech decision"), ("speech_gate_open", DISPLAY_NAMES["speech_gate_open"]), ("webrtc_assist_open", DISPLAY_NAMES["webrtc_assist_open"]), ("whisper_processed", "classifier processed"), ("is_whisper", DISPLAY_NAMES["is_whisper"]), ("trigger", DISPLAY_NAMES["trigger"]), ("actuation_started", DISPLAY_NAMES["actuation_started"])):
+for column, title in (("comparison_speech_is_speech", DISPLAY_NAMES["comparison_speech_is_speech"]), ("webrtc_assist_open", DISPLAY_NAMES["webrtc_assist_open"]), ("is_whisper", DISPLAY_NAMES["is_whisper"]), ("trigger", DISPLAY_NAMES["trigger"]), ("actuation_started", DISPLAY_NAMES["actuation_started"]), ("is_speech", "primary speech decision"), ("speech_gate_open", DISPLAY_NAMES["speech_gate_open"]), ("whisper_processed", "classifier processed")):
     if column in view: fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column].astype(str).str.lower().eq("true").astype(int), name=title, mode="markers"))
-fig.update_layout(xaxis_range=[start, finish], yaxis2=dict(overlaying="y", side="right"), height=600)
-st.plotly_chart(fig, use_container_width=True)
+TIMELINE_MARGIN = dict(l=80, r=80, t=40, b=55)
+fig.update_layout(xaxis=dict(range=[start, finish], title="Audio time (seconds)"), yaxis2=dict(overlaying="y", side="right"), height=460, margin=TIMELINE_MARGIN)
 temporal_columns = ["frame_time_seconds", "low_proportion", "temporal_v1_low_proportion_max", "temporal_v1_low_proportion_max_pass", "temporal_v1_window_full", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper"]
 temporal_columns = [column for column in temporal_columns if column in view]
+low_band_fig = None
 if "temporal_v1_low_proportion_max_pass" in view:
-    st.subheader("Temporal candidate: current-frame low-band maximum")
     low_band_fig = go.Figure()
     if "low_proportion" in view:
         low_band_fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view.low_proportion, name=DISPLAY_NAMES["low_proportion"]))
     if "temporal_v1_low_proportion_max" in view and view.temporal_v1_low_proportion_max.notna().any():
         threshold = view.temporal_v1_low_proportion_max.dropna().iloc[0]
         low_band_fig.add_hline(y=threshold, line_dash="dash", annotation_text=DISPLAY_NAMES["temporal_v1_low_proportion_max"])
-    low_band_fig.update_layout(xaxis_range=[start, finish], yaxis_title="Proportion", height=300)
-    st.plotly_chart(low_band_fig, use_container_width=True)
+    low_band_fig.update_layout(xaxis=dict(range=[start, finish], title="Audio time (seconds)"), yaxis_title="Proportion", height=460, margin=TIMELINE_MARGIN)
+features = feature_columns(view)
+timeline_column, candidate_column, feature_column = st.columns(3)
+with timeline_column:
+    st.subheader("Production decision path")
+    st.plotly_chart(fig, use_container_width=True)
+with candidate_column:
+    st.subheader("Temporal candidate")
+    if low_band_fig:
+        st.plotly_chart(low_band_fig, use_container_width=True)
+    elif "temporal_v1_raw_is_whisper" in view:
+        st.info("This legacy CSV predates the current-frame low-band maximum; the condition was not recorded.")
+with feature_column:
+    st.subheader("Feature traces")
+    visible = st.multiselect("Feature traces", features, default=features[:3])
+    if visible:
+        feature_fig = go.Figure()
+        for column in visible: feature_fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column], name=DISPLAY_NAMES.get(column, column)))
+        feature_fig.update_layout(xaxis=dict(range=[start, finish], title="Audio time (seconds)"), height=460, margin=TIMELINE_MARGIN)
+        st.plotly_chart(feature_fig, use_container_width=True)
+if low_band_fig:
     st.dataframe(view[temporal_columns].rename(columns=DISPLAY_NAMES), use_container_width=True)
-elif "temporal_v1_raw_is_whisper" in view:
-    st.info("This legacy CSV predates the current-frame low-band maximum; its temporal evidence remains comparable, but this condition was not recorded.")
 st.subheader("Detector, policy, and actuation events")
 event_columns = ["frame_time_seconds", "threshold_crossing_route", "trigger_route", "trigger_suppression_reason", "actuation_requested", "actuation_started", "actuation_suppression_reason"]
 event_columns = [column for column in event_columns if column in view]
@@ -100,13 +117,6 @@ if event_columns:
     st.dataframe(events.rename(columns=DISPLAY_NAMES), use_container_width=True)
 else:
     st.info("This legacy CSV does not record policy-route or actuation events.")
-features = feature_columns(view)
-visible = st.multiselect("Feature traces", features, default=features[:3])
-if visible:
-    feature_fig = go.Figure()
-    for column in visible: feature_fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column], name=column))
-    feature_fig.update_layout(xaxis_range=[start, finish])
-    st.plotly_chart(feature_fig, use_container_width=True)
 st.subheader("Annotations in view")
 columns = [c for c in ["annotation_label", "annotation_start_seconds", "annotation_end_seconds", *[f"annotation_{x}" for x in OPTIONAL_COLUMNS]] if c in view]
 st.dataframe(view[columns].drop_duplicates(), use_container_width=True)
