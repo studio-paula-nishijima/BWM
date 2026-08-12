@@ -88,25 +88,21 @@ if "temporal_v1_low_proportion_max_pass" in view:
         threshold = view.temporal_v1_low_proportion_max.dropna().iloc[0]
         low_band_fig.add_hline(y=threshold, line_dash="dash", annotation_text=DISPLAY_NAMES["temporal_v1_low_proportion_max"])
     low_band_fig.update_layout(xaxis=dict(range=[start, finish], title="Audio time (seconds)"), yaxis_title="Proportion", height=460, margin=TIMELINE_MARGIN)
+st.subheader("Production decision path")
+st.plotly_chart(fig, use_container_width=True)
+st.subheader("Temporal candidate")
+if low_band_fig:
+    st.plotly_chart(low_band_fig, use_container_width=True)
+elif "temporal_v1_raw_is_whisper" in view:
+    st.info("This legacy CSV predates the current-frame low-band maximum; the condition was not recorded.")
 features = feature_columns(view)
-timeline_column, candidate_column, feature_column = st.columns(3)
-with timeline_column:
-    st.subheader("Production decision path")
-    st.plotly_chart(fig, use_container_width=True)
-with candidate_column:
-    st.subheader("Temporal candidate")
-    if low_band_fig:
-        st.plotly_chart(low_band_fig, use_container_width=True)
-    elif "temporal_v1_raw_is_whisper" in view:
-        st.info("This legacy CSV predates the current-frame low-band maximum; the condition was not recorded.")
-with feature_column:
-    st.subheader("Feature traces")
-    visible = st.multiselect("Feature traces", features, default=features[:3])
-    if visible:
-        feature_fig = go.Figure()
-        for column in visible: feature_fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column], name=DISPLAY_NAMES.get(column, column)))
-        feature_fig.update_layout(xaxis=dict(range=[start, finish], title="Audio time (seconds)"), height=460, margin=TIMELINE_MARGIN)
-        st.plotly_chart(feature_fig, use_container_width=True)
+st.subheader("Feature traces")
+visible = st.multiselect("Feature traces", features, default=features[:3])
+if visible:
+    feature_fig = go.Figure()
+    for column in visible: feature_fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column], name=DISPLAY_NAMES.get(column, column)))
+    feature_fig.update_layout(xaxis=dict(range=[start, finish], title="Audio time (seconds)"), height=460, margin=TIMELINE_MARGIN)
+    st.plotly_chart(feature_fig, use_container_width=True)
 if low_band_fig:
     st.dataframe(view[temporal_columns].rename(columns=DISPLAY_NAMES), use_container_width=True)
 st.subheader("Detector, policy, and actuation events")
