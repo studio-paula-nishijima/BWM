@@ -24,6 +24,14 @@ DISPLAY_NAMES = {
     "webrtc_assist_open": "WebRTC assist state",
     "comparison_speech_is_speech": "WebRTC VAD result",
     "is_whisper": "Classifier whisper decision",
+    "low_proportion": "Current-frame low-band proportion",
+    "temporal_v1_low_proportion_max": "Low-band maximum threshold",
+    "temporal_v1_low_proportion_max_pass": "Low-band maximum passes",
+    "temporal_v1_window_full": "Temporal window full",
+    "temporal_v1_silero_min_pass": "Silero minimum passes",
+    "temporal_v1_silero_max_pass": "Silero maximum passes",
+    "temporal_v1_low_proportion_std_pass": "Low-band variation passes",
+    "temporal_v1_raw_is_whisper": "Temporal classifier evidence",
     "threshold_crossing_route": "Policy confirmation route reached",
     "trigger_route": "Detector trigger emitted via",
     "trigger_suppression_reason": "Detector trigger not emitted: reason",
@@ -69,6 +77,21 @@ for column, title in (("is_speech", "primary speech decision"), ("speech_gate_op
     if column in view: fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column].astype(str).str.lower().eq("true").astype(int), name=title, mode="markers"))
 fig.update_layout(xaxis_range=[start, finish], yaxis2=dict(overlaying="y", side="right"), height=600)
 st.plotly_chart(fig, use_container_width=True)
+temporal_columns = ["frame_time_seconds", "low_proportion", "temporal_v1_low_proportion_max", "temporal_v1_low_proportion_max_pass", "temporal_v1_window_full", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper"]
+temporal_columns = [column for column in temporal_columns if column in view]
+if "temporal_v1_low_proportion_max_pass" in view:
+    st.subheader("Temporal candidate: current-frame low-band maximum")
+    low_band_fig = go.Figure()
+    if "low_proportion" in view:
+        low_band_fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view.low_proportion, name=DISPLAY_NAMES["low_proportion"]))
+    if "temporal_v1_low_proportion_max" in view and view.temporal_v1_low_proportion_max.notna().any():
+        threshold = view.temporal_v1_low_proportion_max.dropna().iloc[0]
+        low_band_fig.add_hline(y=threshold, line_dash="dash", annotation_text=DISPLAY_NAMES["temporal_v1_low_proportion_max"])
+    low_band_fig.update_layout(xaxis_range=[start, finish], yaxis_title="Proportion", height=300)
+    st.plotly_chart(low_band_fig, use_container_width=True)
+    st.dataframe(view[temporal_columns].rename(columns=DISPLAY_NAMES), use_container_width=True)
+elif "temporal_v1_raw_is_whisper" in view:
+    st.info("This legacy CSV predates the current-frame low-band maximum; its temporal evidence remains comparable, but this condition was not recorded.")
 st.subheader("Detector, policy, and actuation events")
 event_columns = ["frame_time_seconds", "threshold_crossing_route", "trigger_route", "trigger_suppression_reason", "actuation_requested", "actuation_started", "actuation_suppression_reason"]
 event_columns = [column for column in event_columns if column in view]
