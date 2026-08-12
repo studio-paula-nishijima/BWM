@@ -94,6 +94,8 @@ class WhisperDetectionResult:
     temporal_v1_silero_min_pass: bool = None
     temporal_v1_silero_max_pass: bool = None
     temporal_v1_low_proportion_std_pass: bool = None
+    temporal_v1_low_proportion_max: float = None
+    temporal_v1_low_proportion_max_pass: bool = None
     temporal_v1_raw_is_whisper: bool = None
     temporal_v1_is_whisper: bool = None
     temporal_v1_qualifying_run: int = None

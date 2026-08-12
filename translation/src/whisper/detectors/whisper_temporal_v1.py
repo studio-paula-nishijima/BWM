@@ -19,6 +19,9 @@ class TemporalV1WhisperDetector:
         self.silero_median_min = kwargs.get("silero_median_min", 0.005)
         self.silero_median_max = kwargs.get("silero_median_max", 0.50)
         self.low_proportion_std_min = kwargs.get("low_proportion_std_min", 0.05)
+        self.low_proportion_max = kwargs.get("low_proportion_max")
+        if self.low_proportion_max is not None and not 0.0 <= self.low_proportion_max <= 1.0:
+            raise ValueError("low_proportion_max must be within [0, 1] or null")
         self.confirmation_frames = kwargs.get("confirmation_frames", 20)
         self.analysis_full = kwargs.get("analysis_full", True)
         self.features = AudioFeatures(sample_rate=sample_rate, rolling_window_frames=self.rolling_window_frames)
@@ -41,7 +44,8 @@ class TemporalV1WhisperDetector:
         min_pass = None if not full else median >= self.silero_median_min
         max_pass = None if not full else median <= self.silero_median_max
         variation_pass = None if not full else low_std >= self.low_proportion_std_min
-        raw = bool(full and min_pass and max_pass and variation_pass)
+        low_max_pass = True if self.low_proportion_max is None else values["low_proportion"] <= self.low_proportion_max
+        raw = bool(full and min_pass and max_pass and variation_pass and low_max_pass)
         self._qualifying_run = self._qualifying_run + 1 if raw else 0
         return WhisperDetectionResult(
             is_whisper=raw, whisper_probability=0.0, raw_score=int(raw),
@@ -54,6 +58,7 @@ class TemporalV1WhisperDetector:
             cepstral_peak_prominence=values.get("cepstral_peak_prominence"), spectral_slope=values.get("spectral_slope"), spectral_rolloff=values.get("spectral_rolloff"), spectral_flatness=values.get("spectral_flatness"),
             temporal_v1_window_full=full, temporal_v1_silero_median=median, temporal_v1_low_proportion_std=low_std,
             temporal_v1_silero_min_pass=min_pass, temporal_v1_silero_max_pass=max_pass, temporal_v1_low_proportion_std_pass=variation_pass,
+            temporal_v1_low_proportion_max=self.low_proportion_max, temporal_v1_low_proportion_max_pass=low_max_pass,
             temporal_v1_raw_is_whisper=raw, temporal_v1_is_whisper=raw, temporal_v1_qualifying_run=self._qualifying_run,
             confirmation_frames=self.confirmation_frames, whisper_classifier_implementation="temporal_v1",
         )
