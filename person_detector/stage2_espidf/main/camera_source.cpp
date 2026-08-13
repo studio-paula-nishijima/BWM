@@ -2,6 +2,7 @@
 
 #include "esp_log.h"
 #include "esp_psram.h"
+#include "stage2a_config.h"
 
 namespace {
 constexpr char kTag[] = "bwm.camera";
@@ -53,10 +54,10 @@ bool CameraSource::initialise()
     config.pin_reset = kPinReset;
     config.xclk_freq_hz = 20000000;
 
-    // JPEG capture avoids sustained raw-RGB writes to PSRAM. The detector
-    // converts each QVGA JPEG to RGB888 only when it is about to infer.
+    // Tiled mode uses VGA so each crop retains more distant-person detail;
+    // full-frame mode preserves the original QVGA baseline.
     config.pixel_format = PIXFORMAT_JPEG;
-    config.frame_size = FRAMESIZE_QVGA;
+    config.frame_size = tiledModeEnabled() ? FRAMESIZE_VGA : FRAMESIZE_QVGA;
     config.jpeg_quality = 12;
     // Match the proven Stage 1 capture pipeline. Two PSRAM buffers let the
     // driver acquire the next JPEG while the previous one is decoded.
@@ -69,7 +70,8 @@ bool CameraSource::initialise()
         ESP_LOGE(kTag, "camera initialisation failed: %s", esp_err_to_name(result));
         return false;
     }
-    ESP_LOGI(kTag, "camera ready: QVGA JPEG, two PSRAM frame buffers");
+    ESP_LOGI(kTag, "camera ready: %ux%u JPEG, two PSRAM frame buffers",
+             static_cast<unsigned>(sourceFrameWidth()), static_cast<unsigned>(sourceFrameHeight()));
     return true;
 }
 

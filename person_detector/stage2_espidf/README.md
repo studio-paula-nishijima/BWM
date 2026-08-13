@@ -42,6 +42,37 @@ a copied camera JPEG at about 1.4 frames per second and overlays the latest
 detector box. This is intentionally a low-rate diagnostic view: browser
 requests do not acquire camera frames, so they do not interfere with inference.
 
+## Stage 2A wide-scene experiment
+
+The inference mode is selected in `main/stage2a_config.h`:
+
+```cpp
+constexpr InferenceMode kInferenceMode = InferenceMode::Tiled;
+```
+
+- `FullFrame` preserves the baseline: QVGA JPEG (320x240), decoded to RGB888,
+  with the complete frame passed to ESP-DL. ESP-DL resizes it to the PICO S8
+  v1 model's 224x224 input.
+- `Tiled` captures VGA JPEG (640x480), decodes it once, and uses four 2x2
+  overlapping crops. Each crop is bilinearly resized to 224x224 before the
+  same model runs. The default overlap is 20 percent.
+
+Tile results are mapped to normalised full-frame coordinates and duplicate
+boxes are removed with cross-tile IoU NMS. Tile count, overlap, NMS threshold,
+and the five-scan temporal diagnostics window are configurable in the same
+header.
+
+Each scene scan logs mode, detections, rolling hit ratio, JPEG decode time,
+tile-resize time, aggregate and per-region inference time, total scene time,
+scan period, and effective scene scans/second. Each positive box logs
+confidence, normalised `x/y/w/h`, relative area, and inference time. This is
+diagnostic only; it does not implement the later exhibit activation timer.
+
+The tiled RGB workspaces consume about 1,072,128 bytes of PSRAM (a 640x480x3
+decoded frame plus one 224x224x3 reusable tile), in addition to camera buffers,
+the preview copy, and ESP-DL's own allocations. Boot logs report actual free
+PSRAM before and after these allocations.
+
 Use your actual serial port if it is not `COM3`. `idf.py build` will create
 `managed_components/` and `dependencies.lock`; both record the resolved model
 dependencies and should be retained after the first successful build.

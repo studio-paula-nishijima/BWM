@@ -37,7 +37,7 @@ namespace {
 constexpr char kTag[] = "bwm.preview";
 constexpr EventBits_t kWifiConnectedBit = BIT0;
 constexpr TickType_t kWifiTimeout = pdMS_TO_TICKS(20000);
-constexpr size_t kPreviewCapacity = 64 * 1024;
+constexpr size_t kPreviewCapacity = 128 * 1024;
 PreviewServer::Impl *gPreview = nullptr;
 
 const char kIndexHtml[] = R"HTML(<!doctype html>
