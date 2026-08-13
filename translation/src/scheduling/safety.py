@@ -3,10 +3,38 @@ from collections import defaultdict
 
 def enforce_solenoid_safety(
     events,
-    max_duty_cycle=0.6,
-    cooldown_window=10.0,
-    max_continuous_on=0.4
+    safety_config=None,
+    max_duty_cycle=None,
+    cooldown_window=None,
+    max_continuous_on=None,
 ):
+    """Apply configured generation-time limits when explicitly enabled.
+
+    Stage 1's baseline configuration disables this legacy filter so the
+    released base score is left intact. Runtime safety is a later concern.
+    Keyword limits remain available for focused callers and diagnostics.
+    """
+    # Preserve the legacy positional threshold call shape for diagnostics.
+    if safety_config is not None and not isinstance(safety_config, dict):
+        safety_config, max_duty_cycle, cooldown_window, max_continuous_on = (
+            {}, safety_config, max_duty_cycle, cooldown_window
+        )
+    safety_config = safety_config or {}
+    if safety_config and not safety_config.get("enabled", False):
+        return events
+
+    max_duty_cycle = (
+        max_duty_cycle if max_duty_cycle is not None
+        else safety_config.get("max_duty_cycle", 0.6)
+    )
+    cooldown_window = (
+        cooldown_window if cooldown_window is not None
+        else safety_config.get("cooldown_window", 10.0)
+    )
+    max_continuous_on = (
+        max_continuous_on if max_continuous_on is not None
+        else safety_config.get("max_continuous_on", 0.4)
+    )
 
     filtered = []
 

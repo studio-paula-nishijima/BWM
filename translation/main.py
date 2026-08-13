@@ -8,6 +8,8 @@ sys.path.append(
 import yaml
 import numpy as np
 
+from configs.runtime_config import PROJECT_ROOT, RUNTIME_CONFIG
+
 from lamah.lamah_loader import (
     load_lamah_column
 )
@@ -54,7 +56,7 @@ def normalize_linear(x):
 
 def run():
 
-    with open("configs/channels.yaml") as f:
+    with (PROJECT_ROOT / "configs" / "channels.yaml").open(encoding="utf-8") as f:
 
         config = yaml.safe_load(f)
 
@@ -147,10 +149,10 @@ def run():
         key=lambda e: e["playback_time"]
     )
 
-    events = enforce_solenoid_safety(events)
+    events = enforce_solenoid_safety(events, RUNTIME_CONFIG.get("safety"))
 
     np.save(
-        "events.npy",
+        PROJECT_ROOT / RUNTIME_CONFIG["files"]["events_file"],
         np.array(events, dtype=object)
     )
 

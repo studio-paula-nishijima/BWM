@@ -1,33 +1,17 @@
-import sys
 import signal
+import sys
 import time
-import numpy as np
-import pandas as pd
 from pathlib import Path
 
-# ---------------------------------------------------
-# Path setup
-# ---------------------------------------------------
+import numpy as np
+import pandas as pd
 
-sys.path.append(
-    str(Path(__file__).resolve().parent / "src")
-)
+sys.path.append(str(Path(__file__).resolve().parent / "src"))
 
 from configs.runtime_config import RUNTIME_CONFIG
-from events.playback_selection import (
-    select_random_segment,
-    rebase_playback_time
-)
-from runtime.gpio_backend import GPIOBackend
-from runtime.pin_config import PIN_MAP
-from runtime.router import EventRouter
-from runtime.clock import RealtimeClock
 from events.filtering import filter_events_by_date
+from events.playback_selection import rebase_playback_time, select_random_segment
 
-
-# ---------------------------------------------------
-# Global shutdown registry
-# ---------------------------------------------------
 
 shutdown_hooks = []
 _shutdown_in_progress = False
@@ -39,20 +23,15 @@ def register_shutdown_hook(fn):
 
 def shutdown():
     global _shutdown_in_progress
-
     if _shutdown_in_progress:
         return
-
     _shutdown_in_progress = True
-
     print("\n[SHUTDOWN] Cleaning up hardware...")
-
     for fn in shutdown_hooks:
         try:
             fn()
-        except Exception as e:
-            print(f"[SHUTDOWN ERROR] {e}")
-
+        except Exception as exc:
+            print(f"[SHUTDOWN ERROR] {exc}")
     print("[SHUTDOWN] Complete")
 
 
@@ -62,116 +41,74 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-# Attach signal handlers (Ctrl+C + systemd stop)
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
+def prepare_events(events, playback_cfg):
+    """Apply the released date-filter, rebase and segment-selection sequence."""
+    events = filter_events_by_date(
+        events, playback_cfg["start_date"], playback_cfg["end_date"]
+    )
+    if not events:
+        raise RuntimeError("No events remain after playback filtering")
 
-
-# ---------------------------------------------------
-# Config
-# ---------------------------------------------------
-
-playback_cfg = RUNTIME_CONFIG["playback"]
-
-PLAYBACK_START = playback_cfg["start_date"]
-PLAYBACK_END = playback_cfg["end_date"]
-
-
-# ---------------------------------------------------
-# Load events
-# ---------------------------------------------------
-
-events = np.load("events.npy", allow_pickle=True)
-events = list(events)
-
-print(f"Loaded raw events: {len(events)}")
-
-events = filter_events_by_date(events, PLAYBACK_START, PLAYBACK_END)
-
-print(f"Events after filtering: {len(events)}")
-
-if len(events) == 0:
-    raise RuntimeError("No events remain after playback filtering")
-
-
-# ---------------------------------------------------
-# Rebase timeline
-# ---------------------------------------------------
-
-t0 = events[0]["playback_time"]
-
-for e in events:
-    e["playback_time"] -= t0
-
-
-events = sorted(events, key=lambda e: e["playback_time"])
-
-
-# ---------------------------------------------------
-# Optional segment selection
-# ---------------------------------------------------
-
-if playback_cfg["random_segment"]:
-
-    duration_seconds = playback_cfg["segment_minutes"] * 60
-
-    events = select_random_segment(events, duration_seconds)
-    events = rebase_playback_time(events)
-
-
-# ---------------------------------------------------
-# Debug
-# ---------------------------------------------------
-
-print("\nFIRST 10 EVENTS:\n")
-
-for e in events[:10]:
-    print(e["playback_time"], e["timestamp"], e["target"])
-
-
-print(
-    f"\nPlayback window: "
-    f"{events[0]['timestamp']} → {events[-1]['timestamp']}"
-)
-
-print(f"Loaded {len(events)} events")
-
-
-# ---------------------------------------------------
-# Runtime setup
-# ---------------------------------------------------
-
-solenoid_backend = GPIOBackend(PIN_MAP)
-register_shutdown_hook(solenoid_backend.shutdown)
-
-backends = {"solenoid": solenoid_backend}
-router = EventRouter(backends)
-clock = RealtimeClock()
-
-
-# ---------------------------------------------------
-# Main playback loop
-# ---------------------------------------------------
-
-try:
-
+    t0 = events[0]["playback_time"]
     for event in events:
+        event["playback_time"] -= t0
+    events = sorted(events, key=lambda event: event["playback_time"])
 
+    if playback_cfg["random_segment"]:
+        events = select_random_segment(events, playback_cfg["segment_minutes"] * 60)
+        events = rebase_playback_time(events)
+    return events
+
+
+def play(events, router, clock, sleep_resolution):
+    """Dispatch in score order after each released target-time wait."""
+    for event in events:
         print("TARGET:", event["playback_time"])
         target_time = event["playback_time"]
-
         while clock.now() < target_time:
-            time.sleep(0.001)
-
+            time.sleep(sleep_resolution)
         print(
             f"{pd.Timestamp(event['timestamp']).strftime('%Y-%m-%d %H:%M:%S')} | "
-            f"{event['target']} | "
-            f"{event['metadata']['frequency']:.2f} Hz"
+            f"{event['target']} | {event['metadata']['frequency']:.2f} Hz"
         )
-
         router.dispatch(event)
 
 
-finally:
-    # ALWAYS run even on crash / Ctrl+C fallback
-    shutdown()
+def main():
+    # Hardware imports stay in the executable path: test/import operations do
+    # not require a Raspberry Pi or gpiozero.
+    from configs.runtime_config import PROJECT_ROOT, get_solenoid_pin_map
+    from runtime.clock import RealtimeClock
+    from runtime.gpio_backend import GPIOBackend
+    from runtime.router import EventRouter
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    playback_cfg = RUNTIME_CONFIG["playback"]
+    events_path = PROJECT_ROOT / RUNTIME_CONFIG["files"]["events_file"]
+    events = list(np.load(events_path, allow_pickle=True))
+    print(f"Loaded raw events: {len(events)}")
+    events = prepare_events(events, playback_cfg)
+    print(f"Events after filtering: {len(events)}")
+
+    print("\nFIRST 10 EVENTS:\n")
+    for event in events[:10]:
+        print(event["playback_time"], event["timestamp"], event["target"])
+    print(f"\nPlayback window: {events[0]['timestamp']} -> {events[-1]['timestamp']}")
+    print(f"Loaded {len(events)} events")
+
+    solenoid_backend = GPIOBackend(get_solenoid_pin_map())
+    register_shutdown_hook(solenoid_backend.shutdown)
+    try:
+        play(
+            events,
+            EventRouter({"solenoid": solenoid_backend}),
+            RealtimeClock(),
+            playback_cfg["sleep_resolution"],
+        )
+    finally:
+        shutdown()
+
+
+if __name__ == "__main__":
+    main()

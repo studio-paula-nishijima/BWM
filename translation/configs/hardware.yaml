@@ -1,0 +1,17 @@
+# Hardware topology is configuration, not a fixed runtime channel count.
+solenoids:
+  solenoid_1: 18
+  solenoid_2: 23
+  solenoid_3: 24
+  solenoid_4: 22
+  solenoid_5: 25
+  solenoid_6: 27
+
+controls:
+  translation_activation_backup_button: 17
+
+reserved_pins:
+  uart_tx: 14
+  uart_rx: 15
+  i2c_sda: 2
+  i2c_scl: 3

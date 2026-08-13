@@ -2,8 +2,16 @@ from gpiozero import DigitalInputDevice
 import subprocess
 import time
 import sys
+from pathlib import Path
 
-BUTTON_GPIO = 17
+# This script may be run directly by its existing service entry point.
+translation_root = Path(__file__).resolve().parents[2]
+if str(translation_root) not in sys.path:
+    sys.path.append(str(translation_root))
+
+from configs.runtime_config import get_backup_button_pin
+
+BUTTON_GPIO = get_backup_button_pin()
 SERVICE_NAME = "play-events.service"
 
 last_press = 0

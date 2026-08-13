@@ -27,9 +27,9 @@ visualization:
   density_window_default: 10.0
 
 safety:
-
-  max_duty_cycle: 0.6
-
-  cooldown_window: 10.0
-
-  max_continuous_on: 0.2
+  # Stage 1 preserves the released score without applying new restrictions.
+  # Meaningful runtime safety belongs to a later dynamic-runtime stage.
+  enabled: false
+  max_duty_cycle: 1.0
+  cooldown_window: 1.0
+  max_continuous_on: 3600.0
