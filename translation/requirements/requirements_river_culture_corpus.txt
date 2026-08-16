@@ -1,0 +1,2 @@
+# Retrieval Stage 4 only: keep PDF parsing separate from translation/playback.
+pymupdf==1.26.4
