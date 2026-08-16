@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 
 *.log
+*.pdf
+files/river_culture/river_culture_*.jsonl
+files/river_culture/river_culture_corpus_report.json
 
 # Virtual environments
 .venv/
