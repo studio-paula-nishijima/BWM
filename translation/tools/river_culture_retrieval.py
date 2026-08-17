@@ -192,7 +192,30 @@ def evaluate(config: dict[str, Any], root: Path, model_id: str, evaluation_path:
     results = [{**case, "retrieval": query(config, root, model_id, case["query"], top_k)} for case in cases]
     scores = [item["retrieval"]["raw_results"][0]["score"] for item in results]
     return {"model": model_id, "top_k": top_k, "cases": results,
-            "top1_score_summary": {"min": min(scores), "max": max(scores), "mean": sum(scores) / len(scores)}}
+            "top1_score_summary": {"min": min(scores), "max": max(scores), "mean": sum(scores) / len(scores)},
+            "cross_language_consistency": cross_language_consistency(results)}
+
+
+def cross_language_consistency(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Expose page/region overlap for equivalent multilingual questions."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for result in results:
+        grouped.setdefault(result.get("concept_id", result["id"]), []).append(result)
+    summaries: list[dict[str, Any]] = []
+    for concept_id, members in grouped.items():
+        if len(members) < 2:
+            continue
+        baseline = next((item for item in members if item.get("language") == "en"), members[0])
+        baseline_pages = {page for item in baseline["retrieval"]["raw_results"] for page in item["pdf_pages"]}
+        comparisons = []
+        for item in members:
+            pages = {page for candidate in item["retrieval"]["raw_results"] for page in candidate["pdf_pages"]}
+            union = baseline_pages | pages
+            comparisons.append({"language": item.get("language"), "top_chunk_id": item["retrieval"]["raw_results"][0]["id"],
+                                "top_pdf_pages": item["retrieval"]["raw_results"][0]["pdf_pages"],
+                                "top_k_page_jaccard_with_en": (len(baseline_pages & pages) / len(union)) if union else 1.0})
+        summaries.append({"concept_id": concept_id, "baseline_language": baseline.get("language"), "comparisons": comparisons})
+    return summaries
 
 
 def main() -> None:

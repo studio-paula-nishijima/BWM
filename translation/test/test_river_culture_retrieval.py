@@ -25,6 +25,14 @@ class RiverCultureRetrievalTests(unittest.TestCase):
         self.assertEqual(grouped[0]["pdf_pages"], [10, 11, 12])
         self.assertEqual(grouped[1]["best_chunk_id"], "c")
 
+    def test_cross_language_consistency_compares_equivalent_pages(self) -> None:
+        def result(language, pages):
+            return {"id": language, "concept_id": "feeling", "language": language,
+                    "retrieval": {"raw_results": [{"id": language + "-chunk", "pdf_pages": pages}]}}
+        summary = retrieval.cross_language_consistency([result("en", [1, 2]), result("de", [2, 3])])
+        self.assertEqual(summary[0]["concept_id"], "feeling")
+        self.assertAlmostEqual(summary[0]["comparisons"][1]["top_k_page_jaccard_with_en"], 1 / 3)
+
     def test_index_rejects_changed_chunks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
