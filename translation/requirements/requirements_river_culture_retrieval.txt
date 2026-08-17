@@ -1,0 +1,4 @@
+# Retrieval Stage 5 only.  Keep semantic retrieval separate from translation/playback.
+numpy>=1.24,<3
+psutil>=5.9,<7
+sentence-transformers>=3.0,<4

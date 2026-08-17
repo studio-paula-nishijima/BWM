@@ -6,6 +6,10 @@ __pycache__/
 *.pdf
 files/river_culture/river_culture_*.jsonl
 files/river_culture/river_culture_corpus_report.json
+files/river_culture/river_culture_embeddings_*.npy
+files/river_culture/river_culture_index_*.json
+files/river_culture/river_culture_evaluation_*.json
+translation/river_culture_venv/
 
 # Virtual environments
 .venv/

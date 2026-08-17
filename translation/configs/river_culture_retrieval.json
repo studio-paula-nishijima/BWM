@@ -1,0 +1,25 @@
+{
+  "retrieval_version": "1.0.0",
+  "chunks_input": "files/river_culture/river_culture_chunks.jsonl",
+  "corpus_report_input": "files/river_culture/river_culture_corpus_report.json",
+  "index_directory": "files/river_culture",
+  "top_k": 5,
+  "batch_size": 16,
+  "models": [
+    {
+      "id": "sentence-transformers/all-MiniLM-L6-v2",
+      "query_prefix": "",
+      "passage_prefix": ""
+    },
+    {
+      "id": "BAAI/bge-small-en-v1.5",
+      "query_prefix": "Represent this sentence for searching relevant passages: ",
+      "passage_prefix": ""
+    },
+    {
+      "id": "intfloat/multilingual-e5-small",
+      "query_prefix": "query: ",
+      "passage_prefix": "passage: "
+    }
+  ]
+}

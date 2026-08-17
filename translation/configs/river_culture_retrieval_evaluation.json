@@ -1,0 +1,14 @@
+[
+  {"id":"direct-river-culture","category":"factual_direct","query":"What is River Culture?","notes":"Look for the introductory definition and human-river relationship framing.","human_relevance":null},
+  {"id":"direct-flood-pulse","category":"factual_direct","query":"What is a flood pulse?","notes":"Look for flood-pulse ecology, not merely an unrelated flood reference.","human_relevance":null},
+  {"id":"concept-people-rivers","category":"conceptual","query":"How do people relate to rivers?","notes":"Look for cultural, social, emotional or practical human-river relationships.","human_relevance":null},
+  {"id":"concept-water-culture","category":"conceptual","query":"How are culture and water connected?","notes":"Look for biocultural diversity and river-culture material.","human_relevance":null},
+  {"id":"oracle-feeling","category":"abstract_oracle","query":"How does the water feel today?","notes":"Look for sensory, emotional or rhythm-of-water material; lexical overlap is not expected.","human_relevance":null},
+  {"id":"oracle-memory","category":"abstract_oracle","query":"Does the river remember?","notes":"Look for memory, heritage, history, identity or long-term human-river relationships.","human_relevance":null},
+  {"id":"oracle-lonely","category":"abstract_oracle","query":"Is the river lonely?","notes":"Look for isolation, connection, care or living-river material; weak results are informative.","human_relevance":null},
+  {"id":"fragment-memory","category":"fragmentary_stt","query":"river memory people","notes":"Treat as a plausible partial transcription.","human_relevance":null},
+  {"id":"fragment-feeling","category":"fragmentary_stt","query":"water feeling","notes":"Treat as a plausible partial transcription.","human_relevance":null},
+  {"id":"fragment-flood","category":"fragmentary_stt","query":"flood people","notes":"Treat as a plausible partial transcription.","human_relevance":null},
+  {"id":"irrelevant-pasta","category":"irrelevant","query":"How do I cook pasta?","notes":"No meaningful answer is expected; record its score distribution.","human_relevance":null},
+  {"id":"irrelevant-spacecraft","category":"irrelevant","query":"How do I repair a spacecraft engine?","notes":"No meaningful answer is expected; record its score distribution.","human_relevance":null}
+]

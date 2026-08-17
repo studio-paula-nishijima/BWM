@@ -12,17 +12,17 @@ file, then run from the repository root. This intentionally does not alter the
 Pi-aligned `translation_venv` used by the translation/event pipeline.
 
 ```bash
-python3.11 -m venv --system-site-packages river_culture_venv
-river_culture_venv/bin/python -m pip install -r translation/requirements/requirements_river_culture_corpus.txt
-river_culture_venv/bin/python translation/tools/river_culture_corpus.py build
+python3.11 -m venv --system-site-packages translation/river_culture_venv
+translation/river_culture_venv/bin/python -m pip install -r translation/requirements/requirements_river_culture_corpus.txt
+translation/river_culture_venv/bin/python translation/tools/river_culture_corpus.py build
 ```
 
 On Windows, use:
 
 ```powershell
-py -3.11 -m venv river_culture_venv
-.\river_culture_venv\Scripts\python.exe -m pip install -r translation\requirements\requirements_river_culture_corpus.txt
-.\river_culture_venv\Scripts\python.exe translation\tools\river_culture_corpus.py build
+py -3.11 -m venv translation\river_culture_venv
+.\translation\river_culture_venv\Scripts\python.exe -m pip install -r translation\requirements\requirements_river_culture_corpus.txt
+.\translation\river_culture_venv\Scripts\python.exe translation\tools\river_culture_corpus.py build
 ```
 
 On Raspberry Pi OS, preserve apt-provided GPIO availability with
