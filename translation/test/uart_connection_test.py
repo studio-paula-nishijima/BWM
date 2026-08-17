@@ -11,19 +11,18 @@ prints the heartbeats it receives from the other board.
 
 Example:
     python3 uart_connection_test.py --inspect
-    python3 uart_connection_test.py --name pi-a --port /dev/ttyAMA10
-    python3 uart_connection_test.py --name pi-b --port /dev/ttyAMA10
+    python3 uart_connection_test.py --name pi-a
+    python3 uart_connection_test.py --name pi-b
 
-The captured Pi 5 configuration for this installation maps GPIO14 (TX) and
-GPIO15 (RX) to RP1 UART0, exposed as /dev/ttyAMA10.  Do not substitute
-/dev/serial0, ttyAMA0, or ttyS0: those names are aliases or vary by board and
-configuration.
+GPIO14 (TX) and GPIO15 (RX) are assigned to the device-tree ``uart0`` alias.
+The script resolves that alias to its actual /dev/tty* device at runtime, then
+opens that device directly.  Do not use /dev/serial0: it is a separate,
+configuration-dependent alias and can point at the debug UART.
 
 Before running the test on each Pi, run ``--inspect`` and confirm that GPIO14
-and GPIO15 are assigned to uart0.  The kernel serial console and serial getty
-must not use ttyAMA10.  Disable the login shell over serial in raspi-config and
-remove ``console=ttyAMA10,...`` from /boot/firmware/cmdline.txt if present,
-then reboot.
+and GPIO15 are assigned to uart0 and that the resolved transport device is not
+claimed by a kernel serial console or serial getty. Disable the login shell over
+serial in raspi-config if required, then reboot.
 """
 
 from __future__ import annotations
@@ -39,15 +38,15 @@ import time
 import serial
 
 
-GPIO14_15_UART = "/dev/ttyAMA10"
+GPIO_UART_ALIAS = "uart0"
+DEVICE_TREE_ROOT = Path("/sys/firmware/devicetree/base")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--port",
-        default=GPIO14_15_UART,
-        help="GPIO14/15 UART device path (default: %(default)s)",
+        help="override the GPIO14/15 UART device resolved from the uart0 alias",
     )
     parser.add_argument("--baud", type=int, default=115200, help="baud rate")
     parser.add_argument("--name", help="this Pi's label, e.g. pi-a")
@@ -60,6 +59,38 @@ def parse_args() -> argparse.Namespace:
         help="show GPIO14/15 and serial-console state without opening the UART",
     )
     return parser.parse_args()
+
+
+def device_tree_alias_target(alias: str) -> Path | None:
+    """Return the device-tree node targeted by *alias*, when available."""
+    try:
+        relative_path = (DEVICE_TREE_ROOT / "aliases" / alias).read_bytes()
+    except OSError:
+        return None
+    return DEVICE_TREE_ROOT / relative_path.rstrip(b"\0").decode("ascii").lstrip("/")
+
+
+def tty_for_device_tree_node(node: Path) -> str | None:
+    """Find the /dev/tty* device backed by a device-tree node."""
+    try:
+        expected = node.resolve()
+    except OSError:
+        return None
+
+    for tty in sorted(Path("/sys/class/tty").glob("tty*")):
+        of_node = tty / "device" / "of_node"
+        try:
+            if of_node.resolve() == expected:
+                return f"/dev/{tty.name}"
+        except OSError:
+            continue
+    return None
+
+
+def gpio_uart_port() -> str | None:
+    """Resolve the UART selected by the GPIO14/15 uart0 pin function."""
+    target = device_tree_alias_target(GPIO_UART_ALIAS)
+    return tty_for_device_tree_node(target) if target else None
 
 
 def run_inspection(command: list[str]) -> None:
@@ -111,33 +142,52 @@ def serial_getty_claims(port: str) -> str | None:
     return None
 
 
-def inspect(port: str) -> int:
+def inspect(port: str | None) -> int:
     """Show the information needed to verify the GPIO14/15 UART mapping."""
-    tty_name = os.path.basename(os.path.realpath(port))
-    print(f"Configured GPIO14/15 transport device: {port}")
-    run_inspection(["readlink", "-f", port])
+    uart0_node = device_tree_alias_target(GPIO_UART_ALIAS)
+    print(f"GPIO14/15 pin-function alias: {GPIO_UART_ALIAS}")
+    print(f"{GPIO_UART_ALIAS} device-tree node: {uart0_node or 'unavailable'}")
+    print(f"Resolved GPIO14/15 transport device: {port or 'unavailable'}")
+    if port:
+        tty_name = os.path.basename(os.path.realpath(port))
+        run_inspection(["readlink", "-f", port])
+        run_inspection(
+            ["readlink", "-f", f"/sys/class/tty/{tty_name}/device/of_node"]
+        )
     run_inspection(["readlink", "-f", "/dev/serial0"])
-    run_inspection(["readlink", "-f", f"/sys/class/tty/{tty_name}/device/of_node"])
-    run_inspection(["pinctrl", "get", "14", "15"])
+    run_inspection(["pinctrl", "get", "14"])
+    run_inspection(["pinctrl", "get", "15"])
     run_inspection(["sh", "-c", "cat /proc/cmdline"])
     run_inspection(["sh", "-c", "ls -l /dev/ttyAMA* /dev/ttyS* 2>/dev/null"])
-    run_inspection(["systemctl", "is-active", "serial-getty@ttyAMA10.service"])
+    if port:
+        run_inspection(
+            ["systemctl", "is-active", f"serial-getty@{os.path.basename(port)}.service"]
+        )
     return 0
 
 
 def main() -> int:
     args = parse_args()
+    port = args.port or gpio_uart_port()
     if args.inspect:
-        return inspect(args.port)
+        return inspect(port)
     if not args.name:
         print("--name is required unless --inspect is used", file=sys.stderr)
+        return 2
+    if not port:
+        print(
+            "Could not resolve the GPIO14/15 uart0 alias to a /dev/tty* device. "
+            "Run with --inspect, correct the pinmux/UART configuration, or pass "
+            "the verified device explicitly with --port.",
+            file=sys.stderr,
+        )
         return 2
     if args.interval <= 0:
         print("--interval must be greater than zero", file=sys.stderr)
         return 2
 
-    console_tty = serial_console_claims(args.port)
-    getty_tty = serial_getty_claims(args.port)
+    console_tty = serial_console_claims(port)
+    getty_tty = serial_getty_claims(port)
     if console_tty or getty_tty:
         claims = []
         if console_tty:
@@ -150,19 +200,19 @@ def main() -> int:
             else ""
         )
         print(
-            f"Refusing to use {args.port}: {'; '.join(claims)}. "
+            f"Refusing to use {port}: {'; '.join(claims)}. "
             f"Disable the serial login shell and reboot.{console_fix}",
             file=sys.stderr,
         )
         return 2
 
     try:
-        uart = serial.Serial(args.port, args.baud, timeout=0.1)
+        uart = serial.Serial(port, args.baud, timeout=0.1)
     except serial.SerialException as error:
-        print(f"Could not open {args.port}: {error}", file=sys.stderr)
+        print(f"Could not open {port}: {error}", file=sys.stderr)
         return 1
 
-    print(f"Opened {args.port} at {args.baud} baud as {args.name}. Press Ctrl+C to stop.")
+    print(f"Opened {port} at {args.baud} baud as {args.name}. Press Ctrl+C to stop.")
     sequence = 0
     next_heartbeat = time.monotonic()
 
