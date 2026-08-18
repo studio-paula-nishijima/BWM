@@ -16,7 +16,14 @@ import pandas as pd
 
 REQUIRED_COLUMNS = {"wav_file", "start_seconds", "end_seconds", "label"}
 LABELS = {"silence", "background_noise", "normal_speech", "whisper", "uncertain"}
-OPTIONAL_COLUMNS = ("confidence", "strength", "speaker", "distance", "noise_type", "notes")
+SEGMENT_OPTIONAL_COLUMNS = ("confidence", "strength", "speaker", "distance", "noise_type", "notes")
+# These fields extend the same one-CSV-per-WAV annotation format.  They are
+# deliberately optional so older Stage 3J/3L/3M files remain valid unchanged.
+UTTERANCE_METADATA_COLUMNS = ("utterance_id", "language", "transcription", "speaker_id", "session_id")
+OPTIONAL_COLUMNS = SEGMENT_OPTIONAL_COLUMNS + UTTERANCE_METADATA_COLUMNS
+# Long transcriptions are retained in the annotation table and the derived
+# utterance export, rather than copied to every 30 ms labelled-frame row.
+FRAME_METADATA_COLUMNS = SEGMENT_OPTIONAL_COLUMNS + ("utterance_id", "language", "speaker_id", "session_id")
 EXCLUDED_LABELS = {"uncertain"}
 
 
@@ -56,6 +63,13 @@ def load_annotations(path, wav_root=None, reject_overlaps=False, default_wav_fil
     annotations = annotations.copy()
     annotations["wav_file"] = annotations["wav_file"].astype(str)
     annotations["label"] = annotations["label"].astype(str).str.strip().str.lower()
+    for column in OPTIONAL_COLUMNS:
+        if column not in annotations:
+            annotations[column] = pd.NA
+        else:
+            # CSV empty cells arrive as NaN.  Keep them explicitly unavailable
+            # while preserving arbitrary non-empty transcription text.
+            annotations[column] = annotations[column].astype("string").str.strip().replace("", pd.NA)
     bad_labels = sorted(set(annotations.loc[~annotations.label.isin(LABELS), "label"]))
     if bad_labels:
         raise AnnotationValidationError("Unrecognised labels: " + ", ".join(bad_labels))
@@ -79,7 +93,20 @@ def load_annotations(path, wav_root=None, reject_overlaps=False, default_wav_fil
             if reject_overlaps:
                 raise AnnotationValidationError(message)
             warnings.warn(message, UserWarning, stacklevel=2)
+    _validate_utterance_metadata(annotations)
     return annotations.sort_values(["wav_file", "start_seconds", "end_seconds"], kind="stable").reset_index(drop=True)
+
+
+def _validate_utterance_metadata(annotations):
+    """Reject conflicting non-blank metadata for one utterance in one WAV."""
+    identified = annotations.loc[annotations.utterance_id.notna()]
+    for (wav_file, utterance_id), group in identified.groupby(["wav_file", "utterance_id"], dropna=False):
+        for column in ("language", "transcription", "speaker_id", "session_id"):
+            values = group[column].dropna().unique()
+            if len(values) > 1:
+                raise AnnotationValidationError(
+                    f"Conflicting {column} values for utterance_id {utterance_id!r} in {wav_file}"
+                )
 
 
 def derive_frame_times(records, frame_seconds=0.03):
@@ -103,7 +130,7 @@ def join_frames_to_annotations(records, annotations, wav_file, frame_seconds=0.0
     frames["annotation_label"] = pd.NA
     frames["annotation_start_seconds"] = np.nan
     frames["annotation_end_seconds"] = np.nan
-    for column in OPTIONAL_COLUMNS:
+    for column in FRAME_METADATA_COLUMNS:
         frames[f"annotation_{column}"] = pd.NA
     # stable ordering means overlaps deterministically choose the earlier interval.
     for _, interval in anns.iterrows():
@@ -112,10 +139,46 @@ def join_frames_to_annotations(records, annotations, wav_file, frame_seconds=0.0
         frames.loc[mask, "annotation_label"] = interval.label
         frames.loc[mask, "annotation_start_seconds"] = interval.start_seconds
         frames.loc[mask, "annotation_end_seconds"] = interval.end_seconds
-        for column in OPTIONAL_COLUMNS:
+        for column in FRAME_METADATA_COLUMNS:
             if column in anns:
                 frames.loc[mask, f"annotation_{column}"] = interval.get(column)
     return frames
+
+
+def utterance_metadata_summary(annotations):
+    """Return compact, recoverable metadata without inventing utterance IDs.
+
+    The start/end values span all segments sharing an ID.  They are descriptive
+    annotation bounds only; no utterance-capture metrics are calculated here.
+    """
+    columns = ["wav_file", "utterance_id", "start_seconds", "end_seconds",
+               "language", "transcription", "speaker_id", "session_id"]
+    rows = []
+    identified = annotations.loc[annotations.utterance_id.notna()]
+    for (wav_file, utterance_id), group in identified.groupby(["wav_file", "utterance_id"], sort=False):
+        row = {
+            "wav_file": wav_file,
+            "utterance_id": utterance_id,
+            "start_seconds": group.start_seconds.min(),
+            "end_seconds": group.end_seconds.max(),
+        }
+        for column in ("language", "transcription", "speaker_id", "session_id"):
+            values = group[column].dropna()
+            row[column] = values.iloc[0] if not values.empty else pd.NA
+        rows.append(row)
+    # Incremental annotation is allowed: preserve metadata-bearing segments
+    # even where the annotator has not supplied an utterance ID.  Do not group
+    # or synthesize IDs for them, since that would silently change semantics.
+    metadata_columns = ["language", "transcription", "speaker_id", "session_id"]
+    unidentified = annotations.loc[
+        annotations.utterance_id.isna() & annotations[metadata_columns].notna().any(axis=1)
+    ]
+    for _, segment in unidentified.iterrows():
+        row = {"wav_file": segment.wav_file, "utterance_id": pd.NA,
+               "start_seconds": segment.start_seconds, "end_seconds": segment.end_seconds}
+        row.update({column: segment[column] for column in metadata_columns})
+        rows.append(row)
+    return pd.DataFrame(rows, columns=columns)
 
 
 def feature_columns(frames):
@@ -326,24 +389,29 @@ def qualifying_run_summary(frames, column="temporal_v1_raw_is_whisper"):
 
 
 def analyse_triplets(triplets, output_dir, frame_seconds=0.03, weighting="frame", full_pipeline=False, reject_overlaps=False, analysis_tag=None):
-    """Analyse iterable of (wav_path, log_path, annotation_path) and write the four exports."""
+    """Analyse iterable of (wav_path, log_path, annotation_path) and write derived exports."""
     all_frames = []
+    all_annotations = []
     for wav_path, log_path, annotation_path in triplets:
         wav_path = Path(wav_path)
         anns = load_annotations(annotation_path, wav_root=wav_path.parent,
                                 reject_overlaps=reject_overlaps,
                                 default_wav_file=wav_path.name)
+        all_annotations.append(anns)
         all_frames.append(join_frames_to_annotations(pd.read_csv(log_path), anns, wav_path.name, frame_seconds))
     frames = pd.concat(all_frames, ignore_index=True) if all_frames else pd.DataFrame()
+    annotations = pd.concat(all_annotations, ignore_index=True) if all_annotations else pd.DataFrame()
     output = Path(output_dir); output.mkdir(parents=True, exist_ok=True)
     summaries = pd.concat([feature_summary(frames, mode) for mode in ("frame", "segment")], ignore_index=True)
     separation = pd.concat([feature_separation(frames, mode, full_pipeline) for mode in ("frame", "segment")], ignore_index=True)
     evaluation = evaluation_summary(frames, full_pipeline)
     qualifying_runs = qualifying_run_summary(frames)
+    utterances = utterance_metadata_summary(annotations)
     suffix = f"_{analysis_tag}" if analysis_tag else ""
     frames.to_csv(output / f"labelled_frames{suffix}.csv", index=False)
     summaries.to_csv(output / f"feature_summary{suffix}.csv", index=False)
     separation.to_csv(output / f"feature_separation{suffix}.csv", index=False)
     evaluation.to_csv(output / f"evaluation_summary{suffix}.csv", index=False)
     qualifying_runs.to_csv(output / f"qualifying_run_summary{suffix}.csv", index=False)
-    return {"labelled_frames": frames, "feature_summary": summaries, "feature_separation": separation, "evaluation_summary": evaluation, "qualifying_run_summary": qualifying_runs}
+    utterances.to_csv(output / f"utterance_metadata{suffix}.csv", index=False)
+    return {"labelled_frames": frames, "feature_summary": summaries, "feature_separation": separation, "evaluation_summary": evaluation, "qualifying_run_summary": qualifying_runs, "utterance_metadata": utterances}

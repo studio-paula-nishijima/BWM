@@ -5,6 +5,7 @@ from .labelled_wav import (
     analyse_triplets,
     join_frames_to_annotations,
     load_annotations,
+    utterance_metadata_summary,
 )
 
-__all__ = ["AnnotationValidationError", "analyse_triplets", "join_frames_to_annotations", "load_annotations"]
+__all__ = ["AnnotationValidationError", "analyse_triplets", "join_frames_to_annotations", "load_annotations", "utterance_metadata_summary"]

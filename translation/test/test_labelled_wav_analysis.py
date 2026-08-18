@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from analysis.labelled_wav import (AnnotationValidationError, evaluation_summary,
+from analysis.labelled_wav import (AnnotationValidationError, analyse_triplets, evaluation_summary,
     feature_separation, feature_summary, join_frames_to_annotations, load_annotations,
-    qualifying_run_summary)
+    qualifying_run_summary, utterance_metadata_summary)
 
 
 class LabelledWavAnalysisTests(unittest.TestCase):
@@ -35,12 +35,81 @@ class LabelledWavAnalysisTests(unittest.TestCase):
             loaded = load_annotations(path, directory, default_wav_file="a.wav")
             self.assertEqual(loaded.wav_file.iloc[0], "a.wav")
 
+    def test_legacy_annotation_schema_remains_valid_with_blank_utterance_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._csv(directory, "start_seconds,end_seconds,label\n0,.5,whisper\n")
+            loaded = load_annotations(path, directory, default_wav_file="a.wav")
+            self.assertTrue(loaded.utterance_id.isna().all())
+            self.assertTrue(loaded.transcription.isna().all())
+
+    def test_extended_annotation_schema_preserves_shared_utterance_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._csv(directory,
+                'start_seconds,end_seconds,label,utterance_id,language,transcription,speaker_id,session_id\n'
+                '1.2,2.8,whisper,q001,en,"What happens when the river floods, then recedes?",speaker_01,session_a\n'
+                '2.8,3.3,silence,q001,en,"What happens when the river floods, then recedes?",speaker_01,session_a\n'
+                '3.3,5.1,whisper,q001,en,"What happens when the river floods, then recedes?",speaker_01,session_a\n')
+            loaded = load_annotations(path, directory, default_wav_file="a.wav")
+            self.assertEqual(loaded.utterance_id.tolist(), ["q001"] * 3)
+            self.assertEqual(loaded.transcription.iloc[0], "What happens when the river floods, then recedes?")
+            summary = utterance_metadata_summary(loaded)
+            self.assertEqual(len(summary), 1)
+            self.assertEqual(summary.start_seconds.iloc[0], 1.2)
+            self.assertEqual(summary.end_seconds.iloc[0], 5.1)
+
+    def test_conflicting_utterance_metadata_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._csv(directory,
+                "start_seconds,end_seconds,label,utterance_id,language\n"
+                "0,.1,whisper,q001,en\n.1,.2,silence,q001,de\n")
+            with self.assertRaisesRegex(AnnotationValidationError, "Conflicting language"):
+                load_annotations(path, directory, default_wav_file="a.wav")
+
     def test_join_uses_half_open_boundaries_and_metadata(self):
         anns = pd.DataFrame({"wav_file":["a.wav", "a.wav"], "start_seconds":[0, .06], "end_seconds":[.06, .12], "label":["silence", "whisper"], "notes":["quiet", "soft"]})
         rows = pd.DataFrame({"frame":[0, 1, 2, 3], "rms":[1, 2, 3, 4]})
         joined = join_frames_to_annotations(rows, anns, "a.wav")
         self.assertEqual(joined.annotation_label.tolist(), ["silence", "silence", "whisper", "whisper"])
         self.assertEqual(joined.annotation_notes.iloc[2], "soft")
+
+    def test_join_propagates_compact_utterance_metadata_not_transcription(self):
+        anns = pd.DataFrame({"wav_file": ["a.wav"], "start_seconds": [0], "end_seconds": [.06],
+                             "label": ["whisper"], "utterance_id": ["q001"], "language": ["en"],
+                             "transcription": ["A question, with punctuation!"], "speaker_id": ["speaker_01"],
+                             "session_id": ["session_a"]})
+        joined = join_frames_to_annotations(pd.DataFrame({"frame": [0, 1, 2]}), anns, "a.wav")
+        self.assertEqual(joined.annotation_utterance_id.iloc[0], "q001")
+        self.assertEqual(joined.annotation_language.iloc[0], "en")
+        self.assertEqual(joined.annotation_speaker_id.iloc[0], "speaker_01")
+        self.assertEqual(joined.annotation_session_id.iloc[0], "session_a")
+        self.assertNotIn("annotation_transcription", joined.columns)
+
+    def test_analysis_export_writes_transcription_once_per_utterance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            annotation = self._csv(directory,
+                "start_seconds,end_seconds,label,utterance_id,language,transcription,speaker_id,session_id\n"
+                '0,.06,whisper,q001,en,"Question, with punctuation!",speaker_01,session_a\n')
+            log = directory / "log.csv"
+            pd.DataFrame({"frame": [0, 1], "is_speech": [True, True], "is_whisper": [True, True],
+                          "whisper_processed": [True, True], "rms": [1., 1.]}).to_csv(log, index=False)
+            results = analyse_triplets([(directory / "a.wav", log, annotation)], directory / "output")
+            self.assertNotIn("annotation_transcription", results["labelled_frames"].columns)
+            self.assertEqual(results["labelled_frames"].annotation_utterance_id.iloc[0], "q001")
+            utterances = pd.read_csv(directory / "output" / "utterance_metadata.csv")
+            self.assertEqual(utterances.transcription.iloc[0], "Question, with punctuation!")
+            self.assertEqual(utterances.start_seconds.iloc[0], 0.)
+            self.assertEqual(utterances.end_seconds.iloc[0], .06)
+
+    def test_analysis_export_preserves_metadata_when_utterance_id_is_blank(self):
+        annotations = pd.DataFrame({"wav_file": ["a.wav"], "start_seconds": [1.2], "end_seconds": [4.85],
+                                    "label": ["whisper"], "utterance_id": [pd.NA], "language": ["english"],
+                                    "transcription": ["A complete question"], "speaker_id": ["speaker_01"],
+                                    "session_id": [pd.NA]})
+        utterances = utterance_metadata_summary(annotations)
+        self.assertEqual(len(utterances), 1)
+        self.assertTrue(pd.isna(utterances.utterance_id.iloc[0]))
+        self.assertEqual(utterances.transcription.iloc[0], "A complete question")
 
     def test_overlaps_warn_or_reject(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -123,6 +192,24 @@ class LabelledWavAnalysisTests(unittest.TestCase):
         separation = feature_separation(frames, "frame")
         row = separation[(separation.comparison == "whisper_vs_normal_speech") & (separation.feature == "band_energy")].iloc[0]
         self.assertTrue(np.isfinite(row.distribution_overlap))
+
+    def test_equivalent_extended_metadata_does_not_change_metrics_or_runs(self):
+        records = self._frames().copy()
+        records["frame"] = range(len(records))
+        records["temporal_v1_raw_is_whisper"] = [True, True, False, False, True, False]
+        records["temporal_v1_qualifying_run"] = [1, 2, 0, 0, 1, 0]
+        records["confirmation_requirement"] = 2
+        records["trigger"] = [False, True, False, False, False, False]
+        legacy = pd.DataFrame({"wav_file": ["a.wav"] * 3, "start_seconds": [0, .1, .2],
+                               "end_seconds": [.1, .2, .3], "label": ["whisper", "normal_speech", "uncertain"]})
+        extended = legacy.assign(utterance_id=["q001", pd.NA, pd.NA], language=["en", pd.NA, pd.NA],
+                                 transcription=["Question?", pd.NA, pd.NA], speaker_id=["speaker_01", pd.NA, pd.NA],
+                                 session_id=["session_a", pd.NA, pd.NA])
+        old_frames = join_frames_to_annotations(records, legacy, "a.wav")
+        new_frames = join_frames_to_annotations(records, extended, "a.wav")
+        pd.testing.assert_frame_equal(evaluation_summary(old_frames), evaluation_summary(new_frames))
+        pd.testing.assert_frame_equal(qualifying_run_summary(old_frames), qualifying_run_summary(new_frames))
+        pd.testing.assert_frame_equal(feature_summary(old_frames), feature_summary(new_frames))
 
 
 if __name__ == "__main__": unittest.main()
