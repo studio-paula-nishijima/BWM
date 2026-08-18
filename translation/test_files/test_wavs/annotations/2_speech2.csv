@@ -1,4 +1,4 @@
 start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
 0.00,0.20,background_noise,high,startup_click
 0.20,2.12,silence,high,
-2.12,10.00,normal_speech,high,some pauses 0.5m,hello my name is paula nishijima i'm a visual artist i'm making a work about floods and droughts,paula
+2.12,10.00,normal_speech,high,some pauses 0.5m,english,hello my name is paula nishijima i'm a visual artist i'm making a work about floods and droughts,paula

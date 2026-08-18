@@ -3,4 +3,4 @@ start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_
 0.20,1.36,normal_speech,high,solenoid_actuation_noise phone_audio,engligh,uhh go,nicholas
 1.36,1.70,background_noise,high,breathing solenoid_actuation
 1.70,8.09,whisper,high,solenoid_actuation_noise,english,hey oracle i wanna know what you know so let me ask you these questions into the microphone tell me what you know,kaspar
-8.09,10.00,background noise,high,solenoid_actuation_noise
+8.09,10.00,background_noise,high,solenoid_actuation_noise

@@ -1,6 +1,6 @@
 start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
 0.00,0.20,background_noise,high,startup_click
 0.20,1.47,silence,high
-1.47,4.93,background_noise,laughter,,,paula
-4.93,6.61,background_noise,breath,,,paula
-6.61,10.00,normal_speech,,english,well test test let's see,paula
+1.47,4.93,background_noise,high,laughter,,,paula
+4.93,6.61,background_noise,high,breath,,,paula
+6.61,10.00,normal_speech,high,,english,well test test let's see,paula

@@ -2,7 +2,7 @@ start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_
 0.00,0.92,background_noise,high,startup_click buzzing
 0.92,1.77,normal_speech,high,buzzing,english,go,nicholas
 1.77,3.39,background_noise,high,buzzing
-3.30,5.54,background_noise,high,laughing,,,kaspar
+3.39,5.54,background_noise,high,laughing,,,kaspar
 5.54,6.20,normal_speech,high,,english,i was just,kaspar
 6.20,6.61,background_noise,high,buzzing
 6.61,10.00,normal_speech,high,,dutch,,kaspar

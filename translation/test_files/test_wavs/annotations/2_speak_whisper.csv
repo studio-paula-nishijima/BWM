@@ -1,7 +1,7 @@
 start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
 0.00,0.20,background_noise,high,startup_click
 0.20,1.37,silence,high,
-1.37,4.07,normal_speech,0.5m,english,hello how are you i'm paula,paula
+1.37,4.07,normal_speech,high,0.5m,english,hello how are you i'm paula,paula
 4.07,5.16,silence,medium,pause between speech
-5.16,8.71,whisper,0.5m,english,hello how are you i'm paula,paula
+5.16,8.71,whisper,high,0.5m,english,hello how are you i'm paula,paula
 8.71,10.00,silence,medium,
