@@ -33,3 +33,35 @@ Conceptual flow:
 Device-tree resolution and UART ownership checks belong exclusively to the UART transport/bridge layer. MQTT/common semantic events and translation runtime logic remain independent of Linux UART device names and of whether a semantic message crosses UART or IP networking. Message IDs/origin metadata remain the planned deduplication mechanism if redundant transports are enabled.
 
 Generation-time safety is configuration-connected but disabled for the Stage 1 release baseline. Meaningful safety enforcement belongs to the later dynamic-runtime stage.
+
+## Future multilingual ASR and River Culture retrieval
+
+This is architecture guidance only; it does not change detector, capture,
+playback, actuation, or runtime behaviour. The English River Culture corpus can
+be searched through either of two independently configurable routes:
+
+`captured utterance -> ASR translate_to_english -> English query -> English embedding backend -> English corpus retrieval`
+
+or:
+
+`captured utterance -> ASR transcribe -> native-language query -> multilingual embedding backend -> English corpus retrieval`
+
+Neither route is mandatory. The selection must be based primarily on whether
+the recognized query retrieves an intended or semantically appropriate English
+source region from the same captured whispered utterance; ASR transcription
+accuracy alone is not the decision metric. Latency, Pi resource use, model size,
+operational simplicity, inspectability, and uncertainty in language detection
+are secondary evaluation criteria.
+
+Initial languages are English, German, and Italian; Brazilian Portuguese is a
+future-compatible addition. Do not introduce per-language pipeline branches
+unless future backend evidence requires them. Future configuration should expose
+an ASR output mode (`transcribe` or `translate_to_english`) independently from
+an embedding backend (`multilingual` or `english`).
+
+For fair future comparison, retain each captured audio source and capture
+identity alongside language, ground-truth transcription where available,
+speaker/session identity, native ASR transcript, ASR English translation,
+retrieval route, ranked passage/chunk IDs and scores, and intended/acceptable
+retrieval outcome. Producing text must never discard the original captured
+audio. This requirement does not alter Stage 3P capture behaviour.

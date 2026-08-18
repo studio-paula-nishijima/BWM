@@ -37,6 +37,28 @@ ordered canonical `passage_ids`, page/chapter provenance, and propagated layout
 flags. `grouped_regions` is an optional page-overlap grouping for human review;
 it never alters `raw_results`.
 
+## Future ASR/retrieval routes
+
+The retrieval layer accepts query text and is deliberately agnostic about how it
+was produced. The English corpus supports two future routes, both retained for
+evaluation on the same captured whispered utterances:
+
+1. **Route A:** multilingual ASR directly translates to English, then an
+   English embedding model searches the English corpus.
+2. **Route B:** multilingual ASR transcribes in the original language, then a
+   multilingual embedding model searches the English corpus.
+
+Multilingual embeddings are therefore not mandatory. Select the route by
+retrieval quality on real whispered input, especially quiet, incomplete, noisy,
+or imperfectly recognized utterances; transcription accuracy is only a
+secondary diagnostic. The future ASR output mode and embedding backend must
+remain independently configurable. No ASR, translation, or language-specific
+routing is implemented in this stage.
+
+The current EN/DE/IT equivalent text set exercises Route B directly. Its English
+equivalents also provide controlled Route A query text; later ASR evaluation
+must record both outputs for the same source audio before comparing them.
+
 ## Model shortlist
 
 The configuration intentionally evaluates a small shortlist:
@@ -45,15 +67,15 @@ The configuration intentionally evaluates a small shortlist:
    multilingual direct-retrieval baseline for English, German, and Italian.
 2. `intfloat/multilingual-e5-small`: multilingual candidate using E5's
    `query:`/`passage:` prefixes; it is expected to cost more memory/storage.
-3. `sentence-transformers/all-MiniLM-L6-v2`: compact English-only comparator,
-   retained to quantify the practical cost of failing the multilingual need.
+3. `sentence-transformers/all-MiniLM-L6-v2`: compact English Route A candidate
+   for translated query text.
 
-Direct multilingual retrieval is the baseline architecture. The editable set
-contains equivalent English/German/Italian questions and smaller PT-BR probes;
-evaluation reports page-overlap consistency against each English query. Compare
-human judgments and that consistency signal, then measure the selected model on
-the Pi while Whisper is also running. Do not add upstream translation unless
-these direct multilingual candidates prove inadequate.
+The editable set contains equivalent English/German/Italian questions and
+smaller PT-BR probes; evaluation reports page-overlap consistency against each
+English query. Compare human judgments and that consistency signal, then
+measure the route/model combinations on the Pi while Whisper is also running.
+Do not assume either direct translation or direct multilingual retrieval wins
+until that downstream retrieval comparison is complete.
 
 ## Reproducibility and safety
 

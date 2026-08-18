@@ -5,19 +5,34 @@
   "index_directory": "files/river_culture",
   "top_k": 5,
   "batch_size": 16,
+  "future_asr_retrieval_routes": {
+    "route_a": {
+      "asr_output_mode": "translate_to_english",
+      "embedding_backend": "english",
+      "description": "Future ASR direct English translation, then English embedding retrieval."
+    },
+    "route_b": {
+      "asr_output_mode": "transcribe",
+      "embedding_backend": "multilingual",
+      "description": "Future native-language ASR transcript, then multilingual embedding retrieval."
+    }
+  },
   "models": [
     {
       "id": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "embedding_backend": "multilingual",
       "query_prefix": "",
       "passage_prefix": ""
     },
     {
       "id": "intfloat/multilingual-e5-small",
+      "embedding_backend": "multilingual",
       "query_prefix": "query: ",
       "passage_prefix": "passage: "
     },
     {
       "id": "sentence-transformers/all-MiniLM-L6-v2",
+      "embedding_backend": "english",
       "query_prefix": "",
       "passage_prefix": ""
     }
