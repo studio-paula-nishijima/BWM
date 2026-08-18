@@ -1,0 +1,5 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,1.51,normal_speech,high,phone_audio,english,and go,nicholas
+1.51,1.81,background_noise,high,breath solenoid_actuation_noise
+1.81,10.00,normal_speech,high,solenoid_actuation_noise,english,hey oracle tell me what you know i wanna know all about the future and what it holds is the river gonna flood or is it,kaspar

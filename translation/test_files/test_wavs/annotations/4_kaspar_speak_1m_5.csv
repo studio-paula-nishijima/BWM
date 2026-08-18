@@ -1,0 +1,5 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,1.21,normal_speech,high,phone_audio,,english,eee go,nicholas
+1.21,1.92,background_noise,medium,servo maybe
+1.92,10.00,normal_speech,high,background noise maybe servo,english,i'm doing all these tests for the microphone and uh i'm not sure if i'm doing it right or maybe i'm doing it eh who knows,kaspar

@@ -1,0 +1,4 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,9.15,normal_speech,high,,english,kaspar to see if he's really coming cos he's working today then we do this test is there something else,paula
+9.15,10.00,silence,high

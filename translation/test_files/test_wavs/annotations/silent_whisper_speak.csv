@@ -1,7 +1,7 @@
-start_seconds,end_seconds,label,confidence,notes
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
 0.00,0.20,background_noise,high,startup_click
 0.20,2.80,silence,high,studio_tone
-2.80,5.50,whisper,high,
+2.80,5.50,whisper,high,,english,hello hello this is a whisper,paula
 5.50,6.40,silence,medium,speech_pause
-6.40,9.64,normal_speech,high,
+6.40,9.64,normal_speech,high,,english,hello hello this is a normal voice,paula
 9.64,10.00,silence,high,studio_tone

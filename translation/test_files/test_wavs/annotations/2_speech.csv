@@ -1,4 +1,4 @@
-start_seconds,end_seconds,label,confidence,notes
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
 0.00,0.20,background_noise,high,startup_click
 0.20,2.13,silence,high,
-2.13,10.0,normal_speech,high,long pauses
+2.13,10.0,normal_speech,high,long pauses,english,hello today i woke up and then i had breakfast so after that i went to work,paula

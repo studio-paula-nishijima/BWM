@@ -1,0 +1,5 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,1.32,normal_speech,high,phone_audio,english,mmm go,nicholas
+1.32,2.07,background_noise,medium,breath
+2.07,10.00,normal_speech,high,english,i wanna know if the oracle is listening to me that's why I'm here testing it using my voice in the microphone so the oracle can,kaspar

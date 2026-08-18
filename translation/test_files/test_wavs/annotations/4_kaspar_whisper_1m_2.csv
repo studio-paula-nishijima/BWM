@@ -1,0 +1,5 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,1.87,normal_speech,high,phone_audio,english,and go,nicholas
+1.87,2.45,background_noise,medium,breathing
+2.45,10.00,whisper,high,very quiet,dutch,,kaspar

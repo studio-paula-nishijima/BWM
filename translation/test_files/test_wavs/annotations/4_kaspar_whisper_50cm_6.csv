@@ -1,0 +1,6 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,0.89,normal_speech,medium,truncated at start phone_audio,english,eh go,nicholas
+0.89,2.59,background_noise,high,breath
+2.59,9.38,whisper,high,,english,i wanna know if the oracle works that's why i'm testing in here right now using my voice in the microphone,kaspar
+9.38,10.00,silence,high

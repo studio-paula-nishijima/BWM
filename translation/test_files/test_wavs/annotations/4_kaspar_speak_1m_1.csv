@@ -1,0 +1,6 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,5.23,normal_speech,high,,dutch,,kaspar
+5.23,7.19,silence,high
+7.19,8.72,normal_speech,high,,english,longer or,kaspar
+8.72,10.00,silence,high

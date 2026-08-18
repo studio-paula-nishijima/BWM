@@ -1,7 +1,7 @@
-start_seconds,end_seconds,label,confidence,notes
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
 0.00,0.20,background_noise,high,startup_click
 0.20,2.00,silence,high,
-2.00,5.34,whisper,high,
+2.00,5.34,whisper,high,,english,what is the future of water,paula
 5.34,8.17,silence,high,
-8.17,8.70,normal_speech,high,
+8.17,8.70,normal_speech,high,,english,just one,paula
 8.70,10.00,silence,high,

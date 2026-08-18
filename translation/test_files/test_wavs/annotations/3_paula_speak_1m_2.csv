@@ -1,0 +1,7 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,2.20,silence,high
+2.20,4.99,normal_speech,high,,english,hello hello test so,paula
+4.99,5.38,silence,high
+5.38,8.08,background_noise,high,laughter,,,paula
+8.08,10.00,silence,high,non_verbal_vocalisation,,,paula
