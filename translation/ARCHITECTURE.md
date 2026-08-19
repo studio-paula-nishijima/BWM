@@ -53,11 +53,13 @@ accuracy alone is not the decision metric. Latency, Pi resource use, model size,
 operational simplicity, inspectability, and uncertainty in language detection
 are secondary evaluation criteria.
 
-Initial languages are English, German, and Italian; Brazilian Portuguese is a
-future-compatible addition. Do not introduce per-language pipeline branches
-unless future backend evidence requires them. Future configuration should expose
-an ASR output mode (`transcribe` or `translate_to_english`) independently from
-an embedding backend (`multilingual` or `english`).
+Initial languages are English, German, and Italian. Brazilian Portuguese,
+Dutch, and Austrian German are future-compatible additions. Austrian German is
+a German language variant, not a separate pipeline branch. Do not introduce
+per-language pipeline branches unless future backend evidence requires them.
+Future configuration should expose an ASR output mode (`transcribe` or
+`translate_to_english`) independently from an embedding backend (`multilingual`
+or `english`).
 
 For fair future comparison, retain each captured audio source and capture
 identity alongside language, ground-truth transcription where available,

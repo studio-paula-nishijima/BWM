@@ -73,9 +73,11 @@ The configuration intentionally evaluates a small shortlist:
 3. `sentence-transformers/all-MiniLM-L6-v2`: compact English Route A candidate
    for translated query text.
 
-The editable set contains equivalent English/German/Italian questions and
-smaller PT-BR probes; evaluation reports page-overlap consistency against each
-English query. Compare human judgments and that consistency signal, then
+The editable set contains equivalent English/German/Italian questions and a
+smaller PT-BR probe set. Dutch and Austrian German are recorded as future
+extensions; Austrian German should initially be evaluated as a German variant,
+not with a bespoke route. Evaluation reports page-overlap consistency against
+each English query. Compare human judgments and that consistency signal, then
 measure the route/model combinations on the Pi while Whisper is also running.
 Do not assume either direct translation or direct multilingual retrieval wins
 until that downstream retrieval comparison is complete.
