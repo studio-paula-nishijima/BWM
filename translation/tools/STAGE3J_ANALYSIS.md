@@ -59,3 +59,22 @@ repeating long transcriptions on every frame, each analysis run also writes
 identified utterance and its complete transcription and annotation span.  A
 metadata-bearing segment without an `utterance_id` is also retained as its own
 row with a blank ID; the analysis never invents or infers an ID.
+
+## Analysis-only context sweep
+
+`tools/analyse_normal_speech_context_sweep.py` replays policies from an
+existing labelled-frame export; it never loads WAV audio or affects live
+detection.  The Stage 3Q sweep uses temporal-v1 candidate evidence, recent
+Silero speech-probability context, and confirmation penalties only (no veto):
+
+```sh
+python tools/analyse_normal_speech_context_sweep.py \
+  --labelled-frames analysis_output/3P/labelled_frames_3P.csv \
+  --output-dir analysis_output/3Q_context_sweep \
+  --analysis-tag 3Q_context_sweep
+```
+
+It evaluates 0.6/1.0/1.5-second lookback windows, high-Silero fractions of
+0.1/0.2/0.3 (`speech_probability >= 0.5`), and confirmation penalties of
+24/30/36 frames.  Candidate state is continuous within each WAV; an additional
+segment-local calculation exposes annotation-boundary continuations.

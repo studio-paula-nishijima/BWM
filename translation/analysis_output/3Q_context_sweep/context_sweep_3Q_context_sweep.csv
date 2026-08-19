@@ -1,0 +1,352 @@
+row_type,policy_id,context_window_seconds,high_silero_threshold,recent_high_silero_fraction_threshold,penalty_requirement,passage_id,passage_description,passage_candidate_frames,base_threshold_crossings,policy_threshold_crossings,passage_rejected,scope,speaker_id,segment_count,frame_count,candidate_positive_segments,live_positive_segments,segment_local_positive_segments,max_live_qualifying_run,max_segment_local_qualifying_run,live_threshold_crossings,segment_local_threshold_crossings,cross_boundary_segments,cross_boundary_frames,policy_positive_frames
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,249
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,285
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,285
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,35
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w0.6_f0.1_r24,0.6,0.5,0.1,24,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w0.6_f0.1_r24,0.6,0.5,0.1,24,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,17
+known_paula_passage,w0.6_f0.1_r24,0.6,0.5,0.1,24,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,18
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,249
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,285
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,285
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,26
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w0.6_f0.1_r30,0.6,0.5,0.1,30,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w0.6_f0.1_r30,0.6,0.5,0.1,30,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,11
+known_paula_passage,w0.6_f0.1_r30,0.6,0.5,0.1,30,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,15
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,249
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,285
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,285
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,24
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w0.6_f0.1_r36,0.6,0.5,0.1,36,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w0.6_f0.1_r36,0.6,0.5,0.1,36,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,9
+known_paula_passage,w0.6_f0.1_r36,0.6,0.5,0.1,36,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,15
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,44
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w0.6_f0.2_r24,0.6,0.5,0.2,24,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w0.6_f0.2_r24,0.6,0.5,0.2,24,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,17
+known_paula_passage,w0.6_f0.2_r24,0.6,0.5,0.2,24,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,38
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w0.6_f0.2_r30,0.6,0.5,0.2,30,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w0.6_f0.2_r30,0.6,0.5,0.2,30,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,11
+known_paula_passage,w0.6_f0.2_r30,0.6,0.5,0.2,30,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,38
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w0.6_f0.2_r36,0.6,0.5,0.2,36,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w0.6_f0.2_r36,0.6,0.5,0.2,36,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,11
+known_paula_passage,w0.6_f0.2_r36,0.6,0.5,0.2,36,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w0.6_f0.3_r24,0.6,0.5,0.3,24,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w0.6_f0.3_r24,0.6,0.5,0.3,24,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w0.6_f0.3_r24,0.6,0.5,0.3,24,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w0.6_f0.3_r30,0.6,0.5,0.3,30,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w0.6_f0.3_r30,0.6,0.5,0.3,30,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w0.6_f0.3_r30,0.6,0.5,0.3,30,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w0.6_f0.3_r36,0.6,0.5,0.3,36,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w0.6_f0.3_r36,0.6,0.5,0.3,36,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w0.6_f0.3_r36,0.6,0.5,0.3,36,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,242
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,278
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,278
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,44
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1_f0.1_r24,1.0,0.5,0.1,24,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1_f0.1_r24,1.0,0.5,0.1,24,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,17
+known_paula_passage,w1_f0.1_r24,1.0,0.5,0.1,24,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,238
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,274
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,274
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,38
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,46
+scope_summary,w1_f0.1_r30,1.0,0.5,0.1,30,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1_f0.1_r30,1.0,0.5,0.1,30,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,11
+known_paula_passage,w1_f0.1_r30,1.0,0.5,0.1,30,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,238
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,274
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,274
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,30
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,46
+scope_summary,w1_f0.1_r36,1.0,0.5,0.1,36,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1_f0.1_r36,1.0,0.5,0.1,36,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,5
+known_paula_passage,w1_f0.1_r36,1.0,0.5,0.1,36,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,25
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,242
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,278
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,278
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1_f0.2_r24,1.0,0.5,0.2,24,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1_f0.2_r24,1.0,0.5,0.2,24,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1_f0.2_r24,1.0,0.5,0.2,24,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,241
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,277
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,277
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1_f0.2_r30,1.0,0.5,0.2,30,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1_f0.2_r30,1.0,0.5,0.2,30,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1_f0.2_r30,1.0,0.5,0.2,30,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,241
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,277
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,277
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1_f0.2_r36,1.0,0.5,0.2,36,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1_f0.2_r36,1.0,0.5,0.2,36,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1_f0.2_r36,1.0,0.5,0.2,36,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1_f0.3_r24,1.0,0.5,0.3,24,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1_f0.3_r24,1.0,0.5,0.3,24,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1_f0.3_r24,1.0,0.5,0.3,24,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1_f0.3_r30,1.0,0.5,0.3,30,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1_f0.3_r30,1.0,0.5,0.3,30,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1_f0.3_r30,1.0,0.5,0.3,30,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1_f0.3_r36,1.0,0.5,0.3,36,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1_f0.3_r36,1.0,0.5,0.3,36,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1_f0.3_r36,1.0,0.5,0.3,36,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,242
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,278
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,278
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1.5_f0.1_r24,1.5,0.5,0.1,24,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1.5_f0.1_r24,1.5,0.5,0.1,24,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1.5_f0.1_r24,1.5,0.5,0.1,24,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,18,18,1,1,236
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,all_whisper,,12,2365,11,9,9,52,47,20,20,2,21,272
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,20,20,2,21,272
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,4,4,0,0,52
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,43
+scope_summary,w1.5_f0.1_r30,1.5,0.5,0.1,30,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1.5_f0.1_r30,1.5,0.5,0.1,30,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,2.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,25
+known_paula_passage,w1.5_f0.1_r30,1.5,0.5,0.1,30,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,18,18,1,1,236
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,all_whisper,,12,2365,11,9,9,52,47,20,20,2,21,272
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,20,20,2,21,272
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,5,5,0,0,51
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,37
+scope_summary,w1.5_f0.1_r36,1.5,0.5,0.1,36,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1.5_f0.1_r36,1.5,0.5,0.1,36,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,3.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,24
+known_paula_passage,w1.5_f0.1_r36,1.5,0.5,0.1,36,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1.5_f0.2_r24,1.5,0.5,0.2,24,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1.5_f0.2_r24,1.5,0.5,0.2,24,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1.5_f0.2_r24,1.5,0.5,0.2,24,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,43
+scope_summary,w1.5_f0.2_r30,1.5,0.5,0.2,30,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1.5_f0.2_r30,1.5,0.5,0.2,30,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1.5_f0.2_r30,1.5,0.5,0.2,30,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,37
+scope_summary,w1.5_f0.2_r36,1.5,0.5,0.2,36,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1.5_f0.2_r36,1.5,0.5,0.2,36,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1.5_f0.2_r36,1.5,0.5,0.2,36,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,49
+scope_summary,w1.5_f0.3_r24,1.5,0.5,0.3,24,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1.5_f0.3_r24,1.5,0.5,0.3,24,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1.5_f0.3_r24,1.5,0.5,0.3,24,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,43
+scope_summary,w1.5_f0.3_r30,1.5,0.5,0.3,30,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1.5_f0.3_r30,1.5,0.5,0.3,30,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1.5_f0.3_r30,1.5,0.5,0.3,30,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,whisper_by_speaker,kaspar,5,1133,4,2,2,52,32,2,2,1,20,36
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,whisper_by_speaker,paula,7,1232,7,7,7,47,47,19,19,1,1,251
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,all_whisper,,12,2365,11,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,all_whisper_excluding_very_quiet,,10,1836,10,9,9,52,47,21,21,2,21,287
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,direct_microphone_normal_speech,,19,3166,16,2,2,40,40,3,3,0,0,53
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,phone_audio_normal_speech,,11,343,11,4,3,72,24,3,3,1,7,16
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,laughter_background,,2,206,2,1,1,25,25,1,1,0,0,11
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,non_verbal_background,,1,64,1,1,1,29,29,1,1,0,0,6
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,breathing_background,,6,177,5,3,0,29,13,1,0,3,18,18
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,buzzing_background,,6,226,6,2,1,72,65,1,1,1,7,41
+scope_summary,w1.5_f0.3_r36,1.5,0.5,0.3,36,,,,,,,other_background,,32,800,5,0,0,18,10,0,0,0,0,0
+known_paula_passage,w1.5_f0.3_r36,1.5,0.5,0.3,36,paula_s_1m_2,3.39-4.59; base crossing 3.81,40.0,1.0,1.0,False,known_paula_s_false_positive,paula,0,41,0,0,0,40,40,0,0,0,0,26
+known_paula_passage,w1.5_f0.3_r36,1.5,0.5,0.3,36,paula_s_1m_1,8.13-8.79 and 9.03-10.00; reported trigger 8.55,54.0,2.0,2.0,False,known_paula_s_false_positive,paula,0,55,0,0,0,33,33,0,0,0,0,27
