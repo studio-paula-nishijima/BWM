@@ -33,6 +33,22 @@ class RiverCultureRetrievalTests(unittest.TestCase):
         self.assertEqual(summary[0]["concept_id"], "feeling")
         self.assertAlmostEqual(summary[0]["comparisons"][1]["top_k_page_jaccard_with_en"], 1 / 3)
 
+    def test_english_route_uses_equivalent_english_question(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            evaluation = Path(directory) / "cases.json"
+            evaluation.write_text(json.dumps([
+                {"id": "en", "concept_id": "water", "language": "en", "query": "How is water?"},
+                {"id": "de", "concept_id": "water", "language": "de", "query": "Wie ist Wasser?"},
+            ]), encoding="utf-8")
+            original_query = retrieval.query
+            retrieval.query = lambda *_args: {"raw_results": [{"id": "x", "score": .5, "pdf_pages": [1]}]}
+            try:
+                result = retrieval.evaluate({"models": [{"id": "english", "embedding_backend": "english"}]}, Path(directory), "english", evaluation, 1)
+            finally:
+                retrieval.query = original_query
+            self.assertEqual(result["cases"][1]["retrieval_query"], "How is water?")
+            self.assertEqual(result["cases"][1]["retrieval_route"], "route_a_translated_english")
+
     def test_index_rejects_changed_chunks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

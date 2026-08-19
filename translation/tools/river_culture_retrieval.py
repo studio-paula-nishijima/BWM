@@ -189,11 +189,22 @@ def query(config: dict[str, Any], root: Path, model_id: str, text: str, top_k: i
 
 def evaluate(config: dict[str, Any], root: Path, model_id: str, evaluation_path: Path, top_k: int) -> dict[str, Any]:
     cases = json.loads(evaluation_path.read_text(encoding="utf-8"))
-    results = [{**case, "retrieval": query(config, root, model_id, case["query"], top_k)} for case in cases]
+    backend = model_config(config, model_id).get("embedding_backend", "multilingual")
+    english_by_concept = {case["concept_id"]: case["query"] for case in cases if case.get("language") == "en"}
+    results = []
+    for case in cases:
+        # Route A receives English produced by ASR translation; this controlled
+        # text-set proxy uses the equivalent English evaluation question. Route
+        # B receives the native-language query exactly as supplied.
+        retrieval_query = english_by_concept.get(case.get("concept_id"), case["query"]) if backend == "english" else case["query"]
+        results.append({**case, "retrieval_route": "route_a_translated_english" if backend == "english" else "route_b_native_multilingual",
+                        "retrieval_query": retrieval_query,
+                        "retrieval": query(config, root, model_id, retrieval_query, top_k)})
     scores = [item["retrieval"]["raw_results"][0]["score"] for item in results]
-    return {"model": model_id, "top_k": top_k, "cases": results,
+    return {"model": model_id, "embedding_backend": backend, "top_k": top_k, "cases": results,
             "top1_score_summary": {"min": min(scores), "max": max(scores), "mean": sum(scores) / len(scores)},
-            "cross_language_consistency": cross_language_consistency(results)}
+            "cross_language_consistency": cross_language_consistency(results),
+            "evaluation_note": "Route A uses controlled equivalent English text, not an ASR translation-quality measurement." if backend == "english" else "Route B uses native-language text directly."}
 
 
 def cross_language_consistency(results: list[dict[str, Any]]) -> list[dict[str, Any]]:

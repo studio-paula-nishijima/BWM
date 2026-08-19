@@ -55,9 +55,12 @@ secondary diagnostic. The future ASR output mode and embedding backend must
 remain independently configurable. No ASR, translation, or language-specific
 routing is implemented in this stage.
 
-The current EN/DE/IT equivalent text set exercises Route B directly. Its English
-equivalents also provide controlled Route A query text; later ASR evaluation
-must record both outputs for the same source audio before comparing them.
+The current EN/DE/IT equivalent text set exercises Route B directly. For an
+English-backend model, `evaluate` instead sends the matching English question
+for every language variant and records it as `retrieval_query`; this is a
+controlled Route A proxy, not a claim about ASR translation quality. Later ASR
+evaluation must record both outputs for the same source audio before comparing
+the routes.
 
 ## Model shortlist
 
