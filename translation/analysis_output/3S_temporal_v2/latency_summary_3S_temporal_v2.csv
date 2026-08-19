@@ -1,0 +1,7 @@
+profile,scope,segment_count,detected_count,missed_count,minimum_latency_seconds,median_latency_seconds,maximum_latency_seconds,detected_within_1_seconds,detected_within_2_seconds,detected_within_3_seconds,crossing_before_annotation_end_count,qualifying_run_began_before_annotation_boundary_count
+temporal_v2_context,whispers_overall,12,11,1,0.54,2.0200000000000005,3.0200000000000005,3,5,10,11,1
+temporal_v2_context,ordinary_whispers,10,10,0,0.54,2.0700000000000003,3.0200000000000005,3,4,9,10,1
+temporal_v2_context,very_quiet_whispers,2,1,1,1.6400000000000001,1.6400000000000001,1.6400000000000001,0,1,1,1,0
+temporal_v2_recall,whispers_overall,12,11,1,0.3899999999999997,1.94,3.0200000000000005,4,6,10,11,1
+temporal_v2_recall,ordinary_whispers,10,10,0,0.3899999999999997,1.9800000000000002,3.0200000000000005,4,5,9,10,1
+temporal_v2_recall,very_quiet_whispers,2,1,1,1.6400000000000001,1.6400000000000001,1.6400000000000001,0,1,1,1,0

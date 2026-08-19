@@ -190,6 +190,8 @@ class DetectorPipeline:
             whisper_result.grouped_v1_is_whisper = whisper_result.is_whisper
         elif self.classifier_implementation == "temporal_v1":
             whisper_result.temporal_v1_is_whisper = whisper_result.is_whisper
+        elif self.classifier_implementation == "temporal_v2":
+            whisper_result.temporal_v2_raw_is_whisper = whisper_result.is_whisper
 
 
         result = DetectorPipelineResult(

@@ -107,8 +107,9 @@ class WhisperCSVLogger:
             "formant_score",
             "low_proportion_std", "mid_proportion_std", "high_proportion_std", "zcr_std", "entropy_std", "spectral_centroid_std", "spectral_flux", "cepstral_peak_prominence", "spectral_slope", "spectral_rolloff", "spectral_flatness",
             "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_low_proportion_max", "temporal_v1_low_proportion_max_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run",
+            "temporal_v2_window_full", "temporal_v2_silero_median", "temporal_v2_silero_min_pass", "temporal_v2_silero_max_pass", "temporal_v2_low_proportion_std_pass", "temporal_v2_low_proportion_max_pass", "temporal_v2_zcr_std_pass", "temporal_v2_raw_is_whisper", "temporal_v2_qualifying_run", "temporal_v2_context_enabled", "temporal_v2_context_high_silero_count", "temporal_v2_context_active", "temporal_v2_context_window_frames", "temporal_v2_context_silero_threshold", "temporal_v2_context_min_frames",
             *[column for mode in self.comparison_speech_modes for column in (f"webrtc_mode_{mode}_evaluated", f"webrtc_mode_{mode}_is_speech")],
-            "webrtc_assist_open", "webrtc_assist_enter_count", "webrtc_assist_exit_count", "temporal_candidate", "temporal_qualifying_run", "assisted_confirmation_requirement", "fallback_confirmation_requirement", "confirmation_requirement", "threshold_crossing_route", "trigger_route", "trigger_suppression_reason",
+            "webrtc_assist_open", "webrtc_assist_enter_count", "webrtc_assist_exit_count", "temporal_candidate", "temporal_qualifying_run", "assisted_confirmation_requirement", "fallback_confirmation_requirement", "context_confirmation_requirement", "confirmation_requirement", "threshold_crossing_route", "trigger_route", "trigger_suppression_reason",
             "actuation_enabled", "actuation_requested", "actuation_started", "actuation_suppression_reason",
 
         ])
@@ -278,11 +279,14 @@ class WhisperCSVLogger:
             *[getattr(whisper, name, None) for name in (
                 "temporal_v1_window_full", "temporal_v1_silero_median", "temporal_v1_low_proportion_std", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_low_proportion_max", "temporal_v1_low_proportion_max_pass", "temporal_v1_raw_is_whisper", "temporal_v1_is_whisper", "temporal_v1_qualifying_run",
             )],
+            *[getattr(whisper, name, None) for name in (
+                "temporal_v2_window_full", "temporal_v2_silero_median", "temporal_v2_silero_min_pass", "temporal_v2_silero_max_pass", "temporal_v2_low_proportion_std_pass", "temporal_v2_low_proportion_max_pass", "temporal_v2_zcr_std_pass", "temporal_v2_raw_is_whisper", "temporal_v2_qualifying_run", "temporal_v2_context_enabled", "temporal_v2_context_high_silero_count", "temporal_v2_context_active", "temporal_v2_context_window_frames", "temporal_v2_context_silero_threshold", "temporal_v2_context_min_frames",
+            )],
             *[value for mode in self.comparison_speech_modes for value in (
                 bool(speech_comparisons.get(mode) and speech_comparisons[mode].features.get("evaluated", False)),
                 speech_comparisons[mode].is_speech if mode in speech_comparisons else None,
             )],
-            *[getattr(whisper, name, None) for name in ("webrtc_assist_open", "webrtc_assist_enter_count", "webrtc_assist_exit_count", "temporal_candidate", "temporal_qualifying_run", "assisted_confirmation_requirement", "fallback_confirmation_requirement", "confirmation_requirement", "threshold_crossing_route", "trigger_route", "trigger_suppression_reason")],
+            *[getattr(whisper, name, None) for name in ("webrtc_assist_open", "webrtc_assist_enter_count", "webrtc_assist_exit_count", "temporal_candidate", "temporal_qualifying_run", "assisted_confirmation_requirement", "fallback_confirmation_requirement", "context_confirmation_requirement", "confirmation_requirement", "threshold_crossing_route", "trigger_route", "trigger_suppression_reason")],
             self.actuation_enabled,
             actuation_result.get("requested") if actuation_result else False,
             actuation_result.get("started") if actuation_result else False,

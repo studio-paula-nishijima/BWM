@@ -32,6 +32,10 @@ DISPLAY_NAMES = {
     "temporal_v1_silero_max_pass": "Silero maximum passes",
     "temporal_v1_low_proportion_std_pass": "Low-band variation passes",
     "temporal_v1_raw_is_whisper": "Temporal classifier evidence",
+    "temporal_v2_raw_is_whisper": "Temporal v2 classifier evidence",
+    "temporal_v2_silero_median": "Temporal v2 Silero rolling median",
+    "temporal_v2_zcr_std_pass": "Temporal v2 ZCR variation passes",
+    "temporal_v2_context_active": "Temporal v2 high-Silero context active",
     "threshold_crossing_route": "Policy confirmation route reached",
     "trigger_route": "Detector trigger emitted via",
     "trigger_suppression_reason": "Detector trigger not emitted: reason",
@@ -77,7 +81,7 @@ for column, title in (("comparison_speech_is_speech", DISPLAY_NAMES["comparison_
     if column in view: fig.add_trace(go.Scatter(x=view.frame_time_seconds, y=view[column].astype(str).str.lower().eq("true").astype(int), name=title, mode="markers"))
 TIMELINE_MARGIN = dict(l=80, r=80, t=40, b=55)
 fig.update_layout(xaxis=dict(range=[start, finish], title="Audio time (seconds)"), yaxis2=dict(overlaying="y", side="right"), height=460, margin=TIMELINE_MARGIN)
-temporal_columns = ["frame_time_seconds", "low_proportion", "temporal_v1_low_proportion_max", "temporal_v1_low_proportion_max_pass", "temporal_v1_window_full", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper"]
+temporal_columns = ["frame_time_seconds", "low_proportion", "temporal_v1_low_proportion_max", "temporal_v1_low_proportion_max_pass", "temporal_v1_window_full", "temporal_v1_silero_min_pass", "temporal_v1_silero_max_pass", "temporal_v1_low_proportion_std_pass", "temporal_v1_raw_is_whisper", "temporal_v2_silero_median", "temporal_v2_zcr_std_pass", "temporal_v2_context_active", "temporal_v2_raw_is_whisper"]
 temporal_columns = [column for column in temporal_columns if column in view]
 low_band_fig = None
 if "temporal_v1_low_proportion_max_pass" in view:

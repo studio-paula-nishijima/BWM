@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 
-PROFILE_NAMES = ("webrtc_assisted_temporal", "temporal_only", "analysis_full")
+PROFILE_NAMES = ("webrtc_assisted_temporal", "temporal_only", "analysis_full", "temporal_v2_context", "temporal_v2_recall")
 
 
 @dataclass
@@ -16,6 +16,7 @@ class ProfileDecision:
     webrtc_exit_count: int = None
     assisted_confirmation_requirement: int = None
     fallback_confirmation_requirement: int = None
+    context_confirmation_requirement: int = None
 
 
 class TemporalProfilePolicy:
@@ -35,7 +36,7 @@ class TemporalProfilePolicy:
         self._triggered_this_run = False
 
     def update(self, temporal_result, webrtc_result=None):
-        candidate = bool(temporal_result.temporal_v1_raw_is_whisper)
+        candidate = bool(temporal_result.temporal_v2_raw_is_whisper if temporal_result.temporal_v2_raw_is_whisper is not None else temporal_result.temporal_v1_raw_is_whisper)
         if not candidate:
             self._triggered_this_run = False
 
@@ -43,7 +44,7 @@ class TemporalProfilePolicy:
         # decision, but it intentionally reconstructs this same mode-0 gate so
         # that its logged trigger policy is directly comparable with the
         # assisted profile.
-        uses_webrtc_assist = self.profile in ("webrtc_assisted_temporal", "analysis_full")
+        uses_webrtc_assist = self.profile in ("webrtc_assisted_temporal", "analysis_full", "temporal_v2_context", "temporal_v2_recall")
         if uses_webrtc_assist:
             positive = bool(webrtc_result and webrtc_result.is_speech)
             if self._webrtc_assist_open:
@@ -57,26 +58,29 @@ class TemporalProfilePolicy:
                     self._webrtc_assist_open = True
                     self._webrtc_enter_count = 0
 
-        run = temporal_result.temporal_v1_qualifying_run or 0
+        run = temporal_result.temporal_v2_qualifying_run if temporal_result.temporal_v2_qualifying_run is not None else (temporal_result.temporal_v1_qualifying_run or 0)
+        context_active = bool(getattr(temporal_result, "temporal_v2_context_active", False))
+        is_v2 = self.profile in ("temporal_v2_context", "temporal_v2_recall")
+        if is_v2 and context_active:
+            requirement, route = self.settings["context_confirmation_frames"], "context"
+        elif uses_webrtc_assist and self._webrtc_assist_open:
+            requirement, route = self.settings["assisted_confirmation_frames"], "webrtc_assisted"
+        else:
+            requirement, route = self.settings["fallback_confirmation_frames"], "temporal_fallback"
         decision = ProfileDecision(
             webrtc_assist_open=self._webrtc_assist_open if uses_webrtc_assist else None,
             webrtc_enter_count=self._webrtc_enter_count if uses_webrtc_assist else None,
             webrtc_exit_count=self._webrtc_exit_count if uses_webrtc_assist else None,
             assisted_confirmation_requirement=self.settings.get("assisted_confirmation_frames"),
             fallback_confirmation_requirement=self.settings["fallback_confirmation_frames"],
+            context_confirmation_requirement=self.settings.get("context_confirmation_frames"),
             # This is observability, not merely a trigger-crossing value.
-            confirmation_requirement=(
-                self.settings["assisted_confirmation_frames"]
-                if uses_webrtc_assist and self._webrtc_assist_open
-                else self.settings["fallback_confirmation_frames"]
-            ),
+            confirmation_requirement=requirement,
         )
         if not candidate or self._triggered_this_run:
             return decision
-        if uses_webrtc_assist and self._webrtc_assist_open and run >= self.settings["assisted_confirmation_frames"]:
-            decision.trigger, decision.trigger_route = True, "webrtc_assisted"
-        elif run >= self.settings["fallback_confirmation_frames"]:
-            decision.trigger, decision.trigger_route = True, "temporal_fallback"
+        if run >= requirement:
+            decision.trigger, decision.trigger_route = True, route
         if decision.trigger:
             self._triggered_this_run = True
         return decision

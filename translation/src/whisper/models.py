@@ -99,6 +99,21 @@ class WhisperDetectionResult:
     temporal_v1_raw_is_whisper: bool = None
     temporal_v1_is_whisper: bool = None
     temporal_v1_qualifying_run: int = None
+    temporal_v2_window_full: bool = None
+    temporal_v2_silero_median: float = None
+    temporal_v2_silero_min_pass: bool = None
+    temporal_v2_silero_max_pass: bool = None
+    temporal_v2_low_proportion_std_pass: bool = None
+    temporal_v2_low_proportion_max_pass: bool = None
+    temporal_v2_zcr_std_pass: bool = None
+    temporal_v2_raw_is_whisper: bool = None
+    temporal_v2_qualifying_run: int = None
+    temporal_v2_context_enabled: bool = None
+    temporal_v2_context_high_silero_count: int = None
+    temporal_v2_context_active: bool = None
+    temporal_v2_context_window_frames: int = None
+    temporal_v2_context_silero_threshold: float = None
+    temporal_v2_context_min_frames: int = None
 
     # Analysis-only Stage 3L acoustic/temporal observability.  ``None`` is
     # used when history required by a measurement is unavailable.
@@ -126,6 +141,7 @@ class WhisperDetectionResult:
     trigger_suppression_reason: str = None
     assisted_confirmation_requirement: int = None
     fallback_confirmation_requirement: int = None
+    context_confirmation_requirement: int = None
 
     feature_scores: Dict[str, float] = field(
         default_factory=dict

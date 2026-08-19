@@ -3,7 +3,7 @@ frame_ms: 30
 device: "plughw:2,0"
 
 # Independent of processing_mode and classifier selection.
-detector_profile: webrtc_assisted_temporal
+detector_profile: temporal_v2_context
 detector_profiles:
   webrtc_assisted_temporal:
     silero_median_min: 0.0025
@@ -35,6 +35,39 @@ detector_profiles:
     webrtc_exit_frames: 10
     assisted_confirmation_frames: 15
     fallback_confirmation_frames: 24
+  temporal_v2_context:
+    rolling_window_frames: 10
+    silero_median_min: 0.0003
+    silero_median_max: 0.5
+    low_proportion_std_min: 0.05
+    low_proportion_max: 0.85
+    zcr_std_min: 0.020
+    webrtc_aggressiveness: 0
+    webrtc_enter_frames: 10
+    webrtc_exit_frames: 10
+    assisted_confirmation_frames: 15
+    fallback_confirmation_frames: 24
+    context_enabled: true
+    context_window_frames: 50
+    context_silero_threshold: 0.10
+    context_min_frames: 5
+    context_confirmation_frames: 30
+  temporal_v2_recall:
+    rolling_window_frames: 10
+    silero_median_min: 0.0003
+    silero_median_max: 0.5
+    low_proportion_std_min: 0.05
+    low_proportion_max: 0.85
+    zcr_std_min: 0.020
+    webrtc_aggressiveness: 0
+    webrtc_enter_frames: 10
+    webrtc_exit_frames: 10
+    assisted_confirmation_frames: 15
+    fallback_confirmation_frames: 24
+    context_enabled: false
+    context_window_frames: 50
+    context_silero_threshold: 0.10
+    context_min_frames: 5
 
 live_diagnostic_logging:
   enabled: false

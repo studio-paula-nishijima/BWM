@@ -281,7 +281,7 @@ def main():
     if detector_profile not in PROFILE_NAMES:
         raise RuntimeError("Unknown detector profile; choose " + ", ".join(PROFILE_NAMES))
     resolved_processing_mode = args.processing_mode or PROCESSING_MODE
-    classifier_implementation = "temporal_v1"
+    classifier_implementation = "temporal_v2" if detector_profile in ("temporal_v2_context", "temporal_v2_recall") else "temporal_v1"
     comparison_implementation = WHISPER_CLASSIFIER_COMPARE_IMPLEMENTATION if detector_profile == "analysis_full" else None
     profile_policy = TemporalProfilePolicy(detector_profile, profile_settings)
     temporal_settings = {**WHISPER_CLASSIFIER_SETTINGS, **profile_settings, "analysis_full": detector_profile == "analysis_full"}
@@ -344,7 +344,7 @@ def main():
             centroid_max=SPEECH_CENTROID_MAX,
         
         )
-        if detector_profile == "webrtc_assisted_temporal":
+        if detector_profile in ("webrtc_assisted_temporal", "temporal_v2_context", "temporal_v2_recall"):
             comparison_speech_detectors[profile_settings["webrtc_aggressiveness"]] = create_speech_detector(
                 "webrtc", sample_rate=SAMPLE_RATE, aggressiveness=profile_settings["webrtc_aggressiveness"]
             )
@@ -524,10 +524,14 @@ def main():
         f"Whisper classifier: {classifier_implementation}",
     ))
     print(run_configuration_summary)
-    if detector_profile == "webrtc_assisted_temporal":
+    if detector_profile in ("webrtc_assisted_temporal", "temporal_v2_context", "temporal_v2_recall"):
         print(f"Trigger policy: WebRTC assist {profile_settings['assisted_confirmation_frames']} frames; temporal fallback {profile_settings['fallback_confirmation_frames']} frames")
         print(f"WebRTC debounce: enter {profile_settings['webrtc_enter_frames']} / exit {profile_settings['webrtc_exit_frames']} frames")
         run_configuration_summary += f"\nTrigger policy: WebRTC assist {profile_settings['assisted_confirmation_frames']} frames; temporal fallback {profile_settings['fallback_confirmation_frames']} frames\nWebRTC debounce: enter {profile_settings['webrtc_enter_frames']} / exit {profile_settings['webrtc_exit_frames']} frames"
+        if "context_confirmation_frames" in profile_settings:
+            context_line = f"Context: {'enabled' if profile_settings.get('context_enabled') else 'disabled'}; {profile_settings.get('context_window_frames', 0)} frames at ≥{profile_settings.get('context_silero_threshold', 0)} ({profile_settings.get('context_min_frames', 0)} minimum); confirmation {profile_settings['context_confirmation_frames']} frames"
+            print(context_line)
+            run_configuration_summary += "\n" + context_line
     else:
         print(f"Trigger policy: temporal only, {profile_settings['fallback_confirmation_frames']} frames")
         run_configuration_summary += f"\nTrigger policy: temporal only, {profile_settings['fallback_confirmation_frames']} frames"
@@ -629,10 +633,11 @@ def main():
             result.webrtc_assist_open = profile_decision.webrtc_assist_open
             result.webrtc_assist_enter_count = profile_decision.webrtc_enter_count
             result.webrtc_assist_exit_count = profile_decision.webrtc_exit_count
-            result.temporal_candidate = result.temporal_v1_raw_is_whisper
-            result.temporal_qualifying_run = result.temporal_v1_qualifying_run
+            result.temporal_candidate = result.temporal_v2_raw_is_whisper if classifier_implementation == "temporal_v2" else result.temporal_v1_raw_is_whisper
+            result.temporal_qualifying_run = result.temporal_v2_qualifying_run if classifier_implementation == "temporal_v2" else result.temporal_v1_qualifying_run
             result.assisted_confirmation_requirement = profile_decision.assisted_confirmation_requirement
             result.fallback_confirmation_requirement = profile_decision.fallback_confirmation_requirement
+            result.context_confirmation_requirement = profile_decision.context_confirmation_requirement
             result.confirmation_requirement = profile_decision.confirmation_requirement
             result.threshold_crossing_route = profile_decision.trigger_route
             result.trigger_route = None
@@ -689,7 +694,7 @@ def main():
                 f"WPROC={pipeline_result.whisper_processed} "
 
                 f"WHISPER={is_whisper} "            
-                f"COUNT={result.temporal_v1_qualifying_run if result.temporal_v1_qualifying_run is not None else 0} "
+                f"COUNT={result.temporal_qualifying_run if result.temporal_qualifying_run is not None else 0} "
                 f"SCORE={result.raw_score}/3 "            
                 f"PROB={result.whisper_probability:.2f} "            
                 f"CAND={result.stage1_candidate if result.stage1_candidate is not None else 'N/A'} "

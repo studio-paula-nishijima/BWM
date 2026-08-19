@@ -23,7 +23,7 @@ class Speech:
 
 class DetectorProfileTests(unittest.TestCase):
     def test_profile_names_and_temporal_only_never_uses_webrtc(self):
-        self.assertEqual(PROFILE_NAMES, ("webrtc_assisted_temporal", "temporal_only", "analysis_full"))
+        self.assertEqual(PROFILE_NAMES, ("webrtc_assisted_temporal", "temporal_only", "analysis_full", "temporal_v2_context", "temporal_v2_recall"))
         policy = TemporalProfilePolicy("temporal_only", ONLY)
         self.assertFalse(policy.update(temporal(True, 4), Speech(True)).trigger)
         decision = policy.update(temporal(True, 5), Speech(True))
