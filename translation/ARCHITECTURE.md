@@ -1,62 +1,41 @@
 # Translation architecture
 
-Current base path:
+Implemented runtime path:
 
-`LamaH-CE -> event generation -> events.npy -> playback -> routing -> hardware`
+`events.npy -> activation/session controller -> fresh random segment / prepare_events() -> PlaybackEngine -> RuntimeModulationEngine -> future RuntimeSafety -> EventRouter -> GPIOBackend`
 
-`events.npy` is the persistent base score. The present system retains the released generator, score schema, playback ordering, and GPIO dispatch behaviour. Hardware topology is loaded from `configs/hardware.yaml`; its six current solenoids are not an architectural channel-count limit.
+`events.npy` is an immutable base score. The persistent service only reads it;
+every activation prepares a private, freshly selected configured segment and
+never regenerates or rewrites the score. Hardware topology is loaded from
+`configs/hardware.yaml`; its six current solenoids are not an architectural
+channel-count limit.
 
-Implemented playback path:
+`PlaybackSessionRuntime` keeps the process and GPIO17 listener alive while
+idle. Activation creates a new score/session; deactivation is explicit
+cancellation, not a playback pause. A session uses wall-clock lifetime
+(`playback.session_timeout_seconds`, currently 600 seconds) independently of
+PlaybackEngine logical score time. Pause-and-fill freezes logical progression
+only, never extends the session timeout. Timeout or cancellation clears all
+delayed modulation events and strategy state, releases a reaction pause, stops
+the score, and returns to low-resource idle.
 
-`events.npy -> prepared events -> Playback Engine -> routing -> hardware`
+PlaybackEngine decides when a base event is due. The modulation engine copies
+it and maps it to zero, one, or many runtime events without mutating prepared
+base events. It supports pass-through, suppression, replacement, delayed
+overlay/insertion, override while base time continues, and pause-and-fill.
+Cascades and multi-taps are configuration-driven named strategies rather than
+architectural primitives. Delayed artistic outputs use an injected-clock queue
+owned by modulation; this is not safety scheduling.
 
-The Playback Engine owns clock-driven event progression, position and lifecycle.
-It receives already prepared events and dispatches each due event through an
-injected router. Its single due-event dispatch boundary is the intended future
-insertion point for runtime modulation; modulation itself is not implemented.
+GPIO17 remains the local installation activation adapter. It calls the same
+transport-independent controller surface that a future MQTT adapter may use:
 
-Target runtime path (partially implemented):
+`GPIO17 or future semantic input -> PlaybackSessionRuntime -> PlaybackEngine -> RuntimeModulationEngine -> future RuntimeSafety -> EventRouter -> hardware`
 
-## Persistent activation runtime
-
-The translation process initializes the prepared score, hardware backend, and
-GPIO17 input once and remains alive while the installation is active or
-inactive. Installation activation is application state, not a systemd
-start/stop operation. `ActivationController` owns that state and translates
-transport-independent `activate`, `deactivate`, and `toggle` commands into
-`PlaybackEngine` resume/pause operations.
-
-When inactive, logical score time is frozen: pending events are not made due,
-no new base events are dispatched, and reactivation continues from the same
-score position. The runtime blocks on a condition while inactive rather than
-polling at playback cadence. The GPIO backend and prepared event data remain
-initialized; no backend teardown/recreation occurs on deactivation. Existing
-GPIO worker threads remain blocked on their queues and an already-issued pulse
-is not redefined as an emergency cut-off.
-
-GPIO17 is the independent local fallback activation adapter. It receives a
-button edge and calls the same controller toggle command, without systemd,
-MQTT, UART, networking, or the person detector. A future MQTT adapter will
-call this same controller command surface:
-
-`GPIO17 or future MQTT adapter -> ActivationController -> PlaybackEngine -> due base event -> future Runtime Modulation -> EventRouter -> hardware`
-
-`button_service.py` and its service retain the old GPIO17-to-systemd
-start/stop design and are superseded by this runtime path. They remain checked
-in for deployment cleanup, but must not be run alongside the persistent
-runtime. A later deployment change should keep `play-events.service` alive and
-retire the legacy button service; no service files are changed here.
-
-Completion remains terminal: toggling activation after a completed score does
-not replay it. Persistent exhibition behaviour after completion (hold, select
-a new score, or restart under a separate policy) remains a later lifecycle
-decision.
-
-Target runtime path (documented only):
-
-`events.npy -> Playback Engine -> Runtime Modulation Engine -> runtime safety/scheduling -> hardware`
-
-The future Runtime Modulation Engine remains generic: it may support overlays/insertion, interruption, event transformation, suppression/filtering, parameter modulation, and strategies not yet anticipated. Cascades and multi-tap patterns are configurations/strategies using that layer, not architectural primitives.
+`button_service.py` remains superseded legacy GPIO17-to-systemd infrastructure.
+No service files are changed here. `RuntimeSafety` remains a future clean
+insertion point downstream of modulation; no safety arbitration is implemented
+in this stage.
 
 Future external-event path (documented only):
 

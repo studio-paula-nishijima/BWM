@@ -23,6 +23,23 @@ playback:
 
   segment_minutes: 10
 
+  # Session wall-clock lifetime.  A pause-and-fill reaction never extends it.
+  session_timeout_seconds: 600
+
+modulation:
+  # Named effects are explicit requests, not an automatic reaction policy.
+  strategies:
+    cascade:
+      timeline_policy: overlay
+      base_treatment: preserve
+      ordered_targets: []
+      inter_step_delay: 0.1
+    multi_tap:
+      timeline_policy: overlay
+      base_treatment: preserve
+      repeat_count: 2
+      inter_tap_delay: 0.1
+
   renormalize_segment: false
 
 visualization:

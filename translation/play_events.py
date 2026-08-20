@@ -1,5 +1,6 @@
 import signal
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +11,6 @@ sys.path.append(str(Path(__file__).resolve().parent / "src"))
 from configs.runtime_config import RUNTIME_CONFIG
 from events.filtering import filter_events_by_date
 from events.playback_selection import rebase_playback_time, select_random_segment
-from runtime.playback import PlaybackEngine
 
 shutdown_hooks = []
 _shutdown_in_progress = False
@@ -41,6 +41,9 @@ def signal_handler(sig, frame):
 
 
 def prepare_events(events, playback_cfg):
+    # The loaded .npy score is session source data.  Selection/rebasing below
+    # intentionally works on private copies only.
+    events = deepcopy(list(events))
     events = filter_events_by_date(events, playback_cfg["start_date"], playback_cfg["end_date"])
     if not events:
         raise RuntimeError("No events remain after playback filtering")
@@ -69,30 +72,44 @@ def run_engine(activation_controller, engine, sleep_resolution):
             activation_controller.wait_for_change(sleep_resolution)
 
 
+def run_session_runtime(runtime, sleep_resolution):
+    """Persistent low-resource loop: idle waits, active sessions step efficiently."""
+    while True:
+        runtime.wait_until_active()
+        runtime.step()
+        if runtime.is_active:
+            runtime.wait_for_change(sleep_resolution)
+
+
 def main():
     from configs.runtime_config import PROJECT_ROOT, get_backup_button_pin, get_solenoid_pin_map
-    from runtime.activation import ActivationController
     from runtime.clock import RealtimeClock
     from runtime.gpio_backend import GPIOBackend
     from runtime.local_activation_input import LocalActivationInput
     from runtime.router import EventRouter
+    from runtime.session import PlaybackSessionRuntime
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     playback_cfg = RUNTIME_CONFIG["playback"]
-    events = list(np.load(PROJECT_ROOT / RUNTIME_CONFIG["files"]["events_file"], allow_pickle=True))
-    print(f"Loaded raw events: {len(events)}")
-    events = prepare_events(events, playback_cfg)
-    print(f"Events after filtering: {len(events)}")
+    source_events = list(np.load(PROJECT_ROOT / RUNTIME_CONFIG["files"]["events_file"], allow_pickle=True))
+    print(f"Loaded raw events: {len(source_events)}")
+
+    def fresh_session_events():
+        events = prepare_events(source_events, playback_cfg)
+        print(f"Session events after filtering: {len(events)}")
+        return events
     solenoid_backend = GPIOBackend(get_solenoid_pin_map())
     register_shutdown_hook(solenoid_backend.shutdown)
     try:
-        engine = PlaybackEngine(events, RealtimeClock(), EventRouter({"solenoid": solenoid_backend}),
-                                event_logger=log_dispatched_event)
-        controller = ActivationController(engine, playback_cfg.get("initially_active", True))
-        local_input = LocalActivationInput(get_backup_button_pin(), controller)
+        runtime = PlaybackSessionRuntime(
+            fresh_session_events, RealtimeClock(), EventRouter({"solenoid": solenoid_backend}),
+            playback_cfg["session_timeout_seconds"], playback_cfg.get("initially_active", True),
+            event_logger=log_dispatched_event,
+        )
+        local_input = LocalActivationInput(get_backup_button_pin(), runtime)
         register_shutdown_hook(local_input.close)
-        run_engine(controller, engine, playback_cfg["sleep_resolution"])
+        run_session_runtime(runtime, playback_cfg["sleep_resolution"])
     finally:
         shutdown()
 

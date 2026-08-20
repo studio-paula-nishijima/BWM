@@ -13,8 +13,19 @@ class PlaybackEngine:
     COMPLETE = "complete"
     STOPPED = "stopped"
 
-    def __init__(self, events, clock, dispatcher, event_logger=None):
-        self._events, self._clock, self._dispatcher = tuple(events), clock, dispatcher
+    def __init__(self, events, clock, dispatcher=None, event_logger=None, due_event_handler=None):
+        """Create a logical-score clock.
+
+        ``due_event_handler`` is the explicit public seam for runtime
+        modulation.  ``dispatcher`` remains supported for the Stage 2/3
+        direct-routing path and must expose ``dispatch(event)``.
+        """
+        if due_event_handler is None:
+            if dispatcher is None:
+                raise ValueError("A dispatcher or due_event_handler is required")
+            due_event_handler = dispatcher.dispatch
+        self._events, self._clock = tuple(events), clock
+        self._due_event_handler = due_event_handler
         self._event_logger = event_logger
         self._event_index, self._started_at, self._elapsed_time = 0, None, 0.0
         self._state = self.READY
@@ -81,7 +92,7 @@ class PlaybackEngine:
         return dispatched
 
     def _dispatch_due_event(self, event):
-        """Single future insertion point between base timing and routing."""
+        """Deliver one due base event through the public modulation seam."""
         if self._event_logger is not None:
             self._event_logger(event)
-        self._dispatcher.dispatch(event)
+        self._due_event_handler(event)
