@@ -30,11 +30,13 @@ modulation:
   # Named effects are explicit requests, not an automatic reaction policy.
   strategies:
     cascade:
+      type: cascade
       timeline_policy: overlay
       base_treatment: preserve
       ordered_targets: []
       inter_step_delay: 0.1
     multi_tap:
+      type: multi_tap
       timeline_policy: overlay
       base_treatment: preserve
       repeat_count: 2
@@ -53,3 +55,35 @@ safety:
   max_duty_cycle: 1.0
   cooldown_window: 1.0
   max_continuous_on: 3600.0
+
+# Runtime safety observes all events immediately before hardware routing.  Its
+# emergency enforcement is disabled by default so this is not artistic shaping.
+runtime_safety:
+  enabled: false
+  observe: true
+  emergency:
+    max_pulse_duration:
+      enabled: true
+      seconds: 5.0
+      action: reject
+    runaway_rate:
+      enabled: true
+      window_seconds: 5.0
+      max_events: 40
+    extreme_duty:
+      enabled: false
+      window_seconds: 10.0
+      max_fraction: 0.95
+  # Dimensionless retained-heat heuristic: useful for observation and only a
+  # permissive last-resort cutoff. It is not a calibrated temperature model.
+  thermal:
+    enabled: true
+    enforce: false
+    reference_pulse_seconds: 0.15
+    cooling_time_constant_seconds: 90.0
+    emergency_load_threshold: 100.0
+
+reaction_policy:
+  default:
+    mode: fixed
+    strategy: cascade

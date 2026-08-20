@@ -1,7 +1,7 @@
 """Runtime-only score modulation between playback and hardware routing.
 
 The scheduler in this module is deliberately limited to artistic timing.  It
-does not make safety decisions; a future safety layer belongs downstream.
+does not make safety decisions; RuntimeSafety belongs downstream.
 """
 
 from copy import deepcopy

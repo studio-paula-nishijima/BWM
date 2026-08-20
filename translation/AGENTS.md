@@ -10,4 +10,5 @@
 8. Preserve released/default behaviour unless the current stage explicitly changes it.
 9. Do not introduce future-stage abstractions speculatively.
 10. Read `ARCHITECTURE.md` before significant playback, runtime, modulation, safety, or messaging changes.
+11. All hardware-bound runtime events, including modulation-generated events, must pass through RuntimeSafety. Do not use runtime safety to tune artistic behaviour without explicit approval and measured evidence.
 11. Installation activation is application state, not process lifecycle: inactive playback preserves its logical score position and must not busy-spin.

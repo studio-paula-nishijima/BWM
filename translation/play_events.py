@@ -106,6 +106,9 @@ def main():
             fresh_session_events, RealtimeClock(), EventRouter({"solenoid": solenoid_backend}),
             playback_cfg["session_timeout_seconds"], playback_cfg.get("initially_active", True),
             event_logger=log_dispatched_event,
+            safety_config=RUNTIME_CONFIG.get("runtime_safety", {}),
+            reaction_policy_config={"strategies": RUNTIME_CONFIG.get("modulation", {}).get("strategies", {}),
+                                    "policies": RUNTIME_CONFIG.get("reaction_policy", {})},
         )
         local_input = LocalActivationInput(get_backup_button_pin(), runtime)
         register_shutdown_hook(local_input.close)

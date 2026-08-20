@@ -2,7 +2,7 @@
 
 Implemented runtime path:
 
-`events.npy -> activation/session controller -> fresh random segment / prepare_events() -> PlaybackEngine -> RuntimeModulationEngine -> future RuntimeSafety -> EventRouter -> GPIOBackend`
+`events.npy -> activation/session controller -> fresh random segment / prepare_events() -> PlaybackEngine -> RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> GPIOBackend`
 
 `events.npy` is an immutable base score. The persistent service only reads it;
 every activation prepares a private, freshly selected configured segment and
@@ -25,17 +25,36 @@ base events. It supports pass-through, suppression, replacement, delayed
 overlay/insertion, override while base time continues, and pause-and-fill.
 Cascades and multi-taps are configuration-driven named strategies rather than
 architectural primitives. Delayed artistic outputs use an injected-clock queue
-owned by modulation; this is not safety scheduling.
+owned by modulation; this is not safety scheduling. RuntimeSafety sees every
+hardware-bound event, including delayed modulation events. It observes
+per-target request/accept/reject counts, durations, recent rate and rolling
+duty using monotonic runtime time, never logical score time. Its deliberately
+permissive emergency guards are not normal-operation tuning; base, cascade and
+multi-tap behaviour should pass unchanged. Physical history persists across
+sessions because the hardware remains live.
+
+RuntimeSafety also retains a separate per-target, dimensionless thermal-load
+heuristic. Accepted pulse time adds normalized load while real monotonic time
+decays it with a configured first-order cooling constant. It is available for
+observation by default and has an optional deliberately permissive emergency
+cutoff. This is not a calibrated or validated coil-temperature predictor, nor
+is its threshold a certified hardware temperature limit.
 
 GPIO17 remains the local installation activation adapter. It calls the same
 transport-independent controller surface that a future MQTT adapter may use:
 
-`GPIO17 or future semantic input -> PlaybackSessionRuntime -> PlaybackEngine -> RuntimeModulationEngine -> future RuntimeSafety -> EventRouter -> hardware`
+`GPIO17 or future semantic input -> PlaybackSessionRuntime -> PlaybackEngine -> RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> hardware`
 
 `button_service.py` remains superseded legacy GPIO17-to-systemd infrastructure.
-No service files are changed here. `RuntimeSafety` remains a future clean
-insertion point downstream of modulation; no safety arbitration is implemented
-in this stage.
+No service files are changed here. RuntimeSafety is the sole safety insertion
+point downstream of modulation, and never contains strategy-specific logic.
+
+Runtime reaction path:
+
+`runtime trigger/category -> ReactionPolicy -> RuntimeModulationEngine -> RuntimeSafety`
+
+ReactionPolicy selects configured strategies but never schedules autonomous
+reactions or bypasses safety.
 
 Future external-event path (documented only):
 
