@@ -8,6 +8,9 @@ files:
 
 playback:
 
+  # Application state: the process remains alive when this is false.
+  initially_active: true
+
   enable_date_filter: true
 
   start_date: "2003-01-01"
