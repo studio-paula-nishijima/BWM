@@ -1,0 +1,2 @@
+# Stage 3Q offline ASR evaluation only; not required by detector/capture tests.
+faster-whisper>=1.1,<2

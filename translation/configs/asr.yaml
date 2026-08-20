@@ -1,0 +1,10 @@
+# Stage 3Q extension: CPU fallback defaults for Pi measurement, not laptop results.
+asr:
+  backend: faster_whisper
+  model: base
+  device: cpu
+  compute_type: int8
+  cpu_threads: 2
+  worker_enabled: true
+  worker_nice: 10
+  queue_size: 1
