@@ -16,15 +16,19 @@ class TranslationMQTTAdapter:
             return False
         if self._recent_ids.seen(event.id):
             LOG.info("Duplicate semantic event ignored: %s", event.id)
+            print(f"[MQTT] Duplicate event ignored: {event.id}")
             return False
         state = event.payload.get("state")
         if state == "active":
             changed = self._runtime.activate()
             LOG.info("Remote activation %s", "started session" if changed else "ignored; already active")
+            print("[MQTT] installation active: " + ("started session" if changed else "already active"))
             return changed
         if state == "inactive":
             changed = self._runtime.deactivate()
             LOG.info("Remote deactivation %s", "cancelled session" if changed else "ignored; already idle")
+            print("[MQTT] installation inactive: " + ("cancelled session" if changed else "already idle"))
             return changed
         LOG.warning("Rejected installation activation with invalid state: %r", state)
+        print(f"[MQTT] Rejected invalid installation state: {state!r}")
         return False

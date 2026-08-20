@@ -26,3 +26,19 @@ class EventRouter:
             print(
                 f"Unknown event type: {event_type}"
             )
+
+    def begin_session(self):
+        for backend in self.backends.values():
+            begin = getattr(backend, "begin_session", None)
+            if begin is not None:
+                begin()
+
+    def quiesce(self):
+        """Quiesce reusable hardware without releasing process-level ownership."""
+        for backend in self.backends.values():
+            quiesce = getattr(backend, "quiesce", None)
+            if quiesce is not None:
+                quiesce()
+
+    def is_idle(self):
+        return all(getattr(backend, "is_idle", lambda: True)() for backend in self.backends.values())

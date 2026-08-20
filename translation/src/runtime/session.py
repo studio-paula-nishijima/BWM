@@ -42,6 +42,9 @@ class PlaybackSessionRuntime:
         with self._changed:
             if self._active:
                 return False
+            begin_session = getattr(self._dispatcher, "begin_session", None)
+            if begin_session is not None:
+                begin_session()
             modulation = RuntimeModulationEngine(self._clock, self._safety)
             engine = PlaybackEngine(self._events_factory(), self._clock,
                                     due_event_handler=modulation.process,
@@ -50,6 +53,7 @@ class PlaybackSessionRuntime:
             engine.start()
             self._engine, self._modulation = engine, modulation
             self._started_at, self._active = self._clock.now(), True
+            print("[Session] ACTIVE: fresh playback session started")
             self._changed.notify_all()
             return True
 
@@ -58,7 +62,7 @@ class PlaybackSessionRuntime:
         with self._changed:
             if not self._active:
                 return False
-            self._finish_session()
+            self._finish_session("cancelled")
             self._changed.notify_all()
             return True
 
@@ -68,32 +72,38 @@ class PlaybackSessionRuntime:
         return self.deactivate() if self.is_active else self.activate()
 
     def trigger(self, name, **config):
-        if not self._active:
-            raise RuntimeError("Cannot trigger modulation while idle")
-        return self._modulation.trigger(name, **config)
+        with self._changed:
+            if not self._active:
+                raise RuntimeError("Cannot trigger modulation while idle")
+            return self._modulation.trigger(name, **config)
 
     def trigger_reaction(self, category="default"):
-        if not self._active:
-            raise RuntimeError("Cannot trigger reaction while idle")
-        if self._reaction_policy is None:
-            raise RuntimeError("No reaction policy configured")
-        name, config = self._reaction_policy.select(category)
-        # Definitions may have an artistic name (for example ``triple_tap``)
-        # while their executable Stage 4 strategy is ``multi_tap``.
-        return self._modulation.trigger(config.pop("type", name), **config)
+        with self._changed:
+            if not self._active:
+                raise RuntimeError("Cannot trigger reaction while idle")
+            if self._reaction_policy is None:
+                raise RuntimeError("No reaction policy configured")
+            name, config = self._reaction_policy.select(category)
+            # Definitions may have an artistic name (for example ``triple_tap``)
+            # while their executable Stage 4 strategy is ``multi_tap``.
+            return self._modulation.trigger(config.pop("type", name), **config)
 
     def step(self):
         """Advance both clocks' work without allowing logical pause to affect timeout."""
-        if not self._active:
-            return 0
-        if self._clock.now() - self._started_at >= self._session_timeout:
-            self.deactivate()
-            return 0
-        dispatched = self._engine.step()
-        dispatched += self._modulation.step()
-        if self._engine.is_complete and self._modulation.pending_count == 0:
-            self.deactivate()
-        return dispatched
+        with self._changed:
+            if not self._active:
+                return 0
+            if self._clock.now() - self._started_at >= self._session_timeout:
+                self._finish_session("timeout")
+                self._changed.notify_all()
+                return 0
+            dispatched = self._engine.step()
+            dispatched += self._modulation.step()
+            backend_idle = getattr(self._dispatcher, "is_idle", lambda: True)
+            if self._engine.is_complete and self._modulation.pending_count == 0 and backend_idle():
+                self._finish_session("complete")
+                self._changed.notify_all()
+            return dispatched
 
     def wait_until_active(self):
         with self._changed:
@@ -104,8 +114,13 @@ class PlaybackSessionRuntime:
         with self._changed:
             self._changed.wait(timeout)
 
-    def _finish_session(self):
-        # cancel resumes a reaction pause before stopping so it cannot leak.
+    def _finish_session(self, reason):
+        """Single teardown path: close admission, clear session work, quiesce, idle."""
+        print(f"[Session] TEARDOWN: {reason}; closing session admission")
+        self._active = False
         self._modulation.cancel()
         self._engine.stop()
-        self._active = False
+        quiesce = getattr(self._dispatcher, "quiesce", None)
+        if quiesce is not None:
+            quiesce()
+        print("[Session] IDLE: session state cleared; hardware quiescent")

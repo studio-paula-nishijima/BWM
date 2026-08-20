@@ -19,6 +19,30 @@ only, never extends the session timeout. Timeout or cancellation clears all
 delayed modulation events and strategy state, releases a reaction pause, stops
 the score, and returns to low-resource idle.
 
+## Session teardown and hardware quiescence
+
+Every timeout, explicit GPIO17/MQTT cancellation, and completed score uses one
+authoritative session teardown path:
+
+`ACTIVE SESSION -> close session admission -> clear RuntimeModulation -> stop PlaybackEngine -> quiesce GPIOBackend -> IDLE`
+
+Entering IDLE guarantees that no actuation from the ended session remains
+queued and every configured actuator output has been explicitly driven OFF.
+`GPIOBackend.quiesce()` blocks pulse admission, invalidates and drains queued
+work, lets a pulse already physically ON finish, then verifies all outputs OFF.
+Its generation guard prevents a pulse dequeued immediately before cancellation
+from starting after teardown; it does not release GPIO ownership or terminate
+workers. A later activation reopens the reusable backend and prepares an
+entirely fresh playback/modulation session.
+
+Full process shutdown is different: it quiesces first, then stops workers and
+closes GPIO devices. The persistent source score, GPIO17 listener, MQTT
+connection, backend ownership, and RuntimeSafety physical/thermal history live
+across normal session boundaries. Playback state, modulation state, and queued
+backend work do not. Concise `[Session]`, `[GPIOBackend]`, and `[MQTT]` console
+messages record activation, teardown reason, queue quiescence, and semantic
+activation handling without polling or per-loop output.
+
 PlaybackEngine decides when a base event is due. The modulation engine copies
 it and maps it to zero, one, or many runtime events without mutating prepared
 base events. It supports pass-through, suppression, replacement, delayed
