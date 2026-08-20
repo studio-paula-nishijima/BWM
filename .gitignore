@@ -22,3 +22,6 @@ Desktop.ini
 
 # 
 live_whisper_analysis_*.csv
+
+# Deployment-local MQTT broker settings for the ESP-IDF detector.
+person_detector/stage2_espidf/mqtt_config.h

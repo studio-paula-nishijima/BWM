@@ -11,8 +11,17 @@ confidence person's normalised bounding box every 500 ms.
 person=true confidence=0.880 x=0.420 y=0.310 w=0.180 h=0.510 inference_ms=130
 ```
 
-No image or inference result leaves the board. Wi-Fi, MQTT, persistence, the
-zone evaluator, and browser overlays deliberately remain out of this stage.
+No image or inference result leaves the board. Stage 6 adds an optional,
+disabled-by-default MQTT *semantic state adapter*: it publishes only an
+explicit installation `active`/`inactive` transition derived from the existing
+`detection.person` result. It does not alter model, confidence, geometry,
+counting, or camera processing.
+
+Copy `mqtt_config.h.example` to `mqtt_config.h` and configure a local broker
+URI to enable it. The messages use the common envelope and
+`bwm/installation/activation` topic documented in `../../shared/messaging`;
+they are QoS 1 and non-retained. Leaving the URI empty makes MQTT a no-op and
+the detector continues exactly as before.
 
 ## Build requirements
 

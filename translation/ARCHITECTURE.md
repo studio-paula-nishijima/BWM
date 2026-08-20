@@ -43,7 +43,25 @@ is its threshold a certified hardware temperature limit.
 GPIO17 remains the local installation activation adapter. It calls the same
 transport-independent controller surface that a future MQTT adapter may use:
 
-`GPIO17 or future semantic input -> PlaybackSessionRuntime -> PlaybackEngine -> RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> hardware`
+`person detector -> shared semantic MQTT activation -> TranslationMQTTAdapter -> PlaybackSessionRuntime -> PlaybackEngine -> RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> hardware`
+
+`GPIO17 -> LocalActivationInput -> same PlaybackSessionRuntime -> PlaybackEngine -> RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> hardware`
+
+Stage 6 implements the repo-wide `shared.messaging` envelope and MQTT wrapper;
+it is not owned by Translation. MQTT `installation.activation` is explicit
+`active`/`inactive` state on a semantic topic. A bounded shared ID cache
+suppresses delivery duplicates. A new-ID `active` while a session is active is
+also a no-op: it neither starts a new segment nor resets the configured
+600-second wall-clock session. `inactive` cancels through the same session
+path. A later activation creates a fresh segment.
+
+MQTT is optional (`configs/mqtt.yaml`) and non-retained at QoS 1. Its paho
+network-loop thread reconnects with a bounded delay. A missing broker or a
+disconnect never terminates the persistent process or disables the independent
+GPIO17 fallback. GPIO17 may later publish shared installation state for other
+subsystems, but Stage 6 intentionally does not make local activation depend on
+that publication. UART and MQTT-to-UART bridging remain future work; the
+repo-wide IDs and origins prepare for transport-independent deduplication.
 
 `button_service.py` remains superseded legacy GPIO17-to-systemd infrastructure.
 No service files are changed here. RuntimeSafety is the sole safety insertion

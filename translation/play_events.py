@@ -6,7 +6,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.append(str(Path(__file__).resolve().parent / "src"))
+TRANSLATION_ROOT = Path(__file__).resolve().parent
+REPOSITORY_ROOT = TRANSLATION_ROOT.parent
+sys.path.append(str(TRANSLATION_ROOT / "src"))
+sys.path.append(str(REPOSITORY_ROOT))
 
 from configs.runtime_config import RUNTIME_CONFIG
 from events.filtering import filter_events_by_date
@@ -86,6 +89,7 @@ def main():
     from runtime.clock import RealtimeClock
     from runtime.gpio_backend import GPIOBackend
     from runtime.local_activation_input import LocalActivationInput
+    from runtime.mqtt_adapter import TranslationMQTTAdapter
     from runtime.router import EventRouter
     from runtime.session import PlaybackSessionRuntime
 
@@ -112,6 +116,20 @@ def main():
         )
         local_input = LocalActivationInput(get_backup_button_pin(), runtime)
         register_shutdown_hook(local_input.close)
+        # MQTT is an optional semantic input. Failure to import/connect leaves
+        # this persistent GPIO17-capable runtime untouched.
+        try:
+            from shared.messaging.config import load_mqtt_settings
+            from shared.messaging.mqtt_client import SemanticMQTTClient
+            from shared.messaging.topics import TopicNamespace
+            mqtt_settings, topic_base = load_mqtt_settings(REPOSITORY_ROOT)
+            activation_topic = TopicNamespace(topic_base).installation_activation
+            mqtt_client = SemanticMQTTClient(
+                mqtt_settings, TranslationMQTTAdapter(runtime, activation_topic).handle)
+            mqtt_client.start([activation_topic])
+            register_shutdown_hook(mqtt_client.close)
+        except Exception as exc:
+            print(f"[MQTT] Unavailable; continuing with local activation: {exc}")
         run_session_runtime(runtime, playback_cfg["sleep_resolution"])
     finally:
         shutdown()

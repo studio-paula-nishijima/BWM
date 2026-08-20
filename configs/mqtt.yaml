@@ -1,0 +1,10 @@
+# Repo-wide semantic MQTT convention. Keep disabled until a broker is deployed.
+mqtt:
+  enabled: false
+  host: "localhost"
+  port: 1883
+  client_id: "translation-runtime"
+  topic_base: "bwm"
+  qos: 1
+  reconnect_min_seconds: 2
+  reconnect_max_seconds: 30

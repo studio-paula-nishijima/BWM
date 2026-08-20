@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "person_detector.h"
+#include "mqtt_activation_publisher.h"
 #include "preview_server.h"
 #include "stage2a_config.h"
 
@@ -95,6 +96,8 @@ extern "C" void app_main(void)
              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
 
     RecentDetections recent;
+    MqttActivationPublisher mqtt_activation;
+    mqtt_activation.begin();
     uint64_t total_scans = 0;
     int64_t previous_scan_started_us = 0;
     while (true) {
@@ -113,6 +116,9 @@ extern "C" void app_main(void)
             preview.publishDetection(detection);
             ++total_scans;
             recent.add(detection.person);
+            // The detector continues to own this boolean decision. The adapter
+            // emits an explicit semantic state only when it changes.
+            mqtt_activation.publishStateIfChanged(detection.person);
             const uint32_t scene_ms = static_cast<uint32_t>((esp_timer_get_time() - scan_started_us) / 1000);
             logScan(detection, total_scans, recent, scene_ms, period_ms);
         }
