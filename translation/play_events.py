@@ -11,6 +11,7 @@ sys.path.append(str(Path(__file__).resolve().parent / "src"))
 from configs.runtime_config import RUNTIME_CONFIG
 from events.filtering import filter_events_by_date
 from events.playback_selection import rebase_playback_time, select_random_segment
+from runtime.playback import PlaybackEngine
 
 
 shutdown_hooks = []
@@ -60,18 +61,21 @@ def prepare_events(events, playback_cfg):
     return events
 
 
-def play(events, router, clock, sleep_resolution):
-    """Dispatch in score order after each released target-time wait."""
-    for event in events:
-        print("TARGET:", event["playback_time"])
-        target_time = event["playback_time"]
-        while clock.now() < target_time:
+def log_dispatched_event(event):
+    print("TARGET:", event["playback_time"])
+    print(
+        f"{pd.Timestamp(event['timestamp']).strftime('%Y-%m-%d %H:%M:%S')} | "
+        f"{event['target']} | {event['metadata']['frequency']:.2f} Hz"
+    )
+
+
+def run_engine(engine, sleep_resolution):
+    """Keep blocking/sleep behaviour at the command-line composition boundary."""
+    engine.start()
+    while engine.is_running:
+        engine.step()
+        if engine.is_running:
             time.sleep(sleep_resolution)
-        print(
-            f"{pd.Timestamp(event['timestamp']).strftime('%Y-%m-%d %H:%M:%S')} | "
-            f"{event['target']} | {event['metadata']['frequency']:.2f} Hz"
-        )
-        router.dispatch(event)
 
 
 def main():
@@ -100,10 +104,14 @@ def main():
     solenoid_backend = GPIOBackend(get_solenoid_pin_map())
     register_shutdown_hook(solenoid_backend.shutdown)
     try:
-        play(
+        engine = PlaybackEngine(
             events,
-            EventRouter({"solenoid": solenoid_backend}),
             RealtimeClock(),
+            EventRouter({"solenoid": solenoid_backend}),
+            event_logger=log_dispatched_event,
+        )
+        run_engine(
+            engine,
             playback_cfg["sleep_resolution"],
         )
     finally:

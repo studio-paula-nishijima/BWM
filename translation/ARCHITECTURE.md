@@ -6,7 +6,16 @@ Current base path:
 
 `events.npy` is the persistent base score. The present system retains the released generator, score schema, playback ordering, and GPIO dispatch behaviour. Hardware topology is loaded from `configs/hardware.yaml`; its six current solenoids are not an architectural channel-count limit.
 
-Target runtime path (documented only):
+Implemented playback path:
+
+`events.npy -> prepared events -> Playback Engine -> routing -> hardware`
+
+The Playback Engine owns clock-driven event progression, position and lifecycle.
+It receives already prepared events and dispatches each due event through an
+injected router. Its single due-event dispatch boundary is the intended future
+insertion point for runtime modulation; modulation itself is not implemented.
+
+Target runtime path (partially implemented):
 
 `events.npy -> Playback Engine -> Runtime Modulation Engine -> runtime safety/scheduling -> hardware`
 
