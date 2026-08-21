@@ -105,7 +105,10 @@ class FasterWhisperBackend:
 
 def normalize_text(text: str | None) -> str:
     """NFKC, lowercase, punctuation-to-space, then collapse whitespace."""
-    text = unicodedata.normalize("NFKC", text or "").lower()
+    # pandas represents blank CSV metadata as float NaN.  ASR may still run on
+    # such a clip, but it has no reference text and must not enter WER scoring.
+    text = "" if text is None or pd.isna(text) else str(text)
+    text = unicodedata.normalize("NFKC", text).lower()
     text = "".join(" " if unicodedata.category(char).startswith("P") else char for char in text)
     return " ".join(text.split())
 
@@ -209,7 +212,11 @@ def _row(audio, item, input_mode, backend, output_mode, asr_language, language_h
         result, status, error = backend.transcribe(audio, output_mode=output_mode, language=asr_language), "ok", ""
     except Exception as exc: result, status, error = ASRResult(), "inference_failed", f"{type(exc).__name__}: {exc}"
     elapsed = time.perf_counter() - started
-    reference = item.get("transcription") or item.get("ground_truth_transcription") or ""
+    annotation_reference = item.get("transcription")
+    capture_reference = item.get("ground_truth_transcription")
+    reference = "" if annotation_reference is None or pd.isna(annotation_reference) else str(annotation_reference)
+    if not reference and capture_reference is not None and not pd.isna(capture_reference):
+        reference = str(capture_reference)
     metrics = word_error_counts(reference, result.recognized_text) if reference else {
         "word_count": math.nan, "correct_words": math.nan, "substitutions": math.nan,
         "deletions": math.nan, "insertions": math.nan, "wer": math.nan,

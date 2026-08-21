@@ -58,6 +58,14 @@ class ASREvaluationTests(unittest.TestCase):
             wav = self.wav(directory); rows, whole = evaluate(FakeASR(), input_mode="whole_wav", wav_path=wav)
             self.assertEqual(rows.input_mode.iloc[0], "whole_wav"); self.assertEqual(len(whole), 1); self.assertEqual(rows.ground_truth_transcription.iloc[0], "")
 
+    def test_blank_annotation_transcription_is_benchmarked_without_text_metrics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            wav = self.wav(directory); annotations = self.annotation(directory, "start_seconds,end_seconds,label,language\n0,.2,normal_speech,english\n")
+            rows, _ = evaluate(FakeASR(), input_mode="annotated_span", wav_path=wav, annotation_path=annotations)
+            self.assertEqual(rows.status.iloc[0], "ok")
+            self.assertEqual(rows.ground_truth_transcription.iloc[0], "")
+            self.assertTrue(np.isnan(rows.wer.iloc[0]))
+
     def test_capture_metadata_mapping_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
             clip = self.wav(directory, "clip.wav"); metadata = Path(directory) / "captures.csv"
