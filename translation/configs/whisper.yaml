@@ -139,7 +139,7 @@ trigger_ratio: 0.6
 # Existing trigger/cooldown settings; unchanged by classifier selection.
 whisper_frames_required: 10
 cooldown_seconds: 7
-run_duration_seconds: 600
+run_duration_seconds: 6000
 
 # Legacy feature detector thresholds (retained unchanged).
 rms_min: 0.005
