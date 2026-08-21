@@ -8,7 +8,10 @@ ROOT="${BWM_TRANSLATION_ROOT:-/home/raspi/BWM/translation}"
 PY="${ASR_PYTHON:-$ROOT/whisper_venv/bin/python}"
 WAV_ROOT="${ASR_WAV_ROOT:-$ROOT/test_files/test_wavs}"
 OUT_ROOT="${ASR_OUTPUT_ROOT:-$ROOT/analysis_output}"
-COOL_TARGET_C="${COOL_TARGET_C:-65}"
+# This is a between-run resume target, not an in-run limit.  A benchmark that
+# crosses 80C completes normally and records the Pi's throttling state; the
+# next run waits only until the Pi has fallen back to this practical target.
+COOL_TARGET_C="${COOL_TARGET_C:-78}"
 MAX_COOL_SECONDS="${MAX_COOL_SECONDS:-3600}"
 INCLUDE_SMALL="${INCLUDE_SMALL:-0}"
 LOAD_LABEL="${LOAD_LABEL:-clean}"
