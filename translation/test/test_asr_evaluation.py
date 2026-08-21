@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from analysis.asr_evaluation import ASRResult, crop_audio, evaluate, normalize_text, read_wav, word_error_counts, write_outputs
+from analysis.asr_evaluation import ASRResult, crop_audio, evaluate, normalize_text, read_wav, resolve_asr_language, word_error_counts, write_outputs
 
 
 class FakeASR:
@@ -42,6 +42,16 @@ class ASREvaluationTests(unittest.TestCase):
             fake = FakeASR(); rows, _ = evaluate(fake, input_mode="annotated_span", wav_path=wav, annotation_path=annotations)
             self.assertEqual(len(rows), 2); self.assertEqual(rows.utterance_id.tolist(), ["q1", "q2"])
             self.assertEqual(rows.speaker_id.tolist(), ["s1", "s2"]); self.assertEqual([call[0].duration_seconds for call in fake.calls], [.2, .2])
+
+    def test_readable_annotation_language_is_mapped_without_losing_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            wav = self.wav(directory); annotations = self.annotation(directory, "start_seconds,end_seconds,label,language,transcription\n0,.2,whisper,english,hello river\n")
+            fake = FakeASR(); rows, _ = evaluate(fake, input_mode="annotated_span", wav_path=wav, annotation_path=annotations)
+            self.assertEqual(fake.calls[0][2], "en")
+            self.assertEqual(rows.language.iloc[0], "english")
+            self.assertEqual(rows.asr_language_requested.iloc[0], "en")
+            self.assertEqual(rows.language_handling.iloc[0], "annotation")
+        self.assertEqual(resolve_asr_language("Brazilian Portuguese"), "pt")
 
     def test_whole_wav_is_distinct_and_no_annotation_is_required(self):
         with tempfile.TemporaryDirectory() as directory:

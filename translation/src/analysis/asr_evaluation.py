@@ -24,6 +24,15 @@ from .labelled_wav import load_annotations, utterance_metadata_summary
 
 INPUT_MODES = ("annotated_span", "whole_wav", "captured_clip")
 OUTPUT_MODES = ("transcribe", "translate_to_english")
+# Canonical annotation metadata is intentionally human-readable. Faster-Whisper
+# instead requires its short language codes; retain the annotation value in
+# outputs and translate only at the adapter boundary.
+LANGUAGE_ALIASES = {
+    "en": "en", "english": "en", "de": "de", "german": "de", "deutsch": "de",
+    "it": "it", "italian": "it", "italiano": "it", "pt": "pt",
+    "portuguese": "pt", "brazilian portuguese": "pt", "brazilian-portuguese": "pt",
+    "pt-br": "pt", "nl": "nl", "dutch": "nl",
+}
 
 
 @dataclass(frozen=True)
@@ -99,6 +108,18 @@ def normalize_text(text: str | None) -> str:
     text = unicodedata.normalize("NFKC", text or "").lower()
     text = "".join(" " if unicodedata.category(char).startswith("P") else char for char in text)
     return " ".join(text.split())
+
+
+def resolve_asr_language(language: str | None) -> str | None:
+    """Map readable annotation language names to Faster-Whisper language codes.
+
+    Unknown non-empty values pass through unchanged so the backend can report a
+    clear unsupported-code error rather than silently changing annotation data.
+    """
+    if language is None or pd.isna(language) or not str(language).strip():
+        return None
+    value = str(language).strip().lower().replace("_", "-")
+    return LANGUAGE_ALIASES.get(value, value)
 
 
 def word_error_counts(reference: str, hypothesis: str) -> dict[str, int | float]:
@@ -182,10 +203,10 @@ def discover_capture_items(capture_output, metadata_path=None):
     raise ValueError("No capture metadata CSV with a supported capture WAV column was found")
 
 
-def _row(audio, item, input_mode, backend, output_mode, language):
+def _row(audio, item, input_mode, backend, output_mode, asr_language, language_handling):
     started = time.perf_counter()
     try:
-        result, status, error = backend.transcribe(audio, output_mode=output_mode, language=language), "ok", ""
+        result, status, error = backend.transcribe(audio, output_mode=output_mode, language=asr_language), "ok", ""
     except Exception as exc: result, status, error = ASRResult(), "inference_failed", f"{type(exc).__name__}: {exc}"
     elapsed = time.perf_counter() - started
     reference = item.get("transcription") or item.get("ground_truth_transcription") or ""
@@ -195,8 +216,8 @@ def _row(audio, item, input_mode, backend, output_mode, language):
         "word_recall": math.nan, "exact_match": math.nan,
     }
     return {"source_wav": item.get("wav_file") or item.get("source_wav") or audio.source_wav, "utterance_id": item.get("utterance_id"),
-            "capture_id": item.get("capture_id"), "input_mode": input_mode, "language": language or item.get("language"),
-            "language_handling": "supplied" if language else "annotation_or_auto", "speaker_id": item.get("speaker_id"), "session_id": item.get("session_id"),
+            "capture_id": item.get("capture_id"), "input_mode": input_mode, "language": item.get("language"),
+            "asr_language_requested": asr_language, "language_handling": language_handling, "speaker_id": item.get("speaker_id"), "session_id": item.get("session_id"),
             "detector_profile": item.get("detector_profile"), "capture_policy": item.get("capture_policy"), "completion_reason": item.get("completion_reason"),
             "ground_truth_transcription": reference, "asr_backend": backend.name, "asr_model": backend.model,
             "asr_output_mode": output_mode, "recognized_text_raw": result.recognized_text, "recognized_text_normalized": normalize_text(result.recognized_text),
@@ -211,25 +232,31 @@ def evaluate(backend, *, input_mode, wav_path=None, annotation_path=None, captur
     if input_mode not in INPUT_MODES: raise ValueError(f"Unsupported input mode: {input_mode}")
     if output_mode not in OUTPUT_MODES: raise ValueError(f"Unsupported ASR output mode: {output_mode}")
     rows, whole_rows = [], []
+    def language_request(item):
+        requested = language if language is not None else item.get("language")
+        return resolve_asr_language(requested), "supplied" if language is not None else ("annotation" if requested else "auto")
     if input_mode == "captured_clip":
         if not capture_output: raise ValueError("captured_clip mode requires capture_output")
         for item in discover_capture_items(capture_output, capture_metadata):
             audio = read_wav(item["capture_wav"])
-            rows.append(_row(audio, item, input_mode, backend, output_mode, language or item.get("language")))
+            asr_language, handling = language_request(item)
+            rows.append(_row(audio, item, input_mode, backend, output_mode, asr_language, handling))
     else:
         if not wav_path: raise ValueError(f"{input_mode} mode requires wav_path")
         audio = read_wav(wav_path)
         items = annotation_items(wav_path, annotation_path) if annotation_path else []
         if input_mode == "whole_wav":
             item = {"wav_file": Path(wav_path).name, "language": language}
-            row = _row(audio, item, input_mode, backend, output_mode, language)
+            asr_language, handling = language_request(item)
+            row = _row(audio, item, input_mode, backend, output_mode, asr_language, handling)
             whole_rows.append(row); rows.append(row)
             # Multiple annotations are intentionally not scored against a whole-file transcript.
         else:
             if not annotation_path: raise ValueError("annotated_span mode requires annotation_path")
             for item in items:
                 clip = crop_audio(audio, float(item["start_seconds"]), float(item["end_seconds"]))
-                rows.append(_row(clip, item, input_mode, backend, output_mode, language or item.get("language")))
+                asr_language, handling = language_request(item)
+                rows.append(_row(clip, item, input_mode, backend, output_mode, asr_language, handling))
     return pd.DataFrame(rows), pd.DataFrame(whole_rows)
 
 
