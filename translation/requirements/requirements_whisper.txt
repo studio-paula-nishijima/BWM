@@ -13,3 +13,8 @@ webrtcvad-wheels==2.0.14
 soundfile
 torch==2.13.0
 torchaudio==2.11.0
+
+# Stage 3U live Voice invokes the River Culture retrieval adapter after ASR.
+# Keep these in the Whisper environment used by the live Voice runtime.
+psutil>=5.9,<7
+sentence-transformers>=3.0,<4
