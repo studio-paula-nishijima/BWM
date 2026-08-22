@@ -46,7 +46,7 @@ def _worker_main(config, requests, results, ready_event, startup_errors, backend
         job = requests.get()
         if job is None: return
         job_id, audio, metadata = job
-        started = time.perf_counter()
+        started = time.monotonic()
         try:
             result = backend.transcribe(audio, output_mode=metadata.get("asr_output_mode", "transcribe"), language=metadata.get("language"))
             payload, status, error = asdict(result), "ok", ""
@@ -54,7 +54,8 @@ def _worker_main(config, requests, results, ready_event, startup_errors, backend
             payload, status, error = asdict(ASRResult()), "inference_failed", f"{type(exc).__name__}: {exc}"
         results.put({"job_id": job_id, "status": status, "error": error, "result": payload,
                      "metadata": metadata, "audio_duration": audio.duration_seconds,
-                     "inference_duration": time.perf_counter() - started})
+                     "worker_started_monotonic": started,
+                     "inference_duration": time.monotonic() - started})
 
 
 class PersistentASRWorker:

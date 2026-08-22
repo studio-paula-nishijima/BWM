@@ -92,6 +92,10 @@ from whisper.profiles import PROFILE_NAMES, TemporalProfilePolicy
 from audio.wav_source import WavSource
 from audio.arecord_source import ArecordSource
 from src.audio.ring_buffer import AudioRingBuffer
+from audio.utterance_capture import CapturePolicy, UtteranceCaptureController
+from live.asr_worker import ASRWorkerConfig, PersistentASRWorker
+from live.voice_runtime import LiveASRCoordinator
+from configs.runtime_config import load_asr_config
 
 from app_logging.csv_logger import WhisperCSVLogger
 from actuation.runtime import resolve_actuation_enabled, request_for_emitted_trigger
@@ -129,6 +133,7 @@ csv_logger = None
 detector = None
 actuation_controller = None
 run_configuration_summary = None
+asr_coordinator = None
 
 
 audio_buffer = AudioRingBuffer(
@@ -160,6 +165,9 @@ def parse_arguments():
         help="Optional filename tag for analysis logs, e.g. 3L",
     )
     parser.add_argument("--enable-live-logging", action="store_true", help="Enable diagnostic CSV logging for this live run without changing configuration")
+    parser.add_argument("--diagnostic-console", action="store_true", help="Show per-frame detector telemetry (normal live output is event based)")
+    parser.add_argument("--no-live-asr", action="store_true", help="Capture normally but do not start the live ASR worker")
+    parser.add_argument("--asr-model", choices=("tiny", "base", "small"), default=None, help="Override the configured live Faster-Whisper model")
     parser.add_argument("--detector-profile", choices=PROFILE_NAMES, default=None)
     parser.add_argument("--processing-mode", choices=("direct", "speech_gate", "shadow"), default=None)
     actuation_group = parser.add_mutually_exclusive_group()
@@ -181,6 +189,7 @@ def shutdown(*_):
     global detector
     global actuation_controller
     global run_configuration_summary
+    global asr_coordinator
 
 
     print("\nShutdown...")
@@ -209,6 +218,13 @@ def shutdown(*_):
 
     if detector:
         detector.reset()
+
+    if asr_coordinator:
+        try:
+            asr_coordinator.shutdown()
+        except Exception:
+            import traceback
+            traceback.print_exc()
 
     if actuation_controller:
         try:
@@ -273,8 +289,10 @@ def main():
     global detector
     global actuation_controller
     global run_configuration_summary
+    global asr_coordinator
 
     args = parse_arguments()
+    asr_config = load_asr_config().get("asr", {})
     actuation_enabled = resolve_actuation_enabled(wav_path=args.wav, enable_actuation=args.enable_actuation, no_actuation=args.no_actuation)
     detector_profile = args.detector_profile or DETECTOR_PROFILE
     profile_settings = dict(DETECTOR_PROFILES.get(detector_profile, {}))
@@ -504,6 +522,23 @@ def main():
                 except Exception: pass
             raise RuntimeError("Actuation initialisation failed. Check PCA9685/I2C/servo dependencies, or rerun with --no-actuation to test detection without hardware.") from exc
 
+    # Capture and ASR are additional downstream consumers.  They receive only
+    # real emitted triggers, after cooldown, and do not alter detector/servo work.
+    capture_policy = CapturePolicy(pre_roll_seconds=4.0, end_silence_seconds=None,
+                                   post_roll_seconds=0.0, max_utterance_seconds=12.0)
+    capture_controller = UtteranceCaptureController(SAMPLE_RATE, audio_buffer, capture_policy,
+                                                     args.wav or "live_respeaker", detector_profile)
+    worker_enabled = bool(asr_config.get("worker_enabled", True)) and not args.no_live_asr
+    worker = PersistentASRWorker(ASRWorkerConfig(
+        backend=asr_config.get("backend", "faster_whisper"), model=args.asr_model or asr_config.get("model", "base"),
+        device=asr_config.get("device", "cpu"), compute_type=asr_config.get("compute_type", "int8"),
+        cpu_threads=asr_config.get("cpu_threads", 2), worker_nice=asr_config.get("worker_nice", 10),
+        queue_size=asr_config.get("queue_size", 1),
+    )) if worker_enabled else None
+    asr_coordinator = LiveASRCoordinator(capture_controller, worker, source_id=args.wav or "live_respeaker",
+                                         detector_profile=detector_profile)
+    asr_coordinator.start()
+
 
 
     # -----------------------------
@@ -524,6 +559,7 @@ def main():
         f"Whisper classifier: {classifier_implementation}",
     ))
     print(run_configuration_summary)
+    print(f"Live ASR: {'enabled' if worker_enabled else 'disabled'}; model={args.asr_model or asr_config.get('model', 'base')}; language=auto")
     if detector_profile in ("webrtc_assisted_temporal", "temporal_v2_context", "temporal_v2_recall"):
         print(f"Trigger policy: WebRTC assist {profile_settings['assisted_confirmation_frames']} frames; temporal fallback {profile_settings['fallback_confirmation_frames']} frames")
         print(f"WebRTC debounce: enter {profile_settings['webrtc_enter_frames']} / exit {profile_settings['webrtc_exit_frames']} frames")
@@ -575,7 +611,7 @@ def main():
 
 
             if audio_frame is None:
-
+                asr_coordinator.finish_capture()
                 print(
                     "Audio source complete"
                 )
@@ -667,6 +703,12 @@ def main():
                 else:
                     print(f"ACTUATION: suppressed ({actuation_result['suppression_reason']})")
 
+            # Polling only reads already-completed results; ASR remains in its
+            # persistent child process while the next detector frame proceeds.
+            asr_coordinator.process_frame(frame, frame_number, emitted_trigger=triggered,
+                                          temporal_candidate=bool(result.temporal_candidate))
+            asr_coordinator.ready_status()
+
 
 
             # -----------------------------
@@ -686,7 +728,7 @@ def main():
             # DEBUG OUTPUT
             # -----------------------------
 
-            print(
+            if args.diagnostic_console or args.wav or detector_profile == "analysis_full": print(
             
                 f"SPEECH={speech_result.is_speech if speech_result else 'N/A'} "
                 f"SPEECH_PROB={(f'{speech_result.speech_probability:.2f}' if speech_result else 'N/A')} "

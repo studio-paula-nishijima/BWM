@@ -18,12 +18,15 @@ class CaptureState(str, Enum):
 @dataclass(frozen=True)
 class CapturePolicy:
     pre_roll_seconds: float = 4.0
-    end_silence_seconds: float = 1.5
+    # ``None`` intentionally disables detector-derived endpointing.  The live
+    # Stage 3T path uses this conservative mode: maximum duration, not a
+    # short run of false temporal candidates, completes a visitor utterance.
+    end_silence_seconds: float | None = 1.5
     post_roll_seconds: float = 0.5
     max_utterance_seconds: float = 12.0
 
     def validate(self):
-        if self.pre_roll_seconds < 0 or self.end_silence_seconds < 0 or self.post_roll_seconds < 0:
+        if self.pre_roll_seconds < 0 or (self.end_silence_seconds is not None and self.end_silence_seconds < 0) or self.post_roll_seconds < 0:
             raise ValueError("capture timing values must be non-negative")
         if self.max_utterance_seconds <= 0:
             raise ValueError("max_utterance_seconds must be positive")
@@ -111,7 +114,7 @@ class UtteranceCaptureController:
         if elapsed >= self._max_samples:
             return self._complete("max_duration")
 
-        if self.state == CaptureState.CAPTURING:
+        if self.state == CaptureState.CAPTURING and self.policy.end_silence_seconds is not None:
             if temporal_candidate:
                 self._active["negative_frames"] = 0
             else:

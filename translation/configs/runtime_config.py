@@ -17,6 +17,10 @@ def load_runtime_config():
     return load_yaml_config("runtime.yaml")
 
 
+def load_asr_config():
+    return load_yaml_config("asr.yaml")
+
+
 def load_voice_reactions_config():
     """Load editable Voice reaction definitions and their selection policy."""
     return load_yaml_config("voice_reactions.yaml")
