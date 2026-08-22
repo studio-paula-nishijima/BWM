@@ -29,3 +29,12 @@ class RiverCultureRetrievalAdapter:
         raw = result.get("raw_results", [])
         response = raw[0].get("text", "") if raw else ""
         return {"ok": bool(response), "response_text": response, "metadata": result}
+
+    def fallback_response(self, reason: str) -> dict[str, Any]:
+        """Return the retrieval-owned configured River Culture response."""
+        fallback = self.config.get("fallback_response", {})
+        response = fallback.get("text", "")
+        if not isinstance(response, str) or not response.strip():
+            raise RuntimeError(f"configured fallback response is unavailable ({reason})")
+        return {"ok": True, "response_text": response,
+                "metadata": {"fallback": True, "reason": reason, "id": fallback.get("id")}}

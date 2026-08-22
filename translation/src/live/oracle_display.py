@@ -10,6 +10,7 @@ import time
 from dataclasses import dataclass
 
 LISTENING_TEXT = "The Oracle awaits your question. Whisper it to the water."
+INITIALIZING_TEXT = "The Oracle stirs..."
 WHISPER_TEXT = "The Oracle is listening to your question..."
 PROCESSING_TEXT = "The Oracle is considering your question..."
 RESPONSE_TITLE = "The Oracle responds"
@@ -33,6 +34,7 @@ class OracleDisplayController:
         self.view, self.response_text, self._complete_at, self._completion_sent = "idle", "", None, False
 
     def show_listening(self): self.view, self._complete_at = "listening", None
+    def show_initializing(self): self.view, self._complete_at = "initializing", None
     def show_whisper_detected(self): self.view, self._complete_at = "whisper_detected", None
     def show_processing(self): self.view, self._complete_at = "capture_processing", None
 
@@ -84,6 +86,7 @@ class PygameOracleDisplayController(OracleDisplayController):
         pygame.display.flip()
 
     def show_listening(self): super().show_listening(); self._draw_static(LISTENING_TEXT)
+    def show_initializing(self): super().show_initializing(); self._draw_static(INITIALIZING_TEXT)
     def show_whisper_detected(self): super().show_whisper_detected(); self._draw_static(WHISPER_TEXT)
     def show_processing(self): super().show_processing(); self._draw_static(PROCESSING_TEXT)
     def show_response(self, text): super().show_response(text); self._response_started = self.clock(); self._draw_static(text, RESPONSE_TITLE)

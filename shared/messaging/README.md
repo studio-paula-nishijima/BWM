@@ -11,7 +11,7 @@ component (for example `person_detector`). The Stage 6 event is
 `{ "state": "inactive" }` on `bwm/installation/activation`.
 
 Voice/oracle components publish `voice.state` on `bwm/voice/state`, with
-payload `{ "state": "idle|listening|whisper_detected|capture_processing|response_displayed" }`.
+payload `{ "state": "idle|initializing|listening|whisper_detected|capture_processing|response_displayed" }`.
 Each publication uses a fresh envelope ID and a meaningful origin such as
 `voice_pi`. These are coarse semantic milestones, not detector scores, ASR,
 retrieval, display, servo, GPIO, or Translation strategy commands. Receivers

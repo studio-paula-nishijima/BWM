@@ -104,7 +104,7 @@ reactions or bypasses safety.
 matcher -> external-reaction busy guard -> ReactionPolicy ->
 RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> GPIOBackend`
 
-The shared `voice.state` contract accepts `idle`, `listening`,
+The shared `voice.state` contract accepts `idle`, `initializing`, `listening`,
 `whisper_detected`, `capture_processing`, and `response_displayed`. Translation
 retains only the latest state for diagnostics. `voice_interaction.trigger_state`
 is configurable and defaults to `capture_processing`; only a transition *into*

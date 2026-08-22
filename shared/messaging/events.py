@@ -9,7 +9,7 @@ from uuid import uuid4
 SCHEMA_VERSION = 1
 INSTALLATION_ACTIVATION = "installation.activation"
 VOICE_STATE = "voice.state"
-VOICE_STATES = frozenset({"idle", "listening", "whisper_detected", "capture_processing", "response_displayed"})
+VOICE_STATES = frozenset({"idle", "initializing", "listening", "whisper_detected", "capture_processing", "response_displayed"})
 
 
 class EventValidationError(ValueError):

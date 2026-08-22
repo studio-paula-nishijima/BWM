@@ -5,6 +5,10 @@
   "index_directory": "files/river_culture",
   "top_k": 5,
   "batch_size": 16,
+  "fallback_response": {
+    "id": "river_culture_generic_v1",
+    "text": "Water gathers the stories of the land."
+  },
   "future_asr_retrieval_routes": {
     "route_a": {
       "asr_output_mode": "translate_to_english",

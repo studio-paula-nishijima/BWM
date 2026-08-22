@@ -9,6 +9,7 @@ from analysis.asr_evaluation import AudioSegment
 
 class VoiceState(str, Enum):
     IDLE = "idle"
+    INITIALIZING = "initializing"
     LISTENING = "listening"
     WHISPER_DETECTED = "whisper_detected"
     CAPTURE_PROCESSING = "capture_processing"
@@ -69,11 +70,14 @@ class LiveASRCoordinator:
         return self.lifecycle.state is VoiceState.LISTENING and not self.capture.is_capturing
 
     def start(self):
-        self.lifecycle.set(VoiceState.LISTENING)
+        self.lifecycle.set(VoiceState.INITIALIZING)
         if self.worker:
             self.emit("[ASR] loading")
             self._asr_status = "loading"
             self.worker.start()
+        else:
+            self.emit("[Voice] ASR disabled; initialization complete")
+            self.lifecycle.set(VoiceState.LISTENING)
 
     def ready_status(self):
         if not self.worker:
@@ -87,9 +91,18 @@ class LiveASRCoordinator:
         if status != self._asr_status:
             self._asr_status = status
             self.emit(message)
+        if status == "ready" and self.lifecycle.state is VoiceState.INITIALIZING:
+            self.emit("[Voice] required startup resources ready")
+            self.lifecycle.set(VoiceState.LISTENING)
+        elif status == "unavailable" and self.lifecycle.state is VoiceState.INITIALIZING:
+            self.emit(f"[Voice] initialization failed: {self.worker.startup_error}; Voice remains unavailable")
         return status
 
     def process_frame(self, frame, frame_number, *, emitted_trigger, temporal_candidate):
+        # Readiness is checked before admission, so the first trigger after the
+        # persistent worker reports ready is eligible without faking startup.
+        if self.lifecycle.state is VoiceState.INITIALIZING:
+            self.ready_status()
         admitted_trigger = False
         if emitted_trigger:
             self.emit("[Trigger] whisper detected")

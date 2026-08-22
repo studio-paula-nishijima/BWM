@@ -14,7 +14,8 @@ capture/ASR-only runs.
 Use `--oracle-headless` to exercise ASR, retrieval and completion without SDL,
 and omit `--voice-mqtt` for standalone broker-free operation.
 
-Verify the listening view, whisper and considering views, raw ASR transcript,
+Verify the startup “The Oracle stirs...” view before listening, then the whisper
+and considering views, raw ASR transcript,
 retrieval query/result, and that the exact result text reaches the Oracle
 response view. A static response remains for `--oracle-response-seconds`;
 longer text scrolls. Detector triggers during the response must report busy.
@@ -22,3 +23,6 @@ After `[Display] response complete`, Voice returns to listening and accepts the
 next interaction. With MQTT enabled, inspect `bwm/voice/state` for one shared
 `voice.state` envelope per actual lifecycle transition. Observe CPU, RAM,
 temperature and throttling with the normal Pi tools during a live interaction.
+For an empty transcript or a recoverable retrieval failure, confirm concise
+`[ASR]`/`[Retrieval] ERROR` diagnostics identify the reason while the visitor
+still receives the retrieval-configured River Culture fallback response.

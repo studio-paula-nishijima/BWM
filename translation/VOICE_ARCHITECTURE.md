@@ -36,7 +36,7 @@ and display scheduling.  It must not change Voice admission or ASR ownership.
 The authoritative lifecycle is:
 
 ```text
-idle -> listening -> whisper_detected -> capture_processing
+idle -> initializing -> listening -> whisper_detected -> capture_processing
      -> response_displayed -> listening
 ```
 
@@ -45,7 +45,8 @@ three interaction states in order, and returns to `listening` only when
 `complete_interaction()` is called after response presentation completes.
 Repeated assignment of the same state is not a transition.
 
-An interaction is admitted only when the lifecycle is `listening` and capture
+`initializing` covers required Voice resources loading and displays “The Oracle
+stirs...”. An interaction is admitted only when the lifecycle is `listening` and capture
 is not already active.  Once admitted, detector triggers remain observable and
 may still drive their existing detector/servo handling, but they cannot start
 another capture, ASR, retrieval, or display interaction.  This busy admission
@@ -99,8 +100,11 @@ display.  Current settings, model selection, index inputs, and `top_k` live in
 `configs/river_culture_retrieval.json`; retrieval build/query detail is in
 `tools/README_river_culture_retrieval.md`.
 
-Blank ASR text and retrieval/display failures use the controller's visitor
-fallback text.  A display failure also completes the interaction so local
+Blank ASR text and recoverable retrieval failures ask the retrieval adapter for
+its configured River Culture fallback response. Voice/display never own visitor
+fallback wording and always display returned text unchanged. Detailed error
+reasons are emitted as `[ASR] ERROR`, `[Retrieval] ERROR`, or `[Display] failed`
+diagnostics; a display failure also completes the interaction so local
 admission cannot remain stuck.
 
 ## Oracle display
@@ -116,6 +120,7 @@ Lifecycle states map to visitor views as follows:
 | Voice state | View text |
 | --- | --- |
 | `listening` | “The Oracle awaits your question. Whisper it to the water.” |
+| `initializing` | “The Oracle stirs...” |
 | `whisper_detected` | “The Oracle is listening to your question...” |
 | `capture_processing` | “The Oracle is considering your question...” |
 | `response_displayed` | “The Oracle responds”, followed by the retrieval response text |

@@ -23,6 +23,9 @@ class Retrieval:
         self.queries.append(text)
         if self.error: raise self.error
         return {"ok": bool(self.response), "response_text": self.response, "metadata": {}}
+    def fallback_response(self, reason):
+        self.fallback_reason = reason
+        return {"ok": True, "response_text": "configured River Culture response", "metadata": {"fallback": True}}
 
 
 class Clock:
@@ -50,10 +53,12 @@ class Stage3UInteractionTests(unittest.TestCase):
         self.assertEqual(self.retrieval.queries, ["fragment water"])
         self.assertEqual(self.display.response_text, "river text")
         self.assertEqual(self.coordinator.completed, 0)
-    def test_empty_asr_skips_retrieval_and_falls_back(self):
+    def test_empty_asr_uses_retrieval_owned_fallback(self):
         self.controller.on_asr_results([{"status": "ok", "result": {"recognized_text": "  "}}])
+        self.wait_for_response()
         self.assertEqual(self.retrieval.queries, [])
-        self.assertEqual(self.coordinator.lifecycle.state, VoiceState.RESPONSE_DISPLAYED)
+        self.assertEqual(self.retrieval.fallback_reason, "empty_asr")
+        self.assertEqual(self.display.response_text, "configured River Culture response")
     def test_display_completion_is_the_only_release_seam(self):
         self.controller.on_asr_results([{"status": "ok", "result": {"recognized_text": "water"}}]); self.wait_for_response()
         self.clock.now = 2; self.controller.poll()
@@ -71,10 +76,16 @@ class VoiceMessagingTests(unittest.TestCase):
             def publish(self, topic, event): self.events.append((topic, event)); return True
         mqtt, lifecycle = MQTT(), VoiceLifecycle()
         lifecycle.add_transition_observer(VoiceStatePublisher(mqtt, emit=lambda _: None).publish_transition)
-        lifecycle.set("listening"); lifecycle.set("listening")
-        self.assertEqual(len(mqtt.events), 1)
+        lifecycle.set("initializing"); lifecycle.set("initializing"); lifecycle.set("listening")
+        self.assertEqual(len(mqtt.events), 2)
         self.assertEqual(mqtt.events[0][0], "bwm/voice/state")
-        self.assertEqual(mqtt.events[0][1].payload, {"state": "listening"})
+        self.assertEqual(mqtt.events[0][1].payload, {"state": "initializing"})
+
+    def test_initializing_is_not_admissible_and_has_a_view(self):
+        lifecycle = VoiceLifecycle(); lifecycle.set("initializing")
+        self.assertEqual(lifecycle.state, VoiceState.INITIALIZING)
+        display = OracleDisplayController(); display.show_initializing()
+        self.assertEqual(display.view, "initializing")
 
 
 if __name__ == "__main__": unittest.main()
