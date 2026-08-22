@@ -1,6 +1,6 @@
 # Repo-wide semantic MQTT convention. Keep disabled until a broker is deployed.
 mqtt:
-  enabled: false
+  enabled: true
   host: "localhost"
   port: 1883
   client_id: "translation-runtime"
