@@ -7,6 +7,8 @@
   "batch_size": 16,
   "fallback_response": {
     "id": "river_culture_generic_v1",
+    "mode": "random_chunk",
+    "candidate_chunk_ids": [],
     "text": "Water gathers the stories of the land."
   },
   "future_asr_retrieval_routes": {

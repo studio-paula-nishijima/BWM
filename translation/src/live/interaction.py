@@ -55,6 +55,8 @@ class OracleInteractionController:
 
     def _show_fallback(self, reason):
         self.emit("[Retrieval] using configured fallback response")
+        submit = getattr(self.retrieval, "submit_fallback", None)
+        if submit and submit(reason)[1] == "accepted": return
         self._show_response(self.retrieval.fallback_response(reason)["response_text"])
     def _show_response(self, text):
         self.emit(f"[Response] {text!r}")

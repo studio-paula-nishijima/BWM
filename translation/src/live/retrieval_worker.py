@@ -20,9 +20,10 @@ def _worker_main(repository_root, requests, results, ready, errors):
     while True:
         job = requests.get()
         if job is None: return
-        job_id, text = job
+        job_id, action, text = job
         try:
-            results.put({"job_id": job_id, "ok": True, "result": adapter.retrieve(text)})
+            result = adapter.fallback_response(text) if action == "fallback" else adapter.retrieve(text)
+            results.put({"job_id": job_id, "ok": True, "result": result})
         except Exception as exc:
             results.put({"job_id": job_id, "ok": False, "error": f"{type(exc).__name__}: {exc}"})
 
@@ -58,7 +59,13 @@ class PersistentRetrievalWorker:
     def submit(self, text):
         if not self.ready or not self._process or not self._process.is_alive(): return None, "worker_unavailable"
         job_id = str(self._next_id); self._next_id += 1
-        try: self._requests.put_nowait((job_id, text))
+        try: self._requests.put_nowait((job_id, "query", text))
+        except queue.Full: return None, "queue_full"
+        return job_id, "accepted"
+    def submit_fallback(self, reason):
+        if not self.ready or not self._process or not self._process.is_alive(): return None, "worker_unavailable"
+        job_id = str(self._next_id); self._next_id += 1
+        try: self._requests.put_nowait((job_id, "fallback", reason))
         except queue.Full: return None, "queue_full"
         return job_id, "accepted"
     def poll(self):

@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import numpy as np
+import random
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,13 @@ class RiverCultureRetrievalAdapter:
     def fallback_response(self, reason: str) -> dict[str, Any]:
         """Return the retrieval-owned configured River Culture response."""
         fallback = self.config.get("fallback_response", {})
+        if self._runtime is not None and fallback.get("mode") == "random_chunk":
+            _embeddings, metadata, _encoder = self._runtime
+            ids = set(fallback.get("candidate_chunk_ids", ()))
+            choices = [chunk for chunk in metadata["chunks"] if not ids or chunk["id"] in ids]
+            if choices:
+                chosen = random.SystemRandom().choice(choices)
+                return {"ok": True, "response_text": chosen["text"], "metadata": {"fallback": True, "reason": reason, "id": chosen["id"]}}
         response = fallback.get("text", "")
         if not isinstance(response, str) or not response.strip():
             raise RuntimeError(f"configured fallback response is unavailable ({reason})")
