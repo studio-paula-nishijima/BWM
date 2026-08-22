@@ -1,9 +1,10 @@
-import sys, time, unittest
+import os, sys, time, unittest
+from unittest.mock import patch
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from analysis.asr_evaluation import ASRResult, AudioSegment
-from live.asr_worker import ASRWorkerConfig, PersistentASRWorker
+from live.asr_worker import ASRWorkerConfig, PersistentASRWorker, _reset_worker_signal_handlers
 
 class FakeBackend:
     loads = 0
@@ -52,5 +53,11 @@ class LiveASRTests(unittest.TestCase):
         finally: worker.shutdown()
     def test_invalid_configuration_is_clear(self):
         with self.assertRaises(ValueError): ASRWorkerConfig(cpu_threads=0).validate()
+
+    @unittest.skipUnless(os.name == "posix", "Signal inheritance applies to forked POSIX workers")
+    def test_worker_resets_inherited_application_signal_handlers(self):
+        with patch("live.asr_worker.signal.signal") as reset:
+            _reset_worker_signal_handlers()
+        self.assertEqual(reset.call_count, 2)
 
 if __name__ == "__main__": unittest.main()

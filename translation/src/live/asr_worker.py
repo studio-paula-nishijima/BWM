@@ -4,6 +4,7 @@ from __future__ import annotations
 import multiprocessing as mp
 import os
 import queue
+import signal
 import time
 from dataclasses import asdict, dataclass
 from typing import Callable
@@ -32,7 +33,20 @@ def _default_backend(config):
     return FasterWhisperBackend(config.model, config.device, config.compute_type, config.cpu_threads)
 
 
+def _reset_worker_signal_handlers():
+    """Keep the forked ASR child out of the application's shutdown path.
+
+    On Linux ``fork`` copies the live runner's SIGINT/SIGTERM handlers.  Those
+    handlers own parent-only resources (notably ``Process.join``), so they
+    must not run in this child when it is stopped by the parent.
+    """
+    if os.name == "posix":
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
+
 def _worker_main(config, requests, results, ready_event, startup_errors, backend_factory):
+    _reset_worker_signal_handlers()
     try:
         if os.name == "posix" and config.worker_nice:
             os.nice(config.worker_nice)
