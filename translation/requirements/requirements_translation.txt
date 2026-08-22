@@ -14,3 +14,4 @@ adafruit-circuitpython-pca9685
 adafruit-circuitpython-motor
 pyserial
 paho-mqtt
+pygame>=2,<3

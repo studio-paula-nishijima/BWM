@@ -16,10 +16,22 @@ class VoiceState(str, Enum):
 
 
 class VoiceLifecycle:
-    """Small state boundary; it deliberately knows nothing about MQTT/UI."""
-    def __init__(self, emit=print):
+    """Small authoritative state boundary with an optional transition observer.
+
+    The observer is an integration seam.  It cannot alter a transition and is
+    deliberately kept outside capture, detector and ASR concerns.
+    """
+    def __init__(self, emit=print, on_transition=None):
         self.state = VoiceState.IDLE
         self._emit = emit
+        self._on_transition = on_transition
+
+    def add_transition_observer(self, observer):
+        previous = self._on_transition
+        if previous is None:
+            self._on_transition = observer
+        else:
+            self._on_transition = lambda before, after: (previous(before, after), observer(before, after))
 
     def set(self, state):
         state = VoiceState(state)
@@ -27,6 +39,12 @@ class VoiceLifecycle:
             return False
         previous, self.state = self.state, state
         self._emit(f"[Voice] state: {previous.value} -> {state.value}")
+        if self._on_transition:
+            try:
+                self._on_transition(previous, state)
+            except Exception as exc:
+                # External observability must never invalidate local admission.
+                self._emit(f"[Voice] transition observer failed: {exc}")
         return True
 
 

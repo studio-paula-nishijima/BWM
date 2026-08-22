@@ -12,6 +12,7 @@ sys.path.insert(
     0,
     os.path.join(BASE_DIR, "src")
 )
+sys.path.insert(0, os.path.dirname(BASE_DIR))  # repository root: shared/messaging
 
 
 from pathlib import Path
@@ -94,7 +95,11 @@ from audio.arecord_source import ArecordSource
 from src.audio.ring_buffer import AudioRingBuffer
 from audio.utterance_capture import CapturePolicy, UtteranceCaptureController
 from live.asr_worker import ASRWorkerConfig, PersistentASRWorker
-from live.voice_runtime import LiveASRCoordinator
+from live.voice_runtime import LiveASRCoordinator, VoiceLifecycle
+from live.interaction import OracleInteractionController
+from live.oracle_display import DisplayConfig, OracleDisplayController, PygameOracleDisplayController
+from live.retrieval_adapter import RiverCultureRetrievalAdapter
+from live.voice_messaging import VoiceStatePublisher
 from configs.runtime_config import load_asr_config
 
 from app_logging.csv_logger import WhisperCSVLogger
@@ -134,6 +139,8 @@ detector = None
 actuation_controller = None
 run_configuration_summary = None
 asr_coordinator = None
+oracle_interaction = None
+voice_mqtt = None
 shutdown_started = False
 
 
@@ -170,6 +177,13 @@ def parse_arguments():
     parser.add_argument("--no-live-asr", action="store_true", help="Capture normally but do not start the live ASR worker")
     parser.add_argument("--asr-model", choices=("tiny", "base", "small"), default=None, help="Override the configured live Faster-Whisper model")
     parser.add_argument("--release-after-asr", action="store_true", help="Debug only: reopen interaction admission after each ASR result")
+    parser.add_argument("--oracle", action="store_true", help="Enable Stage 3U ASR → retrieval → Oracle response integration")
+    parser.add_argument("--oracle-headless", action="store_true", help="Use the deterministic no-screen Oracle display controller")
+    parser.add_argument("--oracle-width", type=int, default=800, help="Oracle window/test width")
+    parser.add_argument("--oracle-height", type=int, default=480, help="Oracle window/test height")
+    parser.add_argument("--oracle-fullscreen", action="store_true", help="Select fullscreen Oracle display mode")
+    parser.add_argument("--oracle-response-seconds", type=float, default=8.0, help="Minimum static response duration")
+    parser.add_argument("--voice-mqtt", action="store_true", help="Publish shared voice.state transitions through configured MQTT")
     parser.add_argument("--detector-profile", choices=PROFILE_NAMES, default=None)
     parser.add_argument("--processing-mode", choices=("direct", "speech_gate", "shadow"), default=None)
     actuation_group = parser.add_mutually_exclusive_group()
@@ -201,6 +215,8 @@ def shutdown(*_):
     global actuation_controller
     global run_configuration_summary
     global asr_coordinator
+    global oracle_interaction
+    global voice_mqtt
 
     if not _begin_shutdown():
         return
@@ -239,6 +255,10 @@ def shutdown(*_):
         except Exception:
             import traceback
             traceback.print_exc()
+    if oracle_interaction:
+        oracle_interaction.close()
+    if voice_mqtt:
+        voice_mqtt.close()
 
     if actuation_controller:
         try:
@@ -304,6 +324,8 @@ def main():
     global actuation_controller
     global run_configuration_summary
     global asr_coordinator
+    global oracle_interaction
+    global voice_mqtt
 
     args = parse_arguments()
     asr_config = load_asr_config().get("asr", {})
@@ -549,8 +571,24 @@ def main():
         cpu_threads=asr_config.get("cpu_threads", 2), worker_nice=asr_config.get("worker_nice", 10),
         queue_size=asr_config.get("queue_size", 1),
     )) if worker_enabled else None
-    asr_coordinator = LiveASRCoordinator(capture_controller, worker, source_id=args.wav or "live_respeaker",
-                                         detector_profile=detector_profile, release_after_asr=args.release_after_asr)
+    lifecycle = VoiceLifecycle()
+    asr_coordinator = LiveASRCoordinator(capture_controller, worker, lifecycle=lifecycle,
+                                         source_id=args.wav or "live_respeaker", detector_profile=detector_profile,
+                                         release_after_asr=args.release_after_asr)
+    if args.oracle:
+        display_config = DisplayConfig(width=args.oracle_width, height=args.oracle_height,
+            fullscreen=args.oracle_fullscreen, enabled=not args.oracle_headless, minimum_response_seconds=args.oracle_response_seconds)
+        display = OracleDisplayController(display_config) if args.oracle_headless else PygameOracleDisplayController(display_config)
+        retrieval = RiverCultureRetrievalAdapter(Path(BASE_DIR).parent)
+        oracle_interaction = OracleInteractionController(asr_coordinator, retrieval, display)
+        lifecycle.add_transition_observer(oracle_interaction.on_voice_transition)
+    if args.voice_mqtt:
+        from shared.messaging.config import load_mqtt_settings
+        from shared.messaging.mqtt_client import SemanticMQTTClient
+        settings, topic_base = load_mqtt_settings(Path(BASE_DIR).parent)
+        voice_mqtt = SemanticMQTTClient(settings, lambda *_: None)
+        voice_mqtt.start([])
+        lifecycle.add_transition_observer(VoiceStatePublisher(voice_mqtt, topic_base=topic_base).publish_transition)
     asr_coordinator.start()
 
 
@@ -625,7 +663,10 @@ def main():
 
 
             if audio_frame is None:
-                asr_coordinator.finish_capture()
+                completed_asr = asr_coordinator.finish_capture()
+                if oracle_interaction:
+                    oracle_interaction.on_asr_results(completed_asr)
+                    oracle_interaction.poll()
                 print(
                     "Audio source complete"
                 )
@@ -719,8 +760,11 @@ def main():
 
             # Polling only reads already-completed results; ASR remains in its
             # persistent child process while the next detector frame proceeds.
-            asr_coordinator.process_frame(frame, frame_number, emitted_trigger=triggered,
-                                          temporal_candidate=bool(result.temporal_candidate))
+            completed_asr = asr_coordinator.process_frame(frame, frame_number, emitted_trigger=triggered,
+                                                           temporal_candidate=bool(result.temporal_candidate))
+            if oracle_interaction:
+                oracle_interaction.on_asr_results(completed_asr)
+                oracle_interaction.poll()
             asr_coordinator.ready_status()
 
 
