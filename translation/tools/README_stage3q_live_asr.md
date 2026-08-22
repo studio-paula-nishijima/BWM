@@ -8,10 +8,11 @@ given completed `AudioSegment` objects, so detector, ReSpeaker, capture,
 actuation, and UART timing do not wait on ASR.
 
 The worker returns backend-neutral structured results through `poll()`, with
-the submitted capture metadata preserved. A future live runner can hand it a
-completed capture and consume that result without importing Faster-Whisper
-internals. Stage 3Q intentionally does not implement detector/capture, UART,
-actuation, retrieval, or display integration.
+the submitted capture metadata preserved. The live Voice runner now hands it
+completed captures and consumes those results through the ASR-result boundary
+without importing Faster-Whisper internals. The worker itself remains isolated
+from detector/capture, UART, actuation, retrieval, and display integration;
+those are composed by the runtime. See `../VOICE_ARCHITECTURE.md`.
 
 On the Pi, after installing the optional ASR requirement and prefetching the
 models, run a realistic-load comparison (do not interpret laptop latency):

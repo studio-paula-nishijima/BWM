@@ -13,3 +13,6 @@
 11. All hardware-bound runtime events, including modulation-generated events, must pass through RuntimeSafety. Do not use runtime safety to tune artistic behaviour without explicit approval and measured evidence.
 11. Installation activation is application state, not process lifecycle: inactive playback preserves its logical score position and must not busy-spin.
 12. Session teardown must quiesce reusable hardware before IDLE; never substitute full backend shutdown, and no old-session actuation may occur after IDLE.
+13. For live Voice/Whisper work, read `VOICE_ARCHITECTURE.md`: preserve its authoritative lifecycle and busy-admission semantics.  Only display completion normally releases an admitted interaction.
+14. Keep Voice boundaries separate: attach downstream work to structured ASR results, use the retrieval runtime adapter, keep retrieval response text opaque at the Voice/display boundary, and reuse `shared/messaging/` rather than a Voice MQTT stack.
+15. Voice publishes semantic lifecycle state only.  Translation owns reaction selection, modulation, safety, and hardware behaviour.

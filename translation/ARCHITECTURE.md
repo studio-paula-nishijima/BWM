@@ -184,11 +184,19 @@ Device-tree resolution and UART ownership checks belong exclusively to the UART 
 
 Generation-time safety is configuration-connected but disabled for the Stage 1 release baseline. Meaningful safety enforcement belongs to the later dynamic-runtime stage.
 
-## Future multilingual ASR and River Culture retrieval
+## Voice/Whisper and River Culture retrieval
 
-This is architecture guidance only; it does not change detector, capture,
-playback, actuation, or runtime behaviour. The English River Culture corpus can
-be searched through either of two independently configurable routes:
+The implemented Voice runtime is documented canonically in
+`VOICE_ARCHITECTURE.md`. It uses structured ASR output to call the existing
+River Culture retrieval runtime and presents its opaque top response text in
+the Oracle display. Voice remains responsible for its own admission and
+lifecycle, including waiting for display completion before releasing an
+interaction. Its optional shared `voice.state` publication is semantic only;
+Translation's existing reaction path above remains Translation-owned.
+
+The following are future multilingual retrieval alternatives, not a description
+of the current integrated `transcribe` runtime. The English River Culture corpus
+can be searched through either of two independently configurable routes:
 
 `captured utterance -> ASR translate_to_english -> English query -> English embedding backend -> English corpus retrieval`
 

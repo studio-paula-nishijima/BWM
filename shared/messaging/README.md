@@ -1,7 +1,7 @@
 # BWM semantic messaging
 
 `shared.messaging` is repo-wide infrastructure. Translation, the person
-detector, and later whisper/oracle code may use it without importing one
+detector, and the Voice/Oracle runtime use it without importing one
 another's runtime internals.
 
 Each message is compact JSON with `version`, `id`, `type`, `origin`,
@@ -41,8 +41,8 @@ and topic, with a new ID on each explicit state publication and origin
 `person_detector`; it must not issue Translation commands or rely on repeated
 detections extending a session.
 
-Future Voice work should publish the five `voice.state` milestones above using
-this package. Translation's initial behavior reacts to a transition into
+The Voice runtime publishes the five `voice.state` milestones above using this
+package. Translation's initial behavior reacts to a transition into
 `capture_processing`; Voice does not select or need to know the solenoid
 reaction, nor whether Translation is currently busy. Future UART redundancy
 must preserve the same IDs/origins so duplicate transport delivery resolves to
