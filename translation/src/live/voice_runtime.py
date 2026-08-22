@@ -63,6 +63,7 @@ class LiveASRCoordinator:
         self._submitted = {}
         self.results = []
         self._asr_status = None
+        self._startup_failure_reported = False
         self.release_after_asr = release_after_asr
         self.startup_ready = startup_ready or (lambda: (True, ""))
 
@@ -97,7 +98,9 @@ class LiveASRCoordinator:
             self.emit("[Voice] required startup resources ready")
             self.lifecycle.set(VoiceState.LISTENING)
         elif status == "unavailable" and self.lifecycle.state is VoiceState.INITIALIZING:
-            self.emit(f"[Voice] initialization failed: {self.worker.startup_error}; Voice remains unavailable")
+            if not self._startup_failure_reported:
+                self._startup_failure_reported = True
+                self.emit(f"[Voice] initialization failed: {self.worker.startup_error}; Voice remains unavailable")
         elif dependency_error:
             self.emit(f"[RetrievalWorker] error: {dependency_error}")
         return status
