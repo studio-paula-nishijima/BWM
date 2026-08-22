@@ -99,6 +99,13 @@ class RuntimeSafety:
             result[name] = metrics
         return result.get(target) if target is not None else result
 
+    @property
+    def last_accepted_at(self):
+        """Most recent admitted hardware-bound event across all targets."""
+        values = [metrics["last_accepted_at"] for metrics in self._metrics.values()
+                  if metrics["last_accepted_at"] is not None]
+        return max(values) if values else None
+
     def _decide(self, event, now, duration, emergency, thermal_load):
         target = event.get("target")
         enforcement_enabled = self._config.get("enabled", False)

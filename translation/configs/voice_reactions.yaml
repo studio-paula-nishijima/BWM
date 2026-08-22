@@ -1,0 +1,42 @@
+# Voice-triggered solenoid reactions. Edit this file to tune behavior; restart
+# Translation for changes to load. Targets use hardware target identifiers, not pins.
+strategies:
+  voice_simultaneous_then_sequence:
+    type: override_sequence
+    event: {type: solenoid, duration: 0.15, playback_time: 0}
+    initial_quiet_gap_seconds: 0.5
+    phases:
+      - {type: simultaneous, targets: all}
+      - {type: wait, duration_seconds: 0.5}
+      - {type: sequence, targets: all, spacing_seconds: 0.2}
+      - {type: wait, duration_seconds: 1.0}
+
+  voice_cascade:
+    type: override_sequence
+    event: {type: solenoid, duration: 0.15, playback_time: 0}
+    initial_quiet_gap_seconds: 0.5
+    phases:
+      - {type: sequence, targets: all, spacing_seconds: 0.3}
+      - {type: wait, duration_seconds: 1.0}
+
+  voice_triple_tap:
+    type: repeat_transform
+    event: {type: solenoid, duration: 0.15, playback_time: 0}
+    duration_seconds: 3.0
+    repeat_count: 3
+    tap_spacing_seconds: 0.2
+
+  voice_double_tap:
+    type: repeat_transform
+    event: {type: solenoid, duration: 0.15, playback_time: 0}
+    duration_seconds: 4.0
+    repeat_count: 2
+    tap_spacing_seconds: 0.2
+
+policy:
+  mode: weighted
+  choices:
+    voice_simultaneous_then_sequence: 1
+    voice_cascade: 1
+    voice_triple_tap: 1
+    voice_double_tap: 1

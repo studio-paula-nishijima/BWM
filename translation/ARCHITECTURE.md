@@ -98,6 +98,70 @@ Runtime reaction path:
 ReactionPolicy selects configured strategies but never schedules autonomous
 reactions or bypasses safety.
 
+## Stage 7 Voice-state interaction
+
+`Voice subsystem -> voice.state MQTT -> TranslationMQTTAdapter -> transition
+matcher -> external-reaction busy guard -> ReactionPolicy ->
+RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> GPIOBackend`
+
+The shared `voice.state` contract accepts `idle`, `listening`,
+`whisper_detected`, `capture_processing`, and `response_displayed`. Translation
+retains only the latest state for diagnostics. `voice_interaction.trigger_state`
+is configurable and defaults to `capture_processing`; only a transition *into*
+that state may trigger. Voice state never activates Translation or changes its
+600-second wall-clock session.
+
+The default `voice_default` policy selects configured cascade/multi-tap
+reactions and uses overlay timeline policy, so the base score continues while
+the reaction is busy. `PAUSE_AND_FILL` remains available as an explicit
+strategy configuration. Translation owns reaction selection; Voice sends no
+strategy, target, or GPIO instructions.
+
+The initial Voice reaction policy is entirely YAML-configured and offers four
+non-pausing reactions. `voice_simultaneous_then_sequence` temporarily overrides
+base output: after a 0.5 s quiet gap measured from RuntimeSafety's latest
+admitted actuation, it strikes every configured target together, waits 0.5 s,
+then follows the configured target order at 0.2 s spacing and retains the
+override for a final 1.0 s. `voice_cascade` uses the same 0.5 s quiet
+gap, strikes its configured order at 0.3 s spacing, and retains a 1.0 s tail.
+Both continue logical score time and intentionally drop base events due during
+their override; normal routing resumes at the current score position.
+
+`voice_triple_tap` and `voice_double_tap` are temporary non-pausing base-event
+transformations. For their configurable 3.0 s and 4.0 s windows respectively,
+each due base event becomes three or two taps on that event's own target, at
+0.2 s spacing. After the window, ordinary pass-through resumes. All timing,
+target order, target set, pulse seed, choices, and weights are configuration,
+not a fixed actuator topology. None of these initial reactions uses
+`PAUSE_AND_FILL`; that timeline policy remains opt-in for a future reaction.
+
+The editable reaction definitions and Voice policy are in
+`configs/voice_reactions.yaml`; `configs/runtime.yaml` retains base playback,
+modulation, safety, and session settings. Override
+reactions use a short phase list (`simultaneous`, `sequence`, `wait`); a phase
+may use `targets: all`, which resolves to every configured hardware target at
+startup, or an explicit ordered target list. Repeat transforms use
+`duration_seconds`, `repeat_count`, and `tap_spacing_seconds`. Add or alter a
+reaction by editing those fields and the `voice_default` policy choices; set
+that policy to `fixed` with a selected strategy to tune one reaction. Invalid
+types, phases, targets, timings, repeat counts, or policy references fail
+clearly at startup before hardware work is admitted.
+
+An accepted external reaction is busy until its final delayed output has been
+emitted (and any pause-and-fill resumes). Matching transitions while busy are
+dropped, never queued. Session timeout, cancellation, and teardown clear
+modulation and busy state before GPIO quiescence, so a late MQTT callback
+cannot admit work. MQTT duplicate-ID filtering occurs before transition logic;
+new IDs reporting the same state update observation but do not retrigger.
+
+For a Pi smoke test, activate Translation then run:
+`python translation/tools/simulate_voice_state.py listening`,
+`python translation/tools/simulate_voice_state.py capture_processing`, wait for
+completion, publish a state away from the trigger, then publish
+`capture_processing` again. A second trigger while busy is intentionally
+ignored. Stage 8 transports must preserve envelope IDs/origins and route every
+delivery through this same deduplication, transition, and busy logic.
+
 Future external-event path (documented only):
 
 `BWM semantic event layer -> translation-side policy/commands -> Runtime Modulation Engine`

@@ -8,6 +8,8 @@ from uuid import uuid4
 
 SCHEMA_VERSION = 1
 INSTALLATION_ACTIVATION = "installation.activation"
+VOICE_STATE = "voice.state"
+VOICE_STATES = frozenset({"idle", "listening", "whisper_detected", "capture_processing", "response_displayed"})
 
 
 class EventValidationError(ValueError):
@@ -78,3 +80,10 @@ def installation_activation(origin: str, state: str, **kwargs: Any) -> SemanticE
     if state not in {"active", "inactive"}:
         raise EventValidationError("Installation activation state must be 'active' or 'inactive'")
     return SemanticEvent(INSTALLATION_ACTIVATION, origin, {"state": state}, **kwargs)
+
+
+def voice_state(origin: str, state: str, **kwargs: Any) -> SemanticEvent:
+    """Create the coarse, subsystem-independent Voice state event."""
+    if state not in VOICE_STATES:
+        raise EventValidationError("Unsupported Voice state: %r" % (state,))
+    return SemanticEvent(VOICE_STATE, origin, {"state": state}, **kwargs)

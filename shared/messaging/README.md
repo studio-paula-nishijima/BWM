@@ -10,6 +10,14 @@ component (for example `person_detector`). The Stage 6 event is
 `installation.activation`, with payload `{ "state": "active" }` or
 `{ "state": "inactive" }` on `bwm/installation/activation`.
 
+Voice/oracle components publish `voice.state` on `bwm/voice/state`, with
+payload `{ "state": "idle|listening|whisper_detected|capture_processing|response_displayed" }`.
+Each publication uses a fresh envelope ID and a meaningful origin such as
+`voice_pi`. These are coarse semantic milestones, not detector scores, ASR,
+retrieval, display, servo, GPIO, or Translation strategy commands. Receivers
+must validate the state and suppress duplicate IDs before interpreting a
+state transition.
+
 Messages describe semantic state, never GPIO, systemd, UART, or module
 commands. Receivers use a bounded TTL/LRU ID cache and must also make an
 `active` state idempotent. This makes the envelope reusable if a future UART
@@ -33,7 +41,9 @@ and topic, with a new ID on each explicit state publication and origin
 `person_detector`; it must not issue Translation commands or rely on repeated
 detections extending a session.
 
-Whisper/oracle work should reuse this package and configuration, consume the
-installation activation state if required, and later add semantic event types
-such as `question.detected` or `response.ready`. It must not add hardware
-commands to the shared protocol.
+Future Voice work should publish the five `voice.state` milestones above using
+this package. Translation's initial behavior reacts to a transition into
+`capture_processing`; Voice does not select or need to know the solenoid
+reaction, nor whether Translation is currently busy. Future UART redundancy
+must preserve the same IDs/origins so duplicate transport delivery resolves to
+one semantic transition.

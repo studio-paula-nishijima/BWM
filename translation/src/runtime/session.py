@@ -6,18 +6,28 @@ from runtime.modulation import RuntimeModulationEngine
 from runtime.playback import PlaybackEngine
 from runtime.reaction_policy import ReactionPolicy
 from runtime.safety import RuntimeSafety
+from runtime.voice_reactions import prepare_voice_reactions
 
 
 class PlaybackSessionRuntime:
     """Keep an installation runtime alive while creating clean sessions on activation."""
 
     def __init__(self, events_factory, clock, dispatcher, session_timeout, initially_active=False,
-                 event_logger=None, safety_config=None, reaction_policy_config=None, rng=None):
+                 event_logger=None, safety_config=None, reaction_policy_config=None, rng=None,
+                 voice_interaction_config=None, reaction_targets=None):
         self._events_factory, self._clock, self._dispatcher = events_factory, clock, dispatcher
         self._session_timeout, self._event_logger = float(session_timeout), event_logger
         self._safety = RuntimeSafety(clock, dispatcher, safety_config)
+        self._voice_interaction = dict(voice_interaction_config or {})
+        if reaction_policy_config is not None and self._voice_interaction.get("enabled", False):
+            strategies, policies = prepare_voice_reactions(
+                reaction_policy_config.get("strategies", {}), reaction_policy_config.get("policies", {}),
+                self._voice_interaction.get("reaction_policy", "voice_default"), reaction_targets)
+            reaction_policy_config = {"strategies": strategies, "policies": policies}
         self._reaction_policy = None if reaction_policy_config is None else ReactionPolicy(
             reaction_policy_config.get("strategies", {}), reaction_policy_config.get("policies", {}), rng)
+        self._voice_state = None
+        self._external_reaction_busy = False
         self._changed = threading.Condition()
         self._active = False
         self._engine = self._modulation = self._started_at = None
@@ -37,6 +47,16 @@ class PlaybackSessionRuntime:
 
     @property
     def safety(self): return self._safety
+
+    @property
+    def voice_state(self):
+        with self._changed:
+            return self._voice_state
+
+    @property
+    def external_reaction_busy(self):
+        with self._changed:
+            return self._external_reaction_busy
 
     def activate(self):
         with self._changed:
@@ -84,9 +104,40 @@ class PlaybackSessionRuntime:
             if self._reaction_policy is None:
                 raise RuntimeError("No reaction policy configured")
             name, config = self._reaction_policy.select(category)
-            # Definitions may have an artistic name (for example ``triple_tap``)
-            # while their executable Stage 4 strategy is ``multi_tap``.
+            # Definitions may use an artistic name while mapping to a reusable
+            # Stage 4 modulation strategy.
             return self._modulation.trigger(config.pop("type", name), **config)
+
+    def observe_voice_state(self, state):
+        """Track one semantic Voice transition and admit at most one reaction."""
+        with self._changed:
+            previous, self._voice_state = self._voice_state, state
+            print(f"[Voice] state: {previous!r} -> {state!r}")
+            if not self._voice_interaction.get("enabled", False):
+                return "observed_disabled"
+            if previous == state:
+                return "observed_no_transition"
+            if state != self._voice_interaction.get("trigger_state"):
+                return "observed"
+            if not self._active:
+                print("[Voice] trigger ignored: Translation session inactive")
+                return "ignored_inactive"
+            self._refresh_external_reaction()
+            if self._external_reaction_busy:
+                print("[Voice] trigger ignored: external reaction busy")
+                return "ignored_busy"
+            if self._reaction_policy is None:
+                return "ignored_unconfigured"
+            category = self._voice_interaction.get("reaction_policy", "voice_default")
+            name, config = self._reaction_policy.select(category)
+            seed = dict(config.pop("event", {"type": "solenoid", "duration": .15, "playback_time": 0}))
+            if not seed.get("type"):
+                raise ValueError("Voice reaction requires an event type")
+            executable = config.pop("type", name)
+            self._modulation.trigger_external(executable, seed, **config)
+            self._external_reaction_busy = self._modulation.external_busy
+            print(f"[Voice] trigger matched; selected reaction: {name}")
+            return "triggered"
 
     def step(self):
         """Advance both clocks' work without allowing logical pause to affect timeout."""
@@ -99,6 +150,7 @@ class PlaybackSessionRuntime:
                 return 0
             dispatched = self._engine.step()
             dispatched += self._modulation.step()
+            self._refresh_external_reaction()
             backend_idle = getattr(self._dispatcher, "is_idle", lambda: True)
             if self._engine.is_complete and self._modulation.pending_count == 0 and backend_idle():
                 self._finish_session("complete")
@@ -118,9 +170,15 @@ class PlaybackSessionRuntime:
         """Single teardown path: close admission, clear session work, quiesce, idle."""
         print(f"[Session] TEARDOWN: {reason}; closing session admission")
         self._active = False
+        self._external_reaction_busy = False
         self._modulation.cancel()
         self._engine.stop()
         quiesce = getattr(self._dispatcher, "quiesce", None)
         if quiesce is not None:
             quiesce()
         print("[Session] IDLE: session state cleared; hardware quiescent")
+
+    def _refresh_external_reaction(self):
+        if self._external_reaction_busy and not self._modulation.external_busy:
+            self._external_reaction_busy = False
+            print("[Voice] external reaction complete; busy cleared")

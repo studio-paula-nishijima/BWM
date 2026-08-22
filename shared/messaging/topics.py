@@ -1,6 +1,7 @@
 """Small semantic MQTT topic hierarchy; topics never reveal transport or hardware."""
 
 INSTALLATION_ACTIVATION = "installation/activation"
+VOICE_STATE = "voice/state"
 
 
 class TopicNamespace:
@@ -19,6 +20,10 @@ class TopicNamespace:
     @property
     def installation_activation(self) -> str:
         return self.topic(INSTALLATION_ACTIVATION)
+
+    @property
+    def voice_state(self) -> str:
+        return self.topic(VOICE_STATE)
 
     def availability(self, origin: str) -> str:
         if not origin.strip():

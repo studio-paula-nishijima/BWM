@@ -85,7 +85,8 @@ def run_session_runtime(runtime, sleep_resolution):
 
 
 def main():
-    from configs.runtime_config import PROJECT_ROOT, get_backup_button_pin, get_solenoid_pin_map
+    from configs.runtime_config import (PROJECT_ROOT, get_backup_button_pin, get_solenoid_pin_map,
+                                        load_voice_reactions_config)
     from runtime.clock import RealtimeClock
     from runtime.gpio_backend import GPIOBackend
     from runtime.local_activation_input import LocalActivationInput
@@ -103,16 +104,23 @@ def main():
         events = prepare_events(source_events, playback_cfg)
         print(f"Session events after filtering: {len(events)}")
         return events
-    solenoid_backend = GPIOBackend(get_solenoid_pin_map())
+    solenoid_pin_map = get_solenoid_pin_map()
+    solenoid_backend = GPIOBackend(solenoid_pin_map)
     register_shutdown_hook(solenoid_backend.shutdown)
     try:
+        voice_reactions = load_voice_reactions_config()
+        reaction_strategies = {**RUNTIME_CONFIG.get("modulation", {}).get("strategies", {}),
+                               **voice_reactions.get("strategies", {})}
+        reaction_policies = {**RUNTIME_CONFIG.get("reaction_policy", {}),
+                             "voice_default": voice_reactions.get("policy", {})}
         runtime = PlaybackSessionRuntime(
             fresh_session_events, RealtimeClock(), EventRouter({"solenoid": solenoid_backend}),
             playback_cfg["session_timeout_seconds"], playback_cfg.get("initially_active", True),
             event_logger=log_dispatched_event,
             safety_config=RUNTIME_CONFIG.get("runtime_safety", {}),
-            reaction_policy_config={"strategies": RUNTIME_CONFIG.get("modulation", {}).get("strategies", {}),
-                                    "policies": RUNTIME_CONFIG.get("reaction_policy", {})},
+            reaction_policy_config={"strategies": reaction_strategies, "policies": reaction_policies},
+            voice_interaction_config=RUNTIME_CONFIG.get("voice_interaction", {}),
+            reaction_targets=list(solenoid_pin_map),
         )
         local_input = LocalActivationInput(get_backup_button_pin(), runtime)
         register_shutdown_hook(local_input.close)
@@ -124,9 +132,10 @@ def main():
             from shared.messaging.topics import TopicNamespace
             mqtt_settings, topic_base = load_mqtt_settings(REPOSITORY_ROOT)
             activation_topic = TopicNamespace(topic_base).installation_activation
+            voice_state_topic = TopicNamespace(topic_base).voice_state
             mqtt_client = SemanticMQTTClient(
-                mqtt_settings, TranslationMQTTAdapter(runtime, activation_topic).handle)
-            mqtt_client.start([activation_topic])
+                mqtt_settings, TranslationMQTTAdapter(runtime, activation_topic, voice_state_topic).handle)
+            mqtt_client.start([activation_topic, voice_state_topic])
             register_shutdown_hook(mqtt_client.close)
         except Exception as exc:
             print(f"[MQTT] Unavailable; continuing with local activation: {exc}")
