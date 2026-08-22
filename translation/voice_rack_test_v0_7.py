@@ -134,6 +134,7 @@ detector = None
 actuation_controller = None
 run_configuration_summary = None
 asr_coordinator = None
+shutdown_started = False
 
 
 audio_buffer = AudioRingBuffer(
@@ -183,6 +184,15 @@ def parse_arguments():
 # SHUTDOWN
 # -----------------------------
 
+def _begin_shutdown():
+    """Return true once; SIGINT and ``finally`` may both request shutdown."""
+    global shutdown_started
+    if shutdown_started:
+        return False
+    shutdown_started = True
+    return True
+
+
 def shutdown(*_):
 
     global source
@@ -191,6 +201,9 @@ def shutdown(*_):
     global actuation_controller
     global run_configuration_summary
     global asr_coordinator
+
+    if not _begin_shutdown():
+        return
 
 
     print("\nShutdown...")
