@@ -18,7 +18,10 @@ GPIOZERO_PIN_FACTORY=native python voice_rack_test_v0_7.py --asr-model tiny --no
 ```
 
 Useful test variants are `--no-live-asr` (capture without model work) and
-`--diagnostic-console` (restores per-frame detector telemetry).  WAV mode and
+`--diagnostic-console` (restores per-frame detector telemetry).  For standalone
+Stage 3T cycling only, `--release-after-asr` explicitly releases the current
+interaction after ASR; production remains busy until a later response/display
+stage calls the transport-independent `complete_interaction()` seam. WAV mode and
 explicit live CSV logging retain the existing analysis workflow.
 
 Check that normal output reports `listening`, a whisper trigger, capture start

@@ -66,6 +66,8 @@ class VoiceRuntimeTests(unittest.TestCase):
             self.assertEqual(result["detector_profile"], "temporal_v2_context")
             self.assertEqual(result["result"]["recognized_text"], "a partial question")
             self.assertTrue(any("[Capture] started" in item for item in events))
+            self.assertTrue(any("[ASR] complete:" in item for item in events))
+            self.assertEqual(runtime.lifecycle.state, VoiceState.CAPTURE_PROCESSING)
         finally:
             runtime.shutdown()
 
@@ -97,11 +99,26 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertEqual(VoiceState.RESPONSE_DISPLAYED.value, "response_displayed")
         self.assertEqual(len(events), 1)
 
+    def test_busy_interaction_does_not_admit_second_capture_until_released(self):
+        runtime, events = self.make()
+        try:
+            self.feed(runtime)
+            self.assertEqual(runtime.lifecycle.state, VoiceState.CAPTURE_PROCESSING)
+            self.feed(runtime, start=8, count=2, trigger_at=8)
+            self.assertEqual(len(runtime.capture.completed), 1)
+            self.assertTrue(any("[Interaction] ignored: busy (capture_processing)" in item for item in events))
+            self.assertTrue(runtime.complete_interaction("test release"))
+            self.feed(runtime, start=10, count=8, trigger_at=10)
+            self.assertEqual(len(runtime.capture.completed), 2)
+        finally:
+            runtime.shutdown()
+
     def test_worker_unavailability_and_empty_text_are_visible(self):
         events = []
         ring = AudioRingBuffer(100, 1)
         capture = UtteranceCaptureController(100, ring, CapturePolicy(0, None, 0, .1), "live", "p")
         runtime = LiveASRCoordinator(capture, PersistentASRWorker(ASRWorkerConfig(worker_nice=0), backend_factory=fake_factory), emit=events.append)
+        runtime.lifecycle.set(VoiceState.LISTENING)
         frame = np.zeros(10, np.float32); ring.append(frame)
         runtime.process_frame(frame, 0, emitted_trigger=True, temporal_candidate=False)
         ring.append(frame)

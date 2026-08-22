@@ -33,7 +33,8 @@ class VoiceLifecycle:
 class LiveASRCoordinator:
     """Feed canonical frames without ever waiting for model inference."""
     def __init__(self, capture, worker=None, *, lifecycle=None, emit=print,
-                 source_id="live", detector_profile="", output_mode="transcribe", language=None):
+                 source_id="live", detector_profile="", output_mode="transcribe", language=None,
+                 release_after_asr=False):
         self.capture = capture
         self.worker = worker
         self.lifecycle = lifecycle or VoiceLifecycle(emit)
@@ -43,6 +44,11 @@ class LiveASRCoordinator:
         self._submitted = {}
         self.results = []
         self._asr_status = None
+        self.release_after_asr = release_after_asr
+
+    @property
+    def accepting_interaction(self):
+        return self.lifecycle.state is VoiceState.LISTENING and not self.capture.is_capturing
 
     def start(self):
         self.lifecycle.set(VoiceState.LISTENING)
@@ -66,15 +72,31 @@ class LiveASRCoordinator:
         return status
 
     def process_frame(self, frame, frame_number, *, emitted_trigger, temporal_candidate):
+        admitted_trigger = False
         if emitted_trigger:
             self.emit("[Trigger] whisper detected")
-            self.lifecycle.set(VoiceState.WHISPER_DETECTED)
-        completed = self.capture.process_frame(frame, frame_number, emitted_trigger, temporal_candidate)
-        if self.capture.is_capturing and emitted_trigger:
+            if self.accepting_interaction:
+                admitted_trigger = True
+                self.lifecycle.set(VoiceState.WHISPER_DETECTED)
+            else:
+                self.emit(f"[Interaction] ignored: busy ({self.lifecycle.state.value})")
+        completed = self.capture.process_frame(frame, frame_number, admitted_trigger, temporal_candidate)
+        if self.capture.is_capturing and admitted_trigger:
             self.emit("[Capture] started")
         if completed:
             self._submit(completed)
         return self.poll()
+
+    def complete_interaction(self, reason="external"):
+        """Release admission after a future response/display stage has finished.
+
+        Stage 3T deliberately never calls this during ordinary ASR completion:
+        ASR is only one part of the eventual interaction lifecycle.
+        """
+        if self.capture.is_capturing or self.lifecycle.state not in (VoiceState.CAPTURE_PROCESSING, VoiceState.RESPONSE_DISPLAYED):
+            return False
+        self.emit(f"[Interaction] complete: {reason}")
+        return self.lifecycle.set(VoiceState.LISTENING)
 
     def finish_capture(self):
         completed = self.capture.finish()
@@ -133,10 +155,15 @@ class LiveASRCoordinator:
                 result = item["result"]
                 if result.get("detected_language"):
                     self.emit(f"[ASR] language={result['detected_language']}")
+                rtf = item["real_time_factor"]
+                suffix = f"; RTF={rtf:.2f}" if rtf is not None else ""
+                self.emit(f"[ASR] complete: {item['inference_duration']:.2f} s{suffix}")
                 self.emit(f"[ASR] {result.get('recognized_text', '')!r}")
             else:
-                self.emit(f"[ASR] error: {item['error']}")
+                self.emit(f"[ASR] error after {item['inference_duration']:.2f} s: {item['error']}")
             self.results.append(item); completed.append(item)
+            if self.release_after_asr:
+                self.complete_interaction("debug ASR completion")
         return completed
 
     def shutdown(self):

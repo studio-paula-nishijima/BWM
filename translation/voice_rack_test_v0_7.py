@@ -168,6 +168,7 @@ def parse_arguments():
     parser.add_argument("--diagnostic-console", action="store_true", help="Show per-frame detector telemetry (normal live output is event based)")
     parser.add_argument("--no-live-asr", action="store_true", help="Capture normally but do not start the live ASR worker")
     parser.add_argument("--asr-model", choices=("tiny", "base", "small"), default=None, help="Override the configured live Faster-Whisper model")
+    parser.add_argument("--release-after-asr", action="store_true", help="Debug only: reopen interaction admission after each ASR result")
     parser.add_argument("--detector-profile", choices=PROFILE_NAMES, default=None)
     parser.add_argument("--processing-mode", choices=("direct", "speech_gate", "shadow"), default=None)
     actuation_group = parser.add_mutually_exclusive_group()
@@ -536,7 +537,7 @@ def main():
         queue_size=asr_config.get("queue_size", 1),
     )) if worker_enabled else None
     asr_coordinator = LiveASRCoordinator(capture_controller, worker, source_id=args.wav or "live_respeaker",
-                                         detector_profile=detector_profile)
+                                         detector_profile=detector_profile, release_after_asr=args.release_after_asr)
     asr_coordinator.start()
 
 
