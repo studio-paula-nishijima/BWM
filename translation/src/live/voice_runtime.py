@@ -53,7 +53,7 @@ class LiveASRCoordinator:
     """Feed canonical frames without ever waiting for model inference."""
     def __init__(self, capture, worker=None, *, lifecycle=None, emit=print,
                  source_id="live", detector_profile="", output_mode="transcribe", language=None,
-                 release_after_asr=False):
+                 release_after_asr=False, startup_ready=None):
         self.capture = capture
         self.worker = worker
         self.lifecycle = lifecycle or VoiceLifecycle(emit)
@@ -64,6 +64,7 @@ class LiveASRCoordinator:
         self.results = []
         self._asr_status = None
         self.release_after_asr = release_after_asr
+        self.startup_ready = startup_ready or (lambda: (True, ""))
 
     @property
     def accepting_interaction(self):
@@ -91,11 +92,14 @@ class LiveASRCoordinator:
         if status != self._asr_status:
             self._asr_status = status
             self.emit(message)
-        if status == "ready" and self.lifecycle.state is VoiceState.INITIALIZING:
+        dependencies_ready, dependency_error = self.startup_ready()
+        if status == "ready" and dependencies_ready and self.lifecycle.state is VoiceState.INITIALIZING:
             self.emit("[Voice] required startup resources ready")
             self.lifecycle.set(VoiceState.LISTENING)
         elif status == "unavailable" and self.lifecycle.state is VoiceState.INITIALIZING:
             self.emit(f"[Voice] initialization failed: {self.worker.startup_error}; Voice remains unavailable")
+        elif dependency_error:
+            self.emit(f"[RetrievalWorker] error: {dependency_error}")
         return status
 
     def process_frame(self, frame, frame_number, *, emitted_trigger, temporal_candidate):

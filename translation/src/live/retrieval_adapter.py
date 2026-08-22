@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import numpy as np
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +23,24 @@ class RiverCultureRetrievalAdapter:
             raise RuntimeError("River Culture retrieval runtime is unavailable")
         self._module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self._module)
+        self._runtime = None
+
+    def prepare(self):
+        """Load index and embedding model once; called only by retrieval worker."""
+        embeddings, metadata = self._module.load_index(self.config, self.repository_root, self.model_id)
+        self._runtime = embeddings, metadata, self._module.load_encoder(self.model_id)
 
     def retrieve(self, text: str) -> dict[str, Any]:
         """Return the existing top-ranked source text without shaping it."""
-        result = self._module.query(self.config, self.repository_root, self.model_id, text, self.config["top_k"])
-        raw = result.get("raw_results", [])
+        if self._runtime is None: self.prepare()
+        embeddings, metadata, encoder = self._runtime
+        vector = self._module.encode(encoder, [text], metadata["model"]["query_prefix"], self.config["batch_size"])[0]
+        positions = np.argsort(-(embeddings @ vector), kind="stable")[:self.config["top_k"]]
+        raw = []
+        for rank, position in enumerate(positions, 1):
+            record = dict(metadata["chunks"][int(position)]); record.update({"rank": rank, "score": float((embeddings @ vector)[position])}); raw.append(record)
+        result = {"query": text, "model": self.model_id, "similarity": metadata["similarity"], "raw_results": raw,
+                  "grouped_regions": self._module.grouped_regions(raw)}
         response = raw[0].get("text", "") if raw else ""
         return {"ok": bool(response), "response_text": response, "metadata": result}
 

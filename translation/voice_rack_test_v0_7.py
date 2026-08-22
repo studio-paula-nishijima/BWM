@@ -99,6 +99,7 @@ from live.voice_runtime import LiveASRCoordinator, VoiceLifecycle
 from live.interaction import OracleInteractionController
 from live.oracle_display import DisplayConfig, OracleDisplayController, PygameOracleDisplayController
 from live.retrieval_adapter import RiverCultureRetrievalAdapter
+from live.retrieval_worker import PersistentRetrievalWorker
 from live.voice_messaging import VoiceStatePublisher
 from configs.runtime_config import load_asr_config
 
@@ -575,14 +576,22 @@ def main():
         queue_size=asr_config.get("queue_size", 1),
     )) if worker_enabled else None
     lifecycle = VoiceLifecycle()
+    retrieval = None
+    if args.oracle:
+        retrieval = PersistentRetrievalWorker(Path(BASE_DIR).parent)
+        print("[RetrievalWorker] starting")
+        retrieval.start()
+    def retrieval_ready():
+        if retrieval is None: return True, ""
+        if retrieval.ready: return True, ""
+        return False, retrieval.startup_error or ""
     asr_coordinator = LiveASRCoordinator(capture_controller, worker, lifecycle=lifecycle,
                                          source_id=args.wav or "live_respeaker", detector_profile=detector_profile,
-                                         release_after_asr=args.release_after_asr)
+                                         release_after_asr=args.release_after_asr, startup_ready=retrieval_ready)
     if args.oracle:
         display_config = DisplayConfig(width=args.oracle_width, height=args.oracle_height,
             fullscreen=args.oracle_fullscreen, enabled=not args.oracle_headless, minimum_response_seconds=args.oracle_response_seconds)
         display = OracleDisplayController(display_config) if args.oracle_headless else PygameOracleDisplayController(display_config)
-        retrieval = RiverCultureRetrievalAdapter(Path(BASE_DIR).parent)
         oracle_interaction = OracleInteractionController(asr_coordinator, retrieval, display)
         lifecycle.add_transition_observer(oracle_interaction.on_voice_transition)
     if args.voice_mqtt:

@@ -18,14 +18,20 @@ class Coordinator:
 
 
 class Retrieval:
-    def __init__(self, response="river text", error=None): self.queries, self.response, self.error = [], response, error
+    def __init__(self, response="river text", error=None): self.queries, self.response, self.error, self.items = [], response, error, []
     def retrieve(self, text):
         self.queries.append(text)
         if self.error: raise self.error
         return {"ok": bool(self.response), "response_text": self.response, "metadata": {}}
+    def submit(self, text):
+        try: self.items.append({"ok": True, "result": self.retrieve(text)})
+        except Exception as exc: self.items.append({"ok": False, "error": str(exc)})
+        return "1", "accepted"
+    def poll(self): items, self.items = self.items, []; return items
     def fallback_response(self, reason):
         self.fallback_reason = reason
         return {"ok": True, "response_text": "configured River Culture response", "metadata": {"fallback": True}}
+    def shutdown(self): pass
 
 
 class Clock:
