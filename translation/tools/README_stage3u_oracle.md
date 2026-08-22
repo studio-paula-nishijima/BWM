@@ -5,10 +5,12 @@ requirements plus the River Culture retrieval requirements and building a
 selected retrieval index:
 
 ```sh
-GPIOZERO_PIN_FACTORY=native python voice_rack_test_v0_7.py --oracle --oracle-width 800 --oracle-height 480 --no-actuation --voice-mqtt
+GPIOZERO_PIN_FACTORY=native python voice_rack_test_v0_7.py --oracle-width 800 --oracle-height 480 --no-actuation --voice-mqtt
 ```
 
-Start windowed first; add `--oracle-fullscreen` for installation deployment.
+The Oracle display/integration is enabled by default. Start windowed first; add
+`--oracle-fullscreen` for installation deployment. Use `--no-oracle` only for
+capture/ASR-only runs.
 Use `--oracle-headless` to exercise ASR, retrieval and completion without SDL,
 and omit `--voice-mqtt` for standalone broker-free operation.
 

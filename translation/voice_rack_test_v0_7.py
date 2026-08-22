@@ -177,7 +177,10 @@ def parse_arguments():
     parser.add_argument("--no-live-asr", action="store_true", help="Capture normally but do not start the live ASR worker")
     parser.add_argument("--asr-model", choices=("tiny", "base", "small"), default=None, help="Override the configured live Faster-Whisper model")
     parser.add_argument("--release-after-asr", action="store_true", help="Debug only: reopen interaction admission after each ASR result")
-    parser.add_argument("--oracle", action="store_true", help="Enable Stage 3U ASR → retrieval → Oracle response integration")
+    parser.add_argument("--oracle", dest="oracle", action="store_true", default=True,
+                        help="Enable Oracle response integration (the default)")
+    parser.add_argument("--no-oracle", dest="oracle", action="store_false",
+                        help="Disable retrieval and the Oracle display for capture/ASR-only runs")
     parser.add_argument("--oracle-headless", action="store_true", help="Use the deterministic no-screen Oracle display controller")
     parser.add_argument("--oracle-width", type=int, default=800, help="Oracle window/test width")
     parser.add_argument("--oracle-height", type=int, default=480, help="Oracle window/test height")

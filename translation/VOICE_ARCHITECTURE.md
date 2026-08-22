@@ -120,9 +120,11 @@ Lifecycle states map to visitor views as follows:
 | `capture_processing` | “The Oracle is considering your question...” |
 | `response_displayed` | “The Oracle responds”, followed by the retrieval response text |
 
-`--oracle` enables the integrated runtime.  `--oracle-headless` selects the
-headless controller; `--oracle-width`, `--oracle-height`, `--oracle-fullscreen`,
-and `--oracle-response-seconds` control presentation.  `display.poll()` emits
+The integrated runtime and its visible Oracle display are enabled by default.
+`--no-oracle` is the explicit capture/ASR-only opt-out; `--oracle` remains a
+compatible explicit opt-in spelling. `--oracle-headless` selects the headless
+controller; `--oracle-width`, `--oracle-height`, `--oracle-fullscreen`, and
+`--oracle-response-seconds` control presentation. `display.poll()` emits
 completion only after the static/scroll presentation duration, and that event
 is what calls `complete_interaction()`.
 
