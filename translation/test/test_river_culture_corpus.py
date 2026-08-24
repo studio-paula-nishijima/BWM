@@ -47,6 +47,12 @@ class RiverCultureCorpusTests(unittest.TestCase):
         self.assertEqual(corpus.content_type(cell, table_active=table_active, bibliography_active=False,
                                              regions=[], settings=self.FILTER)[0], "table_content")
 
+    def test_table_geometry_is_not_scanned_without_a_numbered_caption(self) -> None:
+        class Page:
+            def find_tables(self):
+                raise AssertionError("table detection should be prefiltered")
+        self.assertEqual(corpus.table_regions(Page(), False), [])
+
     def test_table_geometry_keeps_nearby_prose_before_and_after_table(self) -> None:
         before = self.block("The river changes with the seasons.", y0=10, y1=30)
         cell = self.block("Wet season  42.0", y0=40, y1=60)

@@ -195,8 +195,10 @@ def overlaps_table_region(block: Block, regions: list[tuple[float, float, float,
     return False
 
 
-def table_regions(page: Any) -> list[tuple[float, float, float, float]]:
+def table_regions(page: Any, has_numbered_caption: bool) -> list[tuple[float, float, float, float]]:
     """Use PyMuPDF's table finder when this PDF/page exposes table geometry."""
+    if not has_numbered_caption:
+        return []
     try:
         finder = getattr(page, "find_tables", None)
         if finder is None:
@@ -254,7 +256,8 @@ def make_passages(pdf_path: Path, settings: dict[str, Any],
             suspicious[page_index + 1] = warnings
         printed_page = printed_page_number(raw_blocks, page.rect.height)
         ordinal = 0
-        regions = table_regions(page)
+        has_numbered_caption = any(TABLE_CAPTION_RE.match(normalise_text(block.text)) for block in ordered)
+        regions = table_regions(page, has_numbered_caption)
         table_active = False
         for block_ordinal, block in enumerate(ordered, start=1):
             kind, table_active, bibliography_active = content_type(

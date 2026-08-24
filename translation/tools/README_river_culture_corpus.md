@@ -62,7 +62,8 @@ counts, distributions, missing metadata, and suspicious pages/passages.
 
 Before canonical passage construction, the extractor classifies and excludes
 figure captions, numbered table captions, and table content. It first uses
-PyMuPDF's `find_tables()` rectangles, where available, to exclude intersecting
+PyMuPDF's `find_tables()` rectangles on pages with a strict numbered table
+caption, where available, to exclude intersecting
 table blocks. On pages without a detected rectangle, a strict numbered `Table
 N` caption starts a same-page fallback table-content boundary. This keeps prose
 outside a detected table rectangle, including prose immediately after it.
