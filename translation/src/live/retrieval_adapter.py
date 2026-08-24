@@ -32,17 +32,21 @@ class RiverCultureRetrievalAdapter:
         self._runtime = embeddings, metadata, self._module.load_encoder(self.model_id)
 
     def retrieve(self, text: str) -> dict[str, Any]:
-        """Return the existing top-ranked source text without shaping it."""
+        """Return derived presentation text while preserving canonical metadata."""
         if self._runtime is None: self.prepare()
         embeddings, metadata, encoder = self._runtime
         vector = self._module.encode(encoder, [text], metadata["model"]["query_prefix"], self.config["batch_size"])[0]
         positions = np.argsort(-(embeddings @ vector), kind="stable")[:self.config["top_k"]]
         raw = []
         for rank, position in enumerate(positions, 1):
-            record = dict(metadata["chunks"][int(position)]); record.update({"rank": rank, "score": float((embeddings @ vector)[position])}); raw.append(record)
+            record = dict(metadata["chunks"][int(position)])
+            record.update({"rank": rank, "score": float((embeddings @ vector)[position])})
+            record["presentation_text"] = self._module.presentation_text(
+                record["text"], self.config.get("presentation_cleanup"))
+            raw.append(record)
         result = {"query": text, "model": self.model_id, "similarity": metadata["similarity"], "raw_results": raw,
                   "grouped_regions": self._module.grouped_regions(raw)}
-        response = raw[0].get("text", "") if raw else ""
+        response = raw[0].get("presentation_text", "") if raw else ""
         return {"ok": bool(response), "response_text": response, "metadata": result}
 
     def fallback_response(self, reason: str) -> dict[str, Any]:
@@ -54,9 +58,12 @@ class RiverCultureRetrievalAdapter:
             choices = [chunk for chunk in metadata["chunks"] if not ids or chunk["id"] in ids]
             if choices:
                 chosen = random.SystemRandom().choice(choices)
-                return {"ok": True, "response_text": chosen["text"], "metadata": {"fallback": True, "reason": reason, "id": chosen["id"]}}
+                return {"ok": True, "response_text": self._module.presentation_text(
+                    chosen["text"], self.config.get("presentation_cleanup")),
+                        "metadata": {"fallback": True, "reason": reason, "id": chosen["id"]}}
         response = fallback.get("text", "")
         if not isinstance(response, str) or not response.strip():
             raise RuntimeError(f"configured fallback response is unavailable ({reason})")
-        return {"ok": True, "response_text": response,
+        return {"ok": True, "response_text": self._module.presentation_text(
+            response, self.config.get("presentation_cleanup")),
                 "metadata": {"fallback": True, "reason": reason, "id": fallback.get("id")}}

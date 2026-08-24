@@ -1,9 +1,16 @@
 {
-  "corpus_version": "1.0.0",
+  "corpus_version": "1.1.0",
   "source_pdf": "files/river_culture/382775eng.pdf",
   "passages_output": "files/river_culture/river_culture_passages.jsonl",
   "chunks_output": "files/river_culture/river_culture_chunks.jsonl",
+  "excluded_units_output": "files/river_culture/river_culture_excluded_units.jsonl",
   "report_output": "files/river_culture/river_culture_corpus_report.json",
+  "content_filter": {
+    "exclude_figure_captions": true,
+    "exclude_table_captions": true,
+    "exclude_table_bodies": true,
+    "exclude_bibliography": true
+  },
   "chunking": {
     "target_tokens": 450,
     "minimum_tokens": 250,

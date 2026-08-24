@@ -15,6 +15,20 @@ SPEC.loader.exec_module(retrieval)
 
 
 class RiverCultureRetrievalTests(unittest.TestCase):
+    def test_presentation_cleanup_removes_only_supported_citations(self) -> None:
+        canonical = "Floods shape rivers (Junk et al., 1989; Poff and Allan, 1997) [12]."
+        cleaned = retrieval.presentation_text(canonical)
+        self.assertEqual(canonical, "Floods shape rivers (Junk et al., 1989; Poff and Allan, 1997) [12].")
+        self.assertEqual(cleaned, "Floods shape rivers.")
+
+    def test_presentation_cleanup_retains_substantive_parentheses_and_years(self) -> None:
+        canonical = "The river (which floods in spring) changed in 2018, as Maria explained."
+        self.assertEqual(retrieval.presentation_text(canonical), canonical)
+
+    def test_presentation_cleanup_is_configurable(self) -> None:
+        canonical = "Floods shape rivers (Smith, 2018)."
+        self.assertEqual(retrieval.presentation_text(canonical, {"remove_inline_citations": False}), canonical)
+
     def test_grouped_regions_keeps_raw_neighbours_together(self) -> None:
         grouped = retrieval.grouped_regions([
             {"id": "a", "score": .8, "pdf_pages": [10, 11]},

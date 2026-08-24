@@ -60,9 +60,24 @@ box, and cleaned passage text. Chunk records retain all source passage IDs and
 page/chapter provenance. The JSON report records SHA-256, configuration,
 counts, distributions, missing metadata, and suspicious pages/passages.
 
-Known limitation: text within figures, tables, and some captions is retained
-when present in the text layer but is not semantically classified. The report
-marks complex layouts for manual review before using the corpus in Stage 5.
-The embedded text layer also contains a small number of replacement characters
-for unavailable glyph mappings; their count is reported so it can be assessed
-before quotation use.
+Before canonical passage construction, the extractor classifies and excludes
+figure captions, numbered table captions, and table content. It first uses
+PyMuPDF's `find_tables()` rectangles, where available, to exclude intersecting
+table blocks. On pages without a detected rectangle, a strict numbered `Table
+N` caption starts a same-page fallback table-content boundary. This keeps prose
+outside a detected table rectangle, including prose immediately after it.
+Strict `Fig.`/`Figure` numbering identifies figure captions. Clearly headed
+`Bibliography`/`References` sections are also excluded until the next numbered
+chapter heading.
+
+The ignored `river_culture_excluded_units.jsonl` is a compact audit trail with
+each excluded block's classification, page, bounding box, and source-passage
+ordinal(s). The report includes counts by exclusion type. Canonical passages
+and their derived chunks therefore contain prose-only source material; there
+is no second caption/table filter downstream.
+
+Stable IDs remain PDF-page/ordinal IDs. Ordinals include excluded split units,
+so unaffected passage IDs on the same page remain stable even when neighbouring
+non-prose material is newly excluded. The embedded text layer also contains a
+small number of replacement characters for unavailable glyph mappings; their
+count is reported so it can be assessed before quotation use.

@@ -5,6 +5,9 @@
   "index_directory": "files/river_culture",
   "top_k": 5,
   "batch_size": 16,
+  "presentation_cleanup": {
+    "remove_inline_citations": true
+  },
   "fallback_response": {
     "id": "river_culture_generic_v1",
     "mode": "random_chunk",

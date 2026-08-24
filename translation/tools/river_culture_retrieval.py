@@ -2,7 +2,8 @@
 """Build, query, and evaluate the River Culture semantic chunk index.
 
 This is intentionally retrieval only: returned chunks retain source wording and
-provenance; no quotation selection, cleanup, or display shaping occurs here.
+provenance.  A separately derived presentation string may remove only
+high-confidence citation markers; it never changes indexed canonical text.
 """
 from __future__ import annotations
 
@@ -20,6 +21,28 @@ from typing import Any, Iterable
 import numpy as np
 
 RETRIEVAL_VERSION = "1.0.0"
+AUTHOR = r"[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+"
+AUTHOR_YEAR = rf"{AUTHOR}(?:(?:\s+(?:and|&)\s+{AUTHOR})|\s+et al\.)?\s*,?\s+\d{{4}}[a-z]?"
+PARENTHETICAL_CITATION_RE = re.compile(
+    rf"\(\s*{AUTHOR_YEAR}(?:\s*[;,]\s*{AUTHOR_YEAR})*\s*\)"
+)
+NUMERIC_CITATION_RE = re.compile(r"\[(?:\s*\d{1,4}\s*)(?:[,;]\s*\d{1,4}\s*)*\]")
+
+
+def presentation_text(canonical_text: str, settings: dict[str, Any] | None = None) -> str:
+    """Create conservative display text without mutating the source text.
+
+    Only parentheticals composed entirely of observed author-year citation
+    forms and square-bracket numeric markers are eligible for removal.
+    """
+    if not (settings or {}).get("remove_inline_citations", True):
+        return canonical_text
+    result = PARENTHETICAL_CITATION_RE.sub("", canonical_text)
+    result = NUMERIC_CITATION_RE.sub("", result)
+    result = re.sub(r"\s+([,.;:!?])", r"\1", result)
+    result = re.sub(r"([,;])\s*[,;]", r"\1", result)
+    result = re.sub(r"\(\s*\)|\[\s*\]", "", result)
+    return re.sub(r"[ \t]{2,}", " ", result).strip()
 
 
 def file_hash(path: Path) -> str:
@@ -181,6 +204,7 @@ def query(config: dict[str, Any], root: Path, model_id: str, text: str, top_k: i
     for rank, position in enumerate(positions, start=1):
         record = dict(metadata["chunks"][int(position)])
         record.update({"rank": rank, "score": float(scores[position])})
+        record["presentation_text"] = presentation_text(record["text"], config.get("presentation_cleanup"))
         raw.append(record)
     return {"query": text, "model": model_id, "similarity": metadata["similarity"], "raw_results": raw,
             "grouped_regions": grouped_regions(raw), "performance": {"query_embedding_seconds": round(embedding_seconds, 5),

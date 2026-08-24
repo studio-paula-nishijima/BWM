@@ -32,10 +32,20 @@ translation/river_culture_venv/bin/python translation/tools/river_culture_retrie
   --output files/river_culture/river_culture_evaluation_multilingual_minilm.json
 ```
 
-Query output preserves raw rank and score, complete chunk wording, chunk IDs,
+Query output preserves raw rank and score, complete canonical chunk wording, chunk IDs,
 ordered canonical `passage_ids`, page/chapter provenance, and propagated layout
 flags. `grouped_regions` is an optional page-overlap grouping for human review;
 it never alters `raw_results`.
+
+Each raw result also contains derived `presentation_text`. Its canonical `text`
+is unchanged and is what was embedded, scored, and retained for provenance.
+The display-oriented string conservatively removes only complete
+author-year parentheticals (`(Author, 2018)`, `(Author and Author, 2018)`,
+`(Author et al., 2018)`, and semicolon/comma-separated groups) plus numeric
+markers such as `[12]`. Ordinary explanatory parentheses, names, and years
+remain intact. This independent cleanup is controlled by the single
+`presentation_cleanup.remove_inline_citations` setting; it never affects
+retrieval ranking or index contents.
 
 ## Future ASR/retrieval routes
 

@@ -19,10 +19,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-CORPUS_VERSION = "1.0.0"
+CORPUS_VERSION = "1.1.0"
 TOKEN_RE = re.compile(r"\b[\w'-]+\b", re.UNICODE)
 PAGE_NUMBER_RE = re.compile(r"^\s*(\d{1,4})\s*$")
 HEADING_RE = re.compile(r"^(?:\d{1,2}(?:\.\d+)*\s+|[A-Z][A-Z\s,:;\-]{10,}$)")
+FIGURE_CAPTION_RE = re.compile(r"^\s*(?:fig(?:ure)?\.?\s*\d+(?:\.\d+)*)\b", re.IGNORECASE)
+TABLE_CAPTION_RE = re.compile(r"^\s*table\s+\d+(?:\.\d+)*\b", re.IGNORECASE)
+BIBLIOGRAPHY_RE = re.compile(r"^\s*(?:bibliography|references)\b", re.IGNORECASE)
+CHAPTER_START_RE = re.compile(r"^\s*\d{1,2}(?:\.\d+)*\s+")
 
 
 @dataclass(frozen=True)
@@ -181,7 +185,57 @@ def heading(text: str, font_size: float) -> bool:
     return bool(HEADING_RE.match(compact)) or (font_size >= 13 and token_count(compact) <= 24)
 
 
-def make_passages(pdf_path: Path, settings: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def overlaps_table_region(block: Block, regions: list[tuple[float, float, float, float]]) -> bool:
+    """Return true only for a materially overlapping detected table rectangle."""
+    for x0, y0, x1, y1 in regions:
+        overlap_width = max(0.0, min(block.x1, x1) - max(block.x0, x0))
+        overlap_height = max(0.0, min(block.y1, y1) - max(block.y0, y0))
+        if overlap_width * overlap_height >= min(block.width * (block.y1 - block.y0), (x1 - x0) * (y1 - y0)) * .2:
+            return True
+    return False
+
+
+def table_regions(page: Any) -> list[tuple[float, float, float, float]]:
+    """Use PyMuPDF's table finder when this PDF/page exposes table geometry."""
+    try:
+        finder = getattr(page, "find_tables", None)
+        if finder is None:
+            return []
+        found = finder()
+        return [tuple(map(float, table.bbox)) for table in found.tables]
+    except Exception:
+        # The numbered-caption fallback below remains deliberately conservative
+        # for pages whose vector/text layout cannot be recognised as a table.
+        return []
+
+
+def content_type(block: Block, *, table_active: bool, bibliography_active: bool,
+                 regions: list[tuple[float, float, float, float]], settings: dict[str, bool]) -> tuple[str | None, bool, bool]:
+    """Classify only high-confidence non-prose units for retrieval exclusion."""
+    text = normalise_text(block.text)
+    if bibliography_active and heading(text, block.font_size) and CHAPTER_START_RE.match(text):
+        bibliography_active = False
+    if settings["exclude_bibliography"] and BIBLIOGRAPHY_RE.match(text):
+        return "bibliography", table_active, True
+    if bibliography_active and settings["exclude_bibliography"]:
+        return "bibliography", table_active, bibliography_active
+    if settings["exclude_figure_captions"] and FIGURE_CAPTION_RE.match(text):
+        return "figure_caption", table_active, bibliography_active
+    if settings["exclude_table_bodies"] and overlaps_table_region(block, regions):
+        return "table_content", table_active, bibliography_active
+    if settings["exclude_table_captions"] and TABLE_CAPTION_RE.match(text):
+        # When PyMuPDF cannot identify a table rectangle, the numbered caption
+        # is the conservative fallback boundary for its following text blocks.
+        return "table_caption", not bool(regions), bibliography_active
+    # A numbered table caption is the strongest fallback boundary available
+    # in this PDF. It is used only where table geometry was unavailable.
+    if table_active and settings["exclude_table_bodies"]:
+        return "table_content", table_active, bibliography_active
+    return None, table_active, bibliography_active
+
+
+def make_passages(pdf_path: Path, settings: dict[str, Any],
+                  filter_settings: dict[str, bool]) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     try:
         import fitz  # PyMuPDF
     except ImportError as exc:
@@ -189,8 +243,10 @@ def make_passages(pdf_path: Path, settings: dict[str, Any]) -> tuple[list[dict[s
     document = fitz.open(pdf_path)
     passages: list[dict[str, Any]] = []
     suspicious: dict[int, list[str]] = {}
+    excluded_units: list[dict[str, Any]] = []
     current_chapter: str | None = None
     current_section: str | None = None
+    bibliography_active = False
     for page_index, page in enumerate(document):
         raw_blocks = page_blocks(page)
         ordered, warnings = ordered_body_blocks(raw_blocks, page.rect.width, page.rect.height, settings)
@@ -198,16 +254,39 @@ def make_passages(pdf_path: Path, settings: dict[str, Any]) -> tuple[list[dict[s
             suspicious[page_index + 1] = warnings
         printed_page = printed_page_number(raw_blocks, page.rect.height)
         ordinal = 0
-        for block in ordered:
+        regions = table_regions(page)
+        table_active = False
+        for block_ordinal, block in enumerate(ordered, start=1):
+            kind, table_active, bibliography_active = content_type(
+                block, table_active=table_active, bibliography_active=bibliography_active,
+                regions=regions, settings=filter_settings)
+            source_ids: list[str] = []
+            excluded_by_kind: dict[str, list[tuple[str, str]]] = {}
             for text in split_block_into_passages(block):
                 ordinal += 1
+                passage_id = f"rc_pdf{page_index + 1:03d}_{ordinal:03d}"
+                source_ids.append(passage_id)
+                unit_kind = kind
+                # A bibliography heading can share a PyMuPDF block with the
+                # final prose paragraph before it. Classify from the heading
+                # passage forward, retaining that preceding prose.
+                if unit_kind is None and filter_settings["exclude_bibliography"]:
+                    if bibliography_active and heading(text, block.font_size) and CHAPTER_START_RE.match(text):
+                        bibliography_active = False
+                    if BIBLIOGRAPHY_RE.match(text):
+                        bibliography_active, unit_kind = True, "bibliography"
+                    elif bibliography_active:
+                        unit_kind = "bibliography"
+                if unit_kind:
+                    excluded_by_kind.setdefault(unit_kind, []).append((passage_id, text))
+                    continue
                 if heading(text, block.font_size):
                     if re.match(r"^\d+\s", text):
                         current_chapter, current_section = text, None
                     else:
                         current_section = text
                 passages.append({
-                    "id": f"rc_pdf{page_index + 1:03d}_{ordinal:03d}",
+                    "id": passage_id,
                     "pdf_page": page_index + 1,
                     "printed_page": printed_page,
                     "chapter": current_chapter,
@@ -215,9 +294,20 @@ def make_passages(pdf_path: Path, settings: dict[str, Any]) -> tuple[list[dict[s
                     "text": text,
                     "source_bbox": [round(block.x0, 1), round(block.y0, 1), round(block.x1, 1), round(block.y1, 1)],
                 })
+            for excluded_kind, entries in excluded_by_kind.items():
+                excluded_units.append({
+                    "id": f"rc_pdf{page_index + 1:03d}_block{block_ordinal:03d}_{excluded_kind}",
+                    "content_type": excluded_kind,
+                    "exclusion_reason": excluded_kind,
+                    "pdf_page": page_index + 1,
+                    "printed_page": printed_page,
+                    "source_passage_ids": [passage_id for passage_id, _text in entries],
+                    "source_bbox": [round(block.x0, 1), round(block.y0, 1), round(block.x1, 1), round(block.y1, 1)],
+                    "text": "\n".join(text for _passage_id, text in entries),
+                })
     metadata = {"total_pdf_pages": len(document), "suspicious_pages": suspicious}
     document.close()
-    return passages, metadata
+    return passages, metadata, excluded_units
 
 
 def make_chunks(passages: list[dict[str, Any]], config: dict[str, int]) -> list[dict[str, Any]]:
@@ -279,13 +369,16 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 def build(config_path: Path, root: Path) -> dict[str, Any]:
     config = json.loads(config_path.read_text(encoding="utf-8"))
     pdf_path = root / config["source_pdf"]
-    passages, extraction = make_passages(pdf_path, config["layout"])
+    passages, extraction, excluded_units = make_passages(pdf_path, config["layout"], config["content_filter"])
     chunks = make_chunks(passages, config["chunking"])
     source = {"filename": pdf_path.name, "sha256": sha256(pdf_path)}
     report = {"corpus_version": config.get("corpus_version", CORPUS_VERSION), "source": source,
               "extraction_settings": config["layout"], "chunking": config["chunking"], **extraction,
               "pages_processed": extraction["total_pdf_pages"], "empty_pages": [], "failed_pages": [],
               "canonical_passages": len(passages), "generated_chunks": len(chunks),
+              "content_filter": config["content_filter"],
+              "excluded_unit_counts": dict(Counter(unit["content_type"] for unit in excluded_units)),
+              "excluded_units": len(excluded_units),
               "passage_token_distribution": distribution(passages), "chunk_token_distribution": distribution(chunks),
               "missing_printed_page_metadata": sum(p["printed_page"] is None for p in passages),
               "replacement_characters": sum(p["text"].count("�") for p in passages),
@@ -293,6 +386,7 @@ def build(config_path: Path, root: Path) -> dict[str, Any]:
               "suspicious_long_passages": [p["id"] for p in passages if token_count(p["text"]) > 800]}
     write_jsonl(root / config["passages_output"], passages)
     write_jsonl(root / config["chunks_output"], chunks)
+    write_jsonl(root / config["excluded_units_output"], excluded_units)
     (root / config["report_output"]).write_text(json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
     return report
 
