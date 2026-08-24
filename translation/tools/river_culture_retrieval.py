@@ -22,7 +22,7 @@ import numpy as np
 
 RETRIEVAL_VERSION = "1.0.0"
 AUTHOR = r"[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+"
-AUTHOR_YEAR = rf"{AUTHOR}(?:(?:\s+(?:and|&)\s+{AUTHOR})|\s+et al\.)?\s*,?\s+\d{{4}}[a-z]?"
+AUTHOR_YEAR = rf"{AUTHOR}(?:(?:\s+(?:and|&)\s+{AUTHOR})|\s+et al\.)?\s*,?\s+\d{{4}}[a-z]?(?:\s*,\s*\d{{4}}[a-z]?)*"
 PARENTHETICAL_CITATION_RE = re.compile(
     rf"\(\s*{AUTHOR_YEAR}(?:\s*[;,]\s*{AUTHOR_YEAR})*\s*\)"
 )
