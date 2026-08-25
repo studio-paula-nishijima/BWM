@@ -45,6 +45,12 @@ ingress, where ID deduplication precedes the existing configured Voice
 reaction.  A messaging failure is logged and never interrupts local capture,
 ASR, retrieval, Oracle presentation, or display-completion release.
 
+Demo responsiveness controls: `configs/asr.yaml` sets a 10-second inference
+timeout; a timed-out worker is recycled and follows the retrieval-owned
+fallback path. Response presentation is capped at 8 seconds without changing
+the response text. `configs/servos.yaml` sets a 3-second delay from admitted
+capture start; busy detector triggers do not schedule a servo action.
+
 Verify the startup “The Oracle stirs...” view before listening, then the whisper
 and considering views, raw ASR transcript,
 retrieval query/result, and that the exact result text reaches the Oracle

@@ -105,9 +105,9 @@ from live.voice_messaging import VoiceStatePublisher
 from configs.runtime_config import load_asr_config
 
 from app_logging.csv_logger import WhisperCSVLogger
-from actuation.runtime import resolve_actuation_enabled, request_for_emitted_trigger
+from actuation.runtime import resolve_actuation_enabled, DelayedInteractionServo
 from actuation.servo_controller import ServoActuationController
-from configs.servos import CHANNEL, FREQUENCY, MIN_PULSE, MAX_PULSE, HOME_PULSE
+from configs.servos import CHANNEL, FREQUENCY, MIN_PULSE, MAX_PULSE, HOME_PULSE, DELAY_SECONDS
 
 
 
@@ -144,6 +144,7 @@ asr_coordinator = None
 oracle_interaction = None
 voice_mqtt = None
 voice_uart = None
+interaction_servo = None
 shutdown_started = False
 
 
@@ -189,6 +190,8 @@ def parse_arguments():
     parser.add_argument("--oracle-height", type=int, default=480, help="Oracle window/test height")
     parser.add_argument("--oracle-fullscreen", action="store_true", help="Select fullscreen Oracle display mode")
     parser.add_argument("--oracle-response-seconds", type=float, default=8.0, help="Minimum static response duration")
+    parser.add_argument("--oracle-max-response-seconds", type=float, default=8.0,
+                        help="Demo cap for total response presentation (0 disables cap)")
     parser.add_argument("--voice-mqtt", action="store_true", help="Publish shared voice.state transitions through configured MQTT")
     uart_group = parser.add_mutually_exclusive_group()
     uart_group.add_argument("--voice-uart", dest="voice_uart", action="store_true", default=True,
@@ -227,7 +230,7 @@ def shutdown(*_):
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt, voice_uart
+    global voice_mqtt, voice_uart, interaction_servo
 
     if not _begin_shutdown():
         return
@@ -274,6 +277,7 @@ def shutdown(*_):
         voice_uart.close()
 
     if actuation_controller:
+        if interaction_servo: interaction_servo.cancel()
         try:
             actuation_controller.shutdown()
         except Exception:
@@ -338,7 +342,7 @@ def main():
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt, voice_uart
+    global voice_mqtt, voice_uart, interaction_servo
 
     args = parse_arguments()
     asr_config = load_asr_config().get("asr", {})
@@ -570,6 +574,7 @@ def main():
                 try: csv_logger.close()
                 except Exception: pass
             raise RuntimeError("Actuation initialisation failed. Check PCA9685/I2C/servo dependencies, or rerun with --no-actuation to test detection without hardware.") from exc
+    interaction_servo = DelayedInteractionServo(actuation_controller, DELAY_SECONDS)
 
     # Capture and ASR are additional downstream consumers.  They receive only
     # real emitted triggers, after cooldown, and do not alter detector/servo work.
@@ -596,10 +601,14 @@ def main():
         return False, retrieval.startup_error or ""
     asr_coordinator = LiveASRCoordinator(capture_controller, worker, lifecycle=lifecycle,
                                          source_id=args.wav or "live_respeaker", detector_profile=detector_profile,
-                                         release_after_asr=args.release_after_asr, startup_ready=retrieval_ready)
+                                         release_after_asr=args.release_after_asr, startup_ready=retrieval_ready,
+                                         inference_timeout_seconds=asr_config.get("inference_timeout_seconds"),
+                                         on_capture_started=interaction_servo.schedule)
     if args.oracle:
         display_config = DisplayConfig(width=args.oracle_width, height=args.oracle_height,
-            fullscreen=args.oracle_fullscreen, enabled=not args.oracle_headless, minimum_response_seconds=args.oracle_response_seconds)
+            fullscreen=args.oracle_fullscreen, enabled=not args.oracle_headless,
+            minimum_response_seconds=args.oracle_response_seconds,
+            max_response_seconds=args.oracle_max_response_seconds or None)
         display = OracleDisplayController(display_config) if args.oracle_headless else PygameOracleDisplayController(display_config)
         oracle_interaction = OracleInteractionController(asr_coordinator, retrieval, display)
         lifecycle.add_transition_observer(oracle_interaction.on_voice_transition)
@@ -783,12 +792,7 @@ def main():
                 # emitted trigger while the actuator cooldown is active.
                 result.trigger_suppression_reason = "cooldown"
 
-            actuation_result = request_for_emitted_trigger(emitted_trigger=triggered, controller=actuation_controller)
-            if actuation_result:
-                if actuation_result["started"]:
-                    print(f"ACTUATION: started sequence {actuation_result['sequence']}")
-                else:
-                    print(f"ACTUATION: suppressed ({actuation_result['suppression_reason']})")
+            actuation_result = None
 
             # Polling only reads already-completed results; ASR remains in its
             # persistent child process while the next detector frame proceeds.

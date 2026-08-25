@@ -23,6 +23,7 @@ class DisplayConfig:
     fullscreen: bool = False
     enabled: bool = False
     minimum_response_seconds: float = 8.0
+    max_response_seconds: float | None = 8.0
     scroll_pixels_per_second: float = 28.0
     chars_per_line: int | None = None
 
@@ -45,6 +46,9 @@ class OracleDisplayController:
         scrolling = len(lines) > available_lines
         extra_pixels = max(0, len(lines) - available_lines) * 30
         duration = self.config.minimum_response_seconds + (extra_pixels / self.config.scroll_pixels_per_second if scrolling else 0)
+        cap = self.config.max_response_seconds
+        if cap is not None and cap > 0:
+            duration = min(duration, cap)
         return {"lines": lines, "scrolling": scrolling, "duration": duration}
 
     def show_response(self, text: str):

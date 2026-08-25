@@ -5,6 +5,7 @@ servo:
   min_pulse: 800
   max_pulse: 2200
   home_pulse: 800
+  delay_seconds: 3.0
 
 motion:
   default_speed: 800

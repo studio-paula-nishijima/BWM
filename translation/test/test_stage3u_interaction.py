@@ -74,6 +74,13 @@ class Stage3UInteractionTests(unittest.TestCase):
         self.assertFalse(self.display.layout("short text")["scrolling"])
         self.assertTrue(self.display.layout("word " * 1000)["scrolling"])
 
+    def test_demo_display_cap_preserves_full_text(self):
+        display = OracleDisplayController(DisplayConfig(minimum_response_seconds=2, max_response_seconds=8), clock=self.clock)
+        text = "word " * 1000
+        self.assertEqual(display.layout(text)["duration"], 8)
+        display.show_response(text)
+        self.assertEqual(display.response_text, text)
+
 
 class VoiceMessagingTests(unittest.TestCase):
     def test_shared_voice_state_is_published_only_for_genuine_transition(self):

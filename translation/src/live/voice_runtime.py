@@ -53,7 +53,8 @@ class LiveASRCoordinator:
     """Feed canonical frames without ever waiting for model inference."""
     def __init__(self, capture, worker=None, *, lifecycle=None, emit=print,
                  source_id="live", detector_profile="", output_mode="transcribe", language=None,
-                 release_after_asr=False, startup_ready=None):
+                 release_after_asr=False, startup_ready=None, inference_timeout_seconds=None,
+                 on_capture_started=None):
         self.capture = capture
         self.worker = worker
         self.lifecycle = lifecycle or VoiceLifecycle(emit)
@@ -65,6 +66,9 @@ class LiveASRCoordinator:
         self._asr_status = None
         self._startup_failure_reported = False
         self.release_after_asr = release_after_asr
+        self.inference_timeout_seconds = inference_timeout_seconds
+        self.on_capture_started = on_capture_started
+        self._inference_started = {}
         self.startup_ready = startup_ready or (lambda: (True, ""))
 
     @property
@@ -121,6 +125,8 @@ class LiveASRCoordinator:
         completed = self.capture.process_frame(frame, frame_number, admitted_trigger, temporal_candidate)
         if self.capture.is_capturing and admitted_trigger:
             self.emit("[Capture] started")
+            if self.on_capture_started:
+                self.on_capture_started()
         if completed:
             self._submit(completed)
         return self.poll()
@@ -179,6 +185,10 @@ class LiveASRCoordinator:
             return []
         completed = []
         for item in self.worker.poll():
+            if item["status"] == "started":
+                self._inference_started[item["job_id"]] = item["worker_started_monotonic"]
+                continue
+            self._inference_started.pop(item["job_id"], None)
             finished = time.monotonic()
             metadata = item["metadata"]
             submitted = self._submitted.pop(item["job_id"], metadata.get("capture_completion_monotonic", finished))
@@ -202,6 +212,20 @@ class LiveASRCoordinator:
             self.results.append(item); completed.append(item)
             if self.release_after_asr:
                 self.complete_interaction("debug ASR completion")
+        if self.inference_timeout_seconds and self.inference_timeout_seconds > 0:
+            now = time.monotonic()
+            overdue = [job_id for job_id, started in self._inference_started.items()
+                       if now - started >= self.inference_timeout_seconds]
+            if overdue:
+                job_id = overdue[0]; started = self._inference_started.pop(job_id)
+                submitted = self._submitted.pop(job_id, started)
+                self.emit(f"[ASR] timeout after {self.inference_timeout_seconds:.2f} s")
+                self.emit("[ASRWorker] recycling after timeout")
+                item = {"job_id": job_id, "status": "timeout", "error": "inference timeout",
+                        "result": {"recognized_text": ""}, "capture_id": None,
+                        "asr_submitted_monotonic": submitted, "worker_started_monotonic": started,
+                        "inference_duration": now - started, "timeout_derived": True}
+                self.worker.recycle_after_timeout(); self.results.append(item); completed.append(item)
         return completed
 
     def shutdown(self):

@@ -61,6 +61,8 @@ def _worker_main(config, requests, results, ready_event, startup_errors, backend
         if job is None: return
         job_id, audio, metadata = job
         started = time.monotonic()
+        results.put({"job_id": job_id, "status": "started", "metadata": metadata,
+                     "worker_started_monotonic": started})
         try:
             result = backend.transcribe(audio, output_mode=metadata.get("asr_output_mode", "transcribe"), language=metadata.get("language"))
             payload, status, error = asdict(result), "ok", ""
@@ -113,3 +115,12 @@ class PersistentASRWorker:
             except queue.Full: pass
             self._process.join(timeout)
             if self._process.is_alive(): self._process.terminate(); self._process.join()
+
+    def recycle_after_timeout(self):
+        """Kill a stuck inference and prewarm a fresh isolated worker."""
+        if self._process and self._process.is_alive():
+            self._process.terminate(); self._process.join()
+        self._requests, self._results = self._context.Queue(self.config.queue_size), self._context.Queue()
+        self._ready, self._startup_errors = self._context.Event(), self._context.Queue(1)
+        self._startup_error, self._process = None, None
+        self.start()

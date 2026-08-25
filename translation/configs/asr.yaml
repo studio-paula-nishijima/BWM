@@ -8,3 +8,4 @@ asr:
   worker_enabled: true
   worker_nice: 10
   queue_size: 1
+  inference_timeout_seconds: 10

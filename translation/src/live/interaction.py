@@ -37,6 +37,9 @@ class OracleInteractionController:
 
     def on_asr_results(self, results):
         for item in results:
+            if item.get("status") == "timeout":
+                self.emit("[Retrieval] using configured fallback response")
+                self._show_fallback("asr_timeout"); continue
             if item.get("status") != "ok":
                 self.emit(f"[ASR] ERROR: status={item.get('status')}; using configured fallback response")
                 self._show_fallback("asr_status"); continue
