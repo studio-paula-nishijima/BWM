@@ -1,0 +1,4 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,1.15,silence,high,rpi01_audio_issues
+1.15,10.00,whisper,high,rpi01_audio_issues,english,how does the water feel today is the water feeling well where does the water go when it go,nicholas

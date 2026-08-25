@@ -1,0 +1,5 @@
+start_seconds,end_seconds,label,confidence,notes,language,transcription,speaker_id
+0.00,0.20,background_noise,high,startup_click
+0.20,1.62,silence,high,rpi01_audio_issues
+1.62,8.74,whisper,high,rpi01_audio_issues,english,what are you hearing when i say something about the water is the water listening to me,nicholas
+8.74,10.00,silence,high,rpi01_audio_issues
