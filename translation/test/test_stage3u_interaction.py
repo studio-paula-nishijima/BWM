@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / "translation" / "src")]
 
-from live.interaction import OracleInteractionController
+from live.interaction import OracleInteractionController, retrieval_debug_line
 from live.oracle_display import DisplayConfig, OracleDisplayController
 from live.voice_runtime import VoiceLifecycle, VoiceState
 from live.voice_messaging import VoiceStatePublisher
@@ -92,6 +92,22 @@ class VoiceMessagingTests(unittest.TestCase):
         self.assertEqual(lifecycle.state, VoiceState.INITIALIZING)
         display = OracleDisplayController(); display.show_initializing()
         self.assertEqual(display.view, "initializing")
+
+
+class RetrievalDebugTests(unittest.TestCase):
+    def result(self, text, **chunk):
+        return {"metadata": {"raw_results": [{"text": text, **chunk}]}}
+    def test_long_chunk_is_compact_with_book_page(self):
+        text = "a" * 60 + "b" * 60
+        self.assertEqual(retrieval_debug_line(self.result(text, printed_pages=[237])),
+                         f'[Retrieval] book page 237 | chunk: "{"a" * 50} ... {"b" * 50}"')
+    def test_short_and_multiline_chunk_is_once_and_single_line(self):
+        self.assertEqual(retrieval_debug_line(self.result("river\n carries water")),
+                         '[Retrieval] chunk: "river carries water"')
+    def test_pdf_and_page_range_are_labeled_without_failure_when_absent(self):
+        self.assertIn("PDF page 251", retrieval_debug_line(self.result("x", pdf_pages=[251])))
+        self.assertIn("book pages 237–238", retrieval_debug_line(self.result("x", printed_pages=[237, 238])))
+        self.assertEqual(retrieval_debug_line(self.result("x")), '[Retrieval] chunk: "x"')
 
 
 if __name__ == "__main__": unittest.main()

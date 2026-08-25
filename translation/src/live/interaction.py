@@ -4,6 +4,25 @@ from __future__ import annotations
 from .voice_runtime import VoiceState
 
 
+def retrieval_debug_line(result: dict) -> str | None:
+    """Compact, provenance-preserving diagnostic for the returned top chunk."""
+    raw = result.get("metadata", {}).get("raw_results", [])
+    if not raw:
+        return None
+    chunk = raw[0]
+    text = " ".join(str(chunk.get("text", "")).split())
+    preview = text if len(text) <= 100 else f"{text[:50]} ... {text[-50:]}"
+    printed, pdf = chunk.get("printed_pages") or [], chunk.get("pdf_pages") or []
+    def pages(label, values):
+        values = [str(value) for value in values]
+        if len(values) == 1: return f"{label} page {values[0]}"
+        if len(values) == 2: return f"{label} pages {values[0]}–{values[1]}"
+        return f"{label} pages {', '.join(values)}"
+    provenance = pages("book", printed) if printed else pages("PDF", pdf) if pdf else ""
+    prefix = f"[Retrieval] {provenance} | " if provenance else "[Retrieval] "
+    return f'{prefix}chunk: "{preview}"'
+
+
 class OracleInteractionController:
     """Owns retrieval/display scheduling, never Voice admission or ASR work."""
     def __init__(self, coordinator, retrieval, display, *, emit=print,
@@ -33,6 +52,9 @@ class OracleInteractionController:
                 text = result.get("response_text", "") if result.get("ok") else ""
                 if not text: raise RuntimeError("empty retrieval response")
                 self.emit("[Retrieval] response received")
+                debug_line = retrieval_debug_line(result)
+                if debug_line:
+                    self.emit(debug_line)
                 self._show_response(text)
             except Exception as exc:
                 self.emit(f"[Retrieval] ERROR: {type(exc).__name__}: {exc}")
