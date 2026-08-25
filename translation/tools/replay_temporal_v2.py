@@ -22,7 +22,9 @@ def replay(source, context):
         low=pd.to_numeric(wav.low_proportion, errors="coerce").to_numpy(); lowstd=pd.to_numeric(wav.low_proportion_std, errors="coerce").to_numpy(); zstd=pd.to_numeric(wav.zcr_std, errors="coerce").to_numpy()
         median=pd.Series(probability).rolling(10).median().to_numpy()
         activity=pd.to_numeric(wav.rms,errors="coerce").fillna(0).rolling(5,min_periods=1).mean().to_numpy()
-        activity_ok=activity>=1e-5
+        # Stage 3S daytime-room calibration: above observed false-run activity
+        # (~5.1e-05) while below the corpus ordinary-whisper rolling minimum.
+        activity_ok=activity>=5.5e-5
         candidate=(~np.isnan(median))&(median>=.0003)&(median<=.5)&(lowstd>=.05)&(low<=.85)&(zstd>=.020)&activity_ok
         run=runs(candidate); high=pd.Series(probability>=.1).rolling(50, min_periods=1).sum().to_numpy().astype(int)
         active=(high>=5) if context else np.zeros(len(wav), dtype=bool)

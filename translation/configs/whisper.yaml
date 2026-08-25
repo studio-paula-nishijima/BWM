@@ -43,7 +43,7 @@ detector_profiles:
     low_proportion_max: 0.85
     zcr_std_min: 0.020
     acoustic_activity_window_frames: 5
-    acoustic_activity_rms_min: 0.00001
+    acoustic_activity_rms_min: 0.000055
     webrtc_aggressiveness: 0
     webrtc_enter_frames: 10
     webrtc_exit_frames: 10
@@ -62,7 +62,7 @@ detector_profiles:
     low_proportion_max: 0.85
     zcr_std_min: 0.020
     acoustic_activity_window_frames: 5
-    acoustic_activity_rms_min: 0.00001
+    acoustic_activity_rms_min: 0.000055
     webrtc_aggressiveness: 0
     webrtc_enter_frames: 10
     webrtc_exit_frames: 10

@@ -71,6 +71,12 @@ class TemporalV2Tests(unittest.TestCase):
         result = detector.classify(self.features(rms=0), SpeechDetectionResult(speech_probability=.1))
         self.assertTrue(result.temporal_v2_acoustic_activity_ok)
 
+    def test_daytime_calibration_floor_rejects_observed_false_run_scale(self):
+        detector = self.detector(acoustic_activity_window_frames=5, acoustic_activity_rms_min=5.5e-5)
+        for _ in range(10): result = detector.classify(self.features(rms=5.1e-5, zcr_std=.03), SpeechDetectionResult(speech_probability=.0004))
+        self.assertFalse(result.temporal_v2_acoustic_activity_ok)
+        self.assertFalse(result.is_whisper)
+
     def test_real_alternating_sign_numerical_noise_has_high_zcr_but_fails_gate(self):
         detector = TemporalV2WhisperDetector(acoustic_activity_window_frames=5, acoustic_activity_rms_min=1e-5)
         frame = np.tile([1e-8, 1e-8, 1e-8, 1e-8, -1e-8, -1e-8, -1e-8, -1e-8], 60)

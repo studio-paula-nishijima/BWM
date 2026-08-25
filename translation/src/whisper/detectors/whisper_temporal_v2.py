@@ -17,7 +17,7 @@ class TemporalV2WhisperDetector:
         self.low_max = settings.get("low_proportion_max", .85)
         self.zcr_std_min = settings.get("zcr_std_min", .020)
         self.activity_window = settings.get("acoustic_activity_window_frames", 5)
-        self.activity_rms_min = settings.get("acoustic_activity_rms_min", 1e-5)
+        self.activity_rms_min = settings.get("acoustic_activity_rms_min", 5.5e-5)
         self.context_enabled = bool(settings.get("context_enabled", False))
         self.context_window = settings.get("context_window_frames", 50)
         self.context_threshold = settings.get("context_silero_threshold", .10)
