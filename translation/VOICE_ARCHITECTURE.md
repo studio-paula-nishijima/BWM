@@ -160,6 +160,11 @@ and actuation remain Translation-owned.  See `ARCHITECTURE.md` and
 
 `configs/asr.yaml` holds the live ASR defaults; `configs/whisper.yaml` holds
 audio, selectable detector profiles, cooldown, and diagnostic-logging controls.
+Temporal V2 profiles include a small rolling numerical-silence eligibility gate:
+negligible band-pass RMS makes temporal/ZCR evidence ineligible, resets its
+qualifying accumulation, and is not a speech or noise classifier. Production
+retains the validated `silero_median_min: 0.0003`; all gate calibration remains
+profile configuration.
 Normal live output is concise and event/state-oriented: trigger/state changes,
 capture/ASR status and raw result, retrieval response, and display completion.
 High-volume detector telemetry is opt-in with `--diagnostic-console`; live CSV

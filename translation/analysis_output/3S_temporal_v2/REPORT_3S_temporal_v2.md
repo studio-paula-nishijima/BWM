@@ -34,3 +34,22 @@ These are annotation-relative values, not processing latency: annotations may co
 | whispered_question2.wav | 2.08 | 8.68 | 2.4799999999999995 | 2.4799999999999995 | 0.0 |
 
 Cross-boundary candidate carry influenced 2 crossings.
+
+## Numerical-silence eligibility gate
+
+Temporal V2 now uses the mean band-pass RMS across five frames as a strictly
+numerical-silence eligibility gate before candidate accumulation. The calibrated
+floor is `1.0e-05`; `silero_median_min` remains `0.0003`.
+
+The existing ordinary-whisper corpus has a minimum logged per-frame RMS of
+`4.83e-05` and a minimum five-frame mean of `6.10e-05`; replay therefore
+remains 10/10 ordinary-whisper segments for both profiles. Synthetic
+alternating-sign numerical silence has activity `9.22e-09` (high ZCR by
+construction) and produces 0 qualifying candidates in 40 frames. Tested
+candidate floors were `0`, `1e-06`, and `1e-05`; `1e-05` is the lowest selected
+floor above that numerical fixture while preserving corpus recall.
+
+No raw rpi02 silent-room capture was available in this workspace, so its
+full-precision distribution remains a hardware validation item. A diagnostic
+run now reports the detector-produced activity, gate state, V2 candidate,
+Silero median, low/ZCR variability, and run with scientific notation.

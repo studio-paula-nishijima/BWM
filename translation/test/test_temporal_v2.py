@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from whisper.detectors.whisper_temporal_v2 import TemporalV2WhisperDetector
@@ -15,8 +16,8 @@ class TemporalV2Tests(unittest.TestCase):
         return detector
 
     @staticmethod
-    def features(low=.85, low_std=.05, zcr_std=.020):
-        return {"zcr": .1, "band_low": 0., "band_mid": 0., "band_high": 0., "total_band_energy": 1., "low_proportion": low, "mid_proportion": 0., "high_proportion": 0., "low_proportion_std": low_std, "zcr_std": zcr_std}
+    def features(low=.85, low_std=.05, zcr_std=.020, rms=.001):
+        return {"rms": rms, "acoustic_rms": rms, "zcr": .1, "band_low": 0., "band_mid": 0., "band_high": 0., "total_band_energy": 1., "low_proportion": low, "mid_proportion": 0., "high_proportion": 0., "low_proportion_std": low_std, "zcr_std": zcr_std}
 
     def test_boundaries_and_window_readiness(self):
         detector = self.detector()
@@ -54,6 +55,29 @@ class TemporalV2Tests(unittest.TestCase):
         for _ in range(10): result = detector.classify(self.features(), SpeechDetectionResult(speech_probability=.1))
         self.assertEqual(result.temporal_v2_qualifying_run, 1)
         self.assertEqual(detector.classify(self.features(low=.9), SpeechDetectionResult(speech_probability=.1)).temporal_v2_qualifying_run, 0)
+
+    def test_numerical_silence_gate_blocks_high_zcr_and_resets(self):
+        detector = self.detector(acoustic_activity_window_frames=5, acoustic_activity_rms_min=1e-5)
+        for _ in range(10): result = detector.classify(self.features(zcr_std=.3, rms=1e-8), SpeechDetectionResult(speech_probability=.1))
+        self.assertFalse(result.temporal_v2_acoustic_activity_ok)
+        self.assertFalse(result.temporal_v2_raw_is_whisper)
+        self.assertEqual(result.temporal_v2_qualifying_run, 0)
+        result = detector.classify(self.features(rms=.001), SpeechDetectionResult(speech_probability=.1))
+        self.assertTrue(result.temporal_v2_acoustic_activity_ok)
+
+    def test_rolling_gate_tolerates_one_low_energy_frame(self):
+        detector = self.detector(acoustic_activity_window_frames=5, acoustic_activity_rms_min=1e-5)
+        for _ in range(10): detector.classify(self.features(rms=.001), SpeechDetectionResult(speech_probability=.1))
+        result = detector.classify(self.features(rms=0), SpeechDetectionResult(speech_probability=.1))
+        self.assertTrue(result.temporal_v2_acoustic_activity_ok)
+
+    def test_real_alternating_sign_numerical_noise_has_high_zcr_but_fails_gate(self):
+        detector = TemporalV2WhisperDetector(acoustic_activity_window_frames=5, acoustic_activity_rms_min=1e-5)
+        frame = np.tile([1e-8, 1e-8, 1e-8, 1e-8, -1e-8, -1e-8, -1e-8, -1e-8], 60)
+        for _ in range(10): result = detector.classify(frame, SpeechDetectionResult(speech_probability=.1))
+        self.assertGreater(result.zcr, .2)
+        self.assertFalse(result.temporal_v2_acoustic_activity_ok)
+        self.assertFalse(result.is_whisper)
 
     def test_policy_crossings_and_dynamic_requirement_drop(self):
         settings = {"webrtc_enter_frames": 1, "webrtc_exit_frames": 1, "assisted_confirmation_frames": 15, "fallback_confirmation_frames": 24, "context_confirmation_frames": 30}

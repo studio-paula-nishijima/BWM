@@ -21,7 +21,9 @@ def replay(source, context):
         probability=pd.to_numeric(wav.speech_probability, errors="coerce").fillna(0).to_numpy()
         low=pd.to_numeric(wav.low_proportion, errors="coerce").to_numpy(); lowstd=pd.to_numeric(wav.low_proportion_std, errors="coerce").to_numpy(); zstd=pd.to_numeric(wav.zcr_std, errors="coerce").to_numpy()
         median=pd.Series(probability).rolling(10).median().to_numpy()
-        candidate=(~np.isnan(median))&(median>=.0003)&(median<=.5)&(lowstd>=.05)&(low<=.85)&(zstd>=.020)
+        activity=pd.to_numeric(wav.rms,errors="coerce").fillna(0).rolling(5,min_periods=1).mean().to_numpy()
+        activity_ok=activity>=1e-5
+        candidate=(~np.isnan(median))&(median>=.0003)&(median<=.5)&(lowstd>=.05)&(low<=.85)&(zstd>=.020)&activity_ok
         run=runs(candidate); high=pd.Series(probability>=.1).rolling(50, min_periods=1).sum().to_numpy().astype(int)
         active=(high>=5) if context else np.zeros(len(wav), dtype=bool)
         assist=truth(wav,"webrtc_assist_open")
@@ -30,7 +32,7 @@ def replay(source, context):
         starts=[]; start=np.nan
         for time, value in zip(wav.frame_time_seconds, candidate):
             start=float(time) if value and np.isnan(start) else (np.nan if not value else start); starts.append(start)
-        wav["variant"]="temporal_v2_context" if context else "temporal_v2_recall"; wav["temporal_candidate"]=candidate; wav["qualifying_run"]=run; wav["candidate_run_start_seconds"]=starts; wav["context_active"]=active; wav["context_high_silero_count"]=high if context else np.nan; wav["confirmation_requirement"]=requirement; wav["threshold_crossing"]=crossings(above); wav["threshold_crossing_route"]=route; wav["above"]=above
+        wav["variant"]="temporal_v2_context" if context else "temporal_v2_recall"; wav["temporal_candidate"]=candidate; wav["qualifying_run"]=run; wav["acoustic_activity"]=activity; wav["acoustic_activity_ok"]=activity_ok; wav["candidate_run_start_seconds"]=starts; wav["context_active"]=active; wav["context_high_silero_count"]=high if context else np.nan; wav["confirmation_requirement"]=requirement; wav["threshold_crossing"]=crossings(above); wav["threshold_crossing_route"]=route; wav["above"]=above
         wav["segment_run"]=0; wav["segment_above"]=False
         for _, seg in wav.loc[wav.annotation_label.notna()].groupby(["annotation_start_seconds","annotation_end_seconds","annotation_label"], sort=False):
             local=runs(seg.temporal_candidate.to_numpy()); localabove=seg.temporal_candidate.to_numpy()&(local>=seg.confirmation_requirement.to_numpy()); wav.loc[seg.index,"segment_run"]=local; wav.loc[seg.index,"segment_above"]=localabove

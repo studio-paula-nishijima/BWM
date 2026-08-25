@@ -260,7 +260,7 @@ class AudioFeatures:
                 "ratio_low": low_ratio, "ratio_mid": mid_ratio, "ratio_high": high_ratio,
                 "total_band_energy": total_band_energy, "low_proportion": low_proportion,
                 "mid_proportion": mid_proportion, "high_proportion": high_proportion,
-                "rolling_window_full": window_full, "low_proportion_std": low_std, "zcr": zcr, "zcr_std": zcr_std,
+                "rolling_window_full": window_full, "low_proportion_std": low_std, "zcr": zcr, "zcr_std": zcr_std, "rms": self.rms(filtered), "acoustic_rms": float(np.sqrt(np.mean(filtered ** 2))),
             }
 
         centroid = float(np.sum(freqs * spectrum) / spectrum_total) if spectrum_total else 0.0

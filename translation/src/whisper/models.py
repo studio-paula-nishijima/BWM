@@ -114,6 +114,10 @@ class WhisperDetectionResult:
     temporal_v2_context_window_frames: int = None
     temporal_v2_context_silero_threshold: float = None
     temporal_v2_context_min_frames: int = None
+    temporal_v2_acoustic_activity: float = None
+    temporal_v2_acoustic_activity_ok: bool = None
+    temporal_v2_acoustic_activity_window_frames: int = None
+    temporal_v2_acoustic_activity_rms_min: float = None
 
     # Analysis-only Stage 3L acoustic/temporal observability.  ``None`` is
     # used when history required by a measurement is unavailable.

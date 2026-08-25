@@ -16,6 +16,8 @@ class TemporalV2WhisperDetector:
         self.low_std_min = settings.get("low_proportion_std_min", .05)
         self.low_max = settings.get("low_proportion_max", .85)
         self.zcr_std_min = settings.get("zcr_std_min", .020)
+        self.activity_window = settings.get("acoustic_activity_window_frames", 5)
+        self.activity_rms_min = settings.get("acoustic_activity_rms_min", 1e-5)
         self.context_enabled = bool(settings.get("context_enabled", False))
         self.context_window = settings.get("context_window_frames", 50)
         self.context_threshold = settings.get("context_silero_threshold", .10)
@@ -27,12 +29,16 @@ class TemporalV2WhisperDetector:
         self.features.reset()
         self.silero = deque(maxlen=self.window)
         self.context = deque(maxlen=self.context_window)
+        self.activity = deque(maxlen=self.activity_window)
         self.run = 0
 
     def classify(self, frame, speech_result=None):
         if speech_result is None:
             raise RuntimeError("temporal_v2 requires current Silero speech evidence")
         values = self.features.extract(frame, analysis_full=False)
+        self.activity.append(float(values["acoustic_rms"]))
+        acoustic_activity = float(np.mean(self.activity))
+        acoustic_activity_ok = acoustic_activity >= self.activity_rms_min
         probability = float(speech_result.speech_probability)
         self.silero.append(probability)
         self.context.append(probability >= self.context_threshold)
@@ -44,13 +50,13 @@ class TemporalV2WhisperDetector:
         low_std_pass = None if not full else low_std >= self.low_std_min
         low_max_pass = values["low_proportion"] <= self.low_max
         zcr_pass = None if not full else zcr_std >= self.zcr_std_min
-        candidate = bool(full and min_pass and max_pass and low_std_pass and low_max_pass and zcr_pass)
+        candidate = bool(acoustic_activity_ok and full and min_pass and max_pass and low_std_pass and low_max_pass and zcr_pass)
         self.run = self.run + 1 if candidate else 0
         context_count = int(sum(self.context))
         context_active = self.context_enabled and context_count >= self.context_min
         return WhisperDetectionResult(
             is_whisper=candidate, raw_score=int(candidate), whisper_probability=0.0,
-            zcr=values["zcr"], band_energy_low=values["band_low"], band_energy_mid=values["band_mid"], band_energy_high=values["band_high"],
+            rms=values["rms"], zcr=values["zcr"], band_energy_low=values["band_low"], band_energy_mid=values["band_mid"], band_energy_high=values["band_high"],
             total_band_energy=values["total_band_energy"], low_proportion=values["low_proportion"], mid_proportion=values["mid_proportion"], high_proportion=values["high_proportion"],
             low_proportion_std=low_std, zcr_std=zcr_std, temporal_v2_window_full=full, temporal_v2_silero_median=median,
             temporal_v2_silero_min_pass=min_pass, temporal_v2_silero_max_pass=max_pass, temporal_v2_low_proportion_std_pass=low_std_pass,
@@ -61,5 +67,7 @@ class TemporalV2WhisperDetector:
             temporal_v2_context_window_frames=self.context_window,
             temporal_v2_context_silero_threshold=self.context_threshold,
             temporal_v2_context_min_frames=self.context_min,
+            temporal_v2_acoustic_activity=acoustic_activity, temporal_v2_acoustic_activity_ok=acoustic_activity_ok,
+            temporal_v2_acoustic_activity_window_frames=self.activity_window, temporal_v2_acoustic_activity_rms_min=self.activity_rms_min,
             whisper_classifier_implementation="temporal_v2",
         )
