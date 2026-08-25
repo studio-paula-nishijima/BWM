@@ -44,7 +44,9 @@ author-year parentheticals (`(Author, 2018)`, `(Author and Author, 2018)`,
 `(Author et al., 2018)`, and semicolon/comma-separated groups) plus numeric
 markers such as `[12]`. Ordinary explanatory parentheses, names, and years
 remain intact. This independent cleanup is controlled by the single
-`presentation_cleanup.remove_inline_citations` setting; it never affects
+`presentation_cleanup.remove_inline_citations` setting. It also removes
+standalone parenthetical `Table`/`Fig.` cross-references such as `(Table 17.3)`
+through `presentation_cleanup.remove_figure_table_references`; it never affects
 retrieval ranking or index contents.
 
 ## Future ASR/retrieval routes

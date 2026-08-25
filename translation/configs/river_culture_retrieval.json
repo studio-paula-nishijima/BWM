@@ -6,7 +6,8 @@
   "top_k": 5,
   "batch_size": 16,
   "presentation_cleanup": {
-    "remove_inline_citations": true
+    "remove_inline_citations": true,
+    "remove_figure_table_references": true
   },
   "fallback_response": {
     "id": "river_culture_generic_v1",

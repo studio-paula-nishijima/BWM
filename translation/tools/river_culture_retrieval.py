@@ -27,6 +27,10 @@ PARENTHETICAL_CITATION_RE = re.compile(
     rf"\(\s*{AUTHOR_YEAR}(?:\s*[;,]\s*{AUTHOR_YEAR})*\s*\)"
 )
 NUMERIC_CITATION_RE = re.compile(r"\[(?:\s*\d{1,4}\s*)(?:[,;]\s*\d{1,4}\s*)*\]")
+FIGURE_TABLE_REFERENCE = r"(?:fig(?:ure)?|table)s?\.?\s+\d+(?:\.\d+)*"
+PARENTHETICAL_FIGURE_TABLE_REFERENCE_RE = re.compile(
+    rf"\(\s*{FIGURE_TABLE_REFERENCE}(?:\s*(?:[,;]|and|&)\s*{FIGURE_TABLE_REFERENCE})*\s*\)", re.IGNORECASE
+)
 
 
 def presentation_text(canonical_text: str, settings: dict[str, Any] | None = None) -> str:
@@ -35,10 +39,17 @@ def presentation_text(canonical_text: str, settings: dict[str, Any] | None = Non
     Only parentheticals composed entirely of observed author-year citation
     forms and square-bracket numeric markers are eligible for removal.
     """
-    if not (settings or {}).get("remove_inline_citations", True):
+    options = settings or {}
+    remove_citations = options.get("remove_inline_citations", True)
+    remove_cross_references = options.get("remove_figure_table_references", True)
+    if not remove_citations and not remove_cross_references:
         return canonical_text
-    result = PARENTHETICAL_CITATION_RE.sub("", canonical_text)
-    result = NUMERIC_CITATION_RE.sub("", result)
+    result = canonical_text
+    if remove_citations:
+        result = PARENTHETICAL_CITATION_RE.sub("", result)
+        result = NUMERIC_CITATION_RE.sub("", result)
+    if remove_cross_references:
+        result = PARENTHETICAL_FIGURE_TABLE_REFERENCE_RE.sub("", result)
     result = re.sub(r"\s+([,.;:!?])", r"\1", result)
     result = re.sub(r"([,;])\s*[,;]", r"\1", result)
     result = re.sub(r"\(\s*\)|\[\s*\]", "", result)

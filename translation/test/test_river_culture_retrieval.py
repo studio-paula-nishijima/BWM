@@ -29,6 +29,15 @@ class RiverCultureRetrievalTests(unittest.TestCase):
         canonical = "Floods shape rivers (Smith, 2018)."
         self.assertEqual(retrieval.presentation_text(canonical, {"remove_inline_citations": False}), canonical)
 
+    def test_presentation_cleanup_removes_standalone_figure_and_table_references(self) -> None:
+        canonical = "Flood histories are compared (Table 17.3) and mapped (Fig. 2.1)."
+        self.assertEqual(retrieval.presentation_text(canonical), "Flood histories are compared and mapped.")
+        self.assertEqual(canonical, "Flood histories are compared (Table 17.3) and mapped (Fig. 2.1).")
+
+    def test_presentation_cleanup_retains_non_reference_parentheses(self) -> None:
+        canonical = "The table (a place for community meetings) stood beside the river."
+        self.assertEqual(retrieval.presentation_text(canonical), canonical)
+
     def test_grouped_regions_keeps_raw_neighbours_together(self) -> None:
         grouped = retrieval.grouped_regions([
             {"id": "a", "score": .8, "pdf_pages": [10, 11]},
