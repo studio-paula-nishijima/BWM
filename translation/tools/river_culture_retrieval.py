@@ -31,6 +31,7 @@ FIGURE_TABLE_REFERENCE = r"(?:fig(?:ure)?|table)s?\.?\s+\d+(?:\.\d+)*"
 PARENTHETICAL_FIGURE_TABLE_REFERENCE_RE = re.compile(
     rf"\(\s*{FIGURE_TABLE_REFERENCE}(?:\s*(?:[,;]|and|&)\s*{FIGURE_TABLE_REFERENCE})*\s*\)", re.IGNORECASE
 )
+PHOTO_CREDIT_LINE_RE = re.compile(r"^[ \t]*(?:photo|image)\s*:\s*[^\r\n]+(?:\r?\n|$)", re.IGNORECASE | re.MULTILINE)
 
 
 def presentation_text(canonical_text: str, settings: dict[str, Any] | None = None) -> str:
@@ -42,7 +43,8 @@ def presentation_text(canonical_text: str, settings: dict[str, Any] | None = Non
     options = settings or {}
     remove_citations = options.get("remove_inline_citations", True)
     remove_cross_references = options.get("remove_figure_table_references", True)
-    if not remove_citations and not remove_cross_references:
+    remove_photo_credits = options.get("remove_photo_credits", True)
+    if not remove_citations and not remove_cross_references and not remove_photo_credits:
         return canonical_text
     result = canonical_text
     if remove_citations:
@@ -50,6 +52,8 @@ def presentation_text(canonical_text: str, settings: dict[str, Any] | None = Non
         result = NUMERIC_CITATION_RE.sub("", result)
     if remove_cross_references:
         result = PARENTHETICAL_FIGURE_TABLE_REFERENCE_RE.sub("", result)
+    if remove_photo_credits:
+        result = PHOTO_CREDIT_LINE_RE.sub("", result)
     result = re.sub(r"\s+([,.;:!?])", r"\1", result)
     result = re.sub(r"([,;])\s*[,;]", r"\1", result)
     result = re.sub(r"\(\s*\)|\[\s*\]", "", result)

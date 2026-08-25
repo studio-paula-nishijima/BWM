@@ -38,6 +38,11 @@ class RiverCultureRetrievalTests(unittest.TestCase):
         canonical = "The table (a place for community meetings) stood beside the river."
         self.assertEqual(retrieval.presentation_text(canonical), canonical)
 
+    def test_presentation_cleanup_removes_standalone_photo_credit_only(self) -> None:
+        canonical = "The river catches the evening light.\nPhoto: Mary Lance, with permission\nThe water continues."
+        self.assertEqual(retrieval.presentation_text(canonical), "The river catches the evening light.\nThe water continues.")
+        self.assertEqual(retrieval.presentation_text(canonical, {"remove_photo_credits": False}), canonical)
+
     def test_grouped_regions_keeps_raw_neighbours_together(self) -> None:
         grouped = retrieval.grouped_regions([
             {"id": "a", "score": .8, "pdf_pages": [10, 11]},
