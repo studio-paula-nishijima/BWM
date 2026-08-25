@@ -99,6 +99,15 @@ class VoiceStateIntegrationTests(unittest.TestCase):
         self.assertEqual(self.send("capture_processing", "two"), "ignored_duplicate")
         self.assertEqual(len(self.dispatcher.events), 1)
 
+    def test_same_voice_event_from_mqtt_and_uart_triggers_one_reaction(self):
+        self.runtime.activate()
+        self.assertEqual(self.send("listening", "before"), "observed")
+        capture_processing = voice_state("voice_pi", "capture_processing", id="shared-transport-id")
+        self.assertEqual(self.adapter.handle(self.topic, capture_processing), "triggered")
+        self.assertEqual(self.adapter.handle_event(capture_processing), "ignored_duplicate")
+        self.runtime.step()
+        self.assertEqual(len(self.dispatcher.events), 1)
+
     def test_busy_drops_not_queues_and_clears_after_final_output(self):
         self.runtime.activate()
         self.send("listening"); self.assertEqual(self.send("capture_processing"), "triggered"); self.runtime.step()

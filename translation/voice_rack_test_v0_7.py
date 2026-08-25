@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(BASE_DIR))  # repository root: shared/messagi
 
 from pathlib import Path
 from datetime import datetime
+from dataclasses import replace
 import time
 import signal
 import argparse
@@ -607,7 +608,13 @@ def main():
             voice_mqtt = SemanticMQTTClient(settings, lambda *_: None)
             voice_mqtt.start([])
         if args.voice_uart:
-            voice_uart = SemanticUARTTransport(load_uart_settings(Path(BASE_DIR).parent), lambda *_: None)
+            # The CLI explicitly selects Voice UART publication.  The YAML still
+            # carries device/framing settings, while its default `enabled: false`
+            # keeps Translation's optional UART ingress off unless configured.
+            voice_uart = SemanticUARTTransport(
+                replace(load_uart_settings(Path(BASE_DIR).parent), enabled=True),
+                lambda *_: None,
+            )
             voice_uart.start()
         lifecycle.add_transition_observer(VoiceStatePublisher(voice_mqtt, uart_transport=voice_uart, topic_base=topic_base).publish_transition)
     asr_coordinator.start()

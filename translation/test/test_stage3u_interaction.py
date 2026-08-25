@@ -98,6 +98,29 @@ class VoiceMessagingTests(unittest.TestCase):
         VoiceStatePublisher(mqtt, uart_transport=uart, emit=lambda _: None).publish_transition(None, VoiceState.LISTENING)
         self.assertEqual(uart.events[0], mqtt.events[0][1])
 
+    def test_fanout_keeps_one_envelope_when_one_transport_fails(self):
+        class MQTT:
+            def __init__(self): self.events = []
+            def publish(self, topic, event): self.events.append((topic, event)); return False
+        class UART:
+            def __init__(self): self.events = []
+            def send(self, event): self.events.append(event); return True
+        emitted, mqtt, uart = [], MQTT(), UART()
+        VoiceStatePublisher(mqtt, uart_transport=uart, emit=emitted.append).publish_transition(None, VoiceState.CAPTURE_PROCESSING)
+        mqtt_event, uart_event = mqtt.events[0][1], uart.events[0]
+        self.assertEqual(mqtt_event.to_dict(), uart_event.to_dict())
+        self.assertTrue(any("failed via MQTT" in line for line in emitted))
+        self.assertTrue(any("sent via UART" in line for line in emitted))
+
+    def test_all_transport_failures_are_observable_but_do_not_raise(self):
+        class Unavailable:
+            def publish(self, *_): return False
+            def send(self, *_): return False
+        emitted = []
+        VoiceStatePublisher(Unavailable(), uart_transport=Unavailable(), emit=emitted.append).publish_transition(
+            None, VoiceState.CAPTURE_PROCESSING)
+        self.assertTrue(any("all state transports unavailable" in line for line in emitted))
+
     def test_initializing_is_not_admissible_and_has_a_view(self):
         lifecycle = VoiceLifecycle(); lifecycle.set("initializing")
         self.assertEqual(lifecycle.state, VoiceState.INITIALIZING)

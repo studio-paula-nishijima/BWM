@@ -15,8 +15,16 @@ class VoiceStatePublisher:
         event = voice_state(self.origin, state.value)
         delivered = False
         if self.mqtt_client is not None:
-            delivered = self.mqtt_client.publish(self.topic, event) or delivered
+            if self.mqtt_client.publish(self.topic, event):
+                delivered = True
+                self.emit(f"[VoiceMessaging] voice.state {state.value} sent via MQTT")
+            else:
+                self.emit(f"[VoiceMessaging] voice.state {state.value} failed via MQTT; local lifecycle continues")
         if self.uart_transport is not None:
-            delivered = self.uart_transport.send(event) or delivered
+            if self.uart_transport.send(event):
+                delivered = True
+                self.emit(f"[VoiceMessaging] voice.state {state.value} sent via UART")
+            else:
+                self.emit(f"[VoiceMessaging] voice.state {state.value} failed via UART; local lifecycle continues")
         if not delivered:
-            self.emit("[Voice] state transport unavailable; local lifecycle continues")
+            self.emit("[VoiceMessaging] all state transports unavailable; local lifecycle continues")

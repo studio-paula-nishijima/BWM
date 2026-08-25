@@ -14,6 +14,30 @@ capture/ASR-only runs.
 Use `--oracle-headless` to exercise ASR, retrieval and completion without SDL,
 and omit `--voice-mqtt` for standalone broker-free operation.
 
+## Stage V Voice-state demonstrator
+
+Voice still starts automatically through `idle -> initializing -> listening`;
+it does not consume installation activation and has no quiescent state.  Add
+`--voice-uart` to publish the same lifecycle event through the shared UART
+transport.  The flag explicitly enables UART publication while preserving the
+device and framing settings in `configs/mqtt.yaml`; it resolves DT `uart0` at
+runtime and never selects `/dev/serial0`.
+
+Use either transport independently, or both:
+
+```text
+--voice-mqtt
+--voice-uart
+--voice-mqtt --voice-uart
+```
+
+For each genuine lifecycle transition, Voice creates one `voice.state` event
+and sends that unchanged envelope to every selected transport.  In particular,
+the default `capture_processing` transition reaches Translation's semantic
+ingress, where ID deduplication precedes the existing configured Voice
+reaction.  A messaging failure is logged and never interrupts local capture,
+ASR, retrieval, Oracle presentation, or display-completion release.
+
 Verify the startup “The Oracle stirs...” view before listening, then the whisper
 and considering views, raw ASR transcript,
 retrieval query/result, and that the exact result text reaches the Oracle
