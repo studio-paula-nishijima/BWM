@@ -17,20 +17,20 @@ and omit `--voice-mqtt` for standalone broker-free operation.
 ## Stage V Voice-state demonstrator
 
 Voice still starts automatically through `idle -> initializing -> listening`;
-it does not consume installation activation and has no quiescent state.  Add
-`--voice-uart` to publish the same lifecycle event through the shared UART
-transport.  The flag explicitly enables UART publication while preserving the
-device and framing settings in `configs/mqtt.yaml`. Translation's shared UART
-ingress is enabled by default and is failure-isolated: an unavailable UART is
-logged while normal playback continues. It resolves DT `uart0` at runtime and
-never selects `/dev/serial0`.
+it does not consume installation activation and has no quiescent state. The
+shared UART transport publishes the same lifecycle event by default. Use
+`--no-voice-uart` only for an MQTT-only or standalone run; `--voice-uart`
+remains an explicit compatible spelling. Translation's shared UART ingress is
+also enabled by default and failure-isolated: an unavailable UART is logged
+while normal playback continues. It resolves DT `uart0` at runtime and never
+selects `/dev/serial0`.
 
 Use either transport independently, or both:
 
 ```text
---voice-mqtt
---voice-uart
---voice-mqtt --voice-uart
+(no messaging flag)              # UART only, the default
+--voice-mqtt                      # MQTT + UART
+--voice-mqtt --no-voice-uart      # MQTT only
 ```
 
 For each genuine lifecycle transition, Voice creates one `voice.state` event
