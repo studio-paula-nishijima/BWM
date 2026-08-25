@@ -168,7 +168,19 @@ Future external-event path (documented only):
 
 Future compatibility includes shared semantic MQTT events, an MQTT-to-UART transport bridge, UART reservation on GPIO14/15, person-detector installation activation, GPIO17 as the local activation fallback, whisper/oracle semantic interaction and question events, a separate Voice Pi backup interaction button, and message IDs/origin metadata for transport deduplication. None is implemented in this stage.
 
-## Future UART inter-Pi transport
+## UART device rules
+
+## Stage 8 shared UART transport
+
+`MQTT --\` and `UART --+-> semantic ingress -> validation/dedup -> existing
+Translation handler`. UART is process-wide, not session-scoped: it remains
+open across teardown while GPIO17 remains local-first. UART `voice.state` and
+`installation.activation` use the same semantic paths as MQTT. One Voice
+lifecycle transition creates one envelope, then configured MQTT/UART transports
+fan it out with the same ID. The shared transport resolves DT `uart0`, rejects
+`/dev/serial0`, and checks console/getty ownership. On the observed Pi 5,
+GPIO14/15 map to `/dev/ttyAMA0`; `/dev/serial0` maps to debug `/dev/ttyAMA10`.
+Voice lifecycle/admission remains Voice-owned.
 
 GPIO14/TXD0 and GPIO15/RXD0 are reserved as the intended physical UART pins for the BWM inter-Pi transport. On the current Raspberry Pi 5 configuration, those pins are provided by RP1 UART0.
 

@@ -6,9 +6,17 @@ from shared.messaging.topics import TopicNamespace
 
 
 class VoiceStatePublisher:
-    def __init__(self, mqtt_client, *, topic_base="bwm", origin="voice_pi", emit=print):
-        self.mqtt_client, self.topic, self.origin, self.emit = mqtt_client, TopicNamespace(topic_base).voice_state, origin, emit
+    """Build one authoritative event then fan it out without changing its identity."""
+    def __init__(self, mqtt_client=None, *, uart_transport=None, topic_base="bwm", origin="voice_pi", emit=print):
+        self.mqtt_client, self.uart_transport = mqtt_client, uart_transport
+        self.topic, self.origin, self.emit = TopicNamespace(topic_base).voice_state, origin, emit
 
     def publish_transition(self, _previous, state):
-        if not self.mqtt_client.publish(self.topic, voice_state(self.origin, state.value)):
-            self.emit("[Voice] MQTT state publication unavailable; local lifecycle continues")
+        event = voice_state(self.origin, state.value)
+        delivered = False
+        if self.mqtt_client is not None:
+            delivered = self.mqtt_client.publish(self.topic, event) or delivered
+        if self.uart_transport is not None:
+            delivered = self.uart_transport.send(event) or delivered
+        if not delivered:
+            self.emit("[Voice] state transport unavailable; local lifecycle continues")

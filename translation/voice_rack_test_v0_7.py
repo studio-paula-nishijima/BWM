@@ -142,6 +142,7 @@ run_configuration_summary = None
 asr_coordinator = None
 oracle_interaction = None
 voice_mqtt = None
+voice_uart = None
 shutdown_started = False
 
 
@@ -188,6 +189,7 @@ def parse_arguments():
     parser.add_argument("--oracle-fullscreen", action="store_true", help="Select fullscreen Oracle display mode")
     parser.add_argument("--oracle-response-seconds", type=float, default=8.0, help="Minimum static response duration")
     parser.add_argument("--voice-mqtt", action="store_true", help="Publish shared voice.state transitions through configured MQTT")
+    parser.add_argument("--voice-uart", action="store_true", help="Publish shared voice.state transitions through configured UART")
     parser.add_argument("--detector-profile", choices=PROFILE_NAMES, default=None)
     parser.add_argument("--processing-mode", choices=("direct", "speech_gate", "shadow"), default=None)
     actuation_group = parser.add_mutually_exclusive_group()
@@ -220,7 +222,7 @@ def shutdown(*_):
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt
+    global voice_mqtt, voice_uart
 
     if not _begin_shutdown():
         return
@@ -263,6 +265,8 @@ def shutdown(*_):
         oracle_interaction.close()
     if voice_mqtt:
         voice_mqtt.close()
+    if voice_uart:
+        voice_uart.close()
 
     if actuation_controller:
         try:
@@ -329,7 +333,7 @@ def main():
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt
+    global voice_mqtt, voice_uart
 
     args = parse_arguments()
     asr_config = load_asr_config().get("asr", {})
@@ -594,13 +598,18 @@ def main():
         display = OracleDisplayController(display_config) if args.oracle_headless else PygameOracleDisplayController(display_config)
         oracle_interaction = OracleInteractionController(asr_coordinator, retrieval, display)
         lifecycle.add_transition_observer(oracle_interaction.on_voice_transition)
-    if args.voice_mqtt:
-        from shared.messaging.config import load_mqtt_settings
+    if args.voice_mqtt or args.voice_uart:
+        from shared.messaging.config import load_mqtt_settings, load_uart_settings
         from shared.messaging.mqtt_client import SemanticMQTTClient
+        from shared.messaging.uart import SemanticUARTTransport
         settings, topic_base = load_mqtt_settings(Path(BASE_DIR).parent)
-        voice_mqtt = SemanticMQTTClient(settings, lambda *_: None)
-        voice_mqtt.start([])
-        lifecycle.add_transition_observer(VoiceStatePublisher(voice_mqtt, topic_base=topic_base).publish_transition)
+        if args.voice_mqtt:
+            voice_mqtt = SemanticMQTTClient(settings, lambda *_: None)
+            voice_mqtt.start([])
+        if args.voice_uart:
+            voice_uart = SemanticUARTTransport(load_uart_settings(Path(BASE_DIR).parent), lambda *_: None)
+            voice_uart.start()
+        lifecycle.add_transition_observer(VoiceStatePublisher(voice_mqtt, uart_transport=voice_uart, topic_base=topic_base).publish_transition)
     asr_coordinator.start()
 
 

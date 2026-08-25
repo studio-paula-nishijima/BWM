@@ -151,6 +151,11 @@ publication failure is logged but cannot alter or corrupt the local lifecycle.
 Voice publishes semantic state only: it neither selects Translation reactions
 nor sends solenoid, GPIO, or modulation instructions.
 
+When UART is configured, this existing authoritative lifecycle observer still
+builds one `voice.state` envelope per genuine transition and fans the same ID
+to MQTT and UART. UART transport failure is isolated degradation and cannot
+change lifecycle timing or busy admission; display completion remains release.
+
 Translation currently reacts by default to a transition into
 `capture_processing`, but transition matching, busy handling, reaction choice,
 and actuation remain Translation-owned.  See `ARCHITECTURE.md` and

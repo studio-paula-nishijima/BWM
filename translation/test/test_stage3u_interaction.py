@@ -87,6 +87,17 @@ class VoiceMessagingTests(unittest.TestCase):
         self.assertEqual(mqtt.events[0][0], "bwm/voice/state")
         self.assertEqual(mqtt.events[0][1].payload, {"state": "initializing"})
 
+    def test_voice_state_fanout_preserves_one_event_identity(self):
+        class MQTT:
+            def __init__(self): self.events = []
+            def publish(self, topic, event): self.events.append((topic, event)); return True
+        class UART:
+            def __init__(self): self.events = []
+            def send(self, event): self.events.append(event); return True
+        mqtt, uart = MQTT(), UART()
+        VoiceStatePublisher(mqtt, uart_transport=uart, emit=lambda _: None).publish_transition(None, VoiceState.LISTENING)
+        self.assertEqual(uart.events[0], mqtt.events[0][1])
+
     def test_initializing_is_not_admissible_and_has_a_view(self):
         lifecycle = VoiceLifecycle(); lifecycle.set("initializing")
         self.assertEqual(lifecycle.state, VoiceState.INITIALIZING)

@@ -47,3 +47,23 @@ package. Translation's initial behavior reacts to a transition into
 reaction, nor whether Translation is currently busy. Future UART redundancy
 must preserve the same IDs/origins so duplicate transport delivery resolves to
 one semantic transition.
+
+## Stage 8 UART transport
+
+MQTT and UART carry the identical semantic envelope. Emitters create one
+`SemanticEvent` and may fan that exact object out through both transports; its
+ID, origin, timestamp, type, and payload never change. Receivers validate then
+deduplicate at semantic ingress, so delivery of the same ID by MQTT and UART
+executes application behaviour once. Received events are never blindly
+forwarded, preventing loops.
+
+UART frames are compact UTF-8 JSON followed by a newline: default 115200 8N1,
+0.25-second read timeout, and 8192-byte maximum. Partial/multiple frames work;
+malformed or oversized frames are discarded through their next newline and
+parsing recovers. GPIO14/15 resolve dynamically from DT alias `uart0`, never
+`/dev/serial0`. The observed Pi 5 result is `/dev/ttyAMA0`; `/dev/serial0` can
+be debug `/dev/ttyAMA10`. Startup rejects kernel-console or serial-getty
+ownership of the resolved device.
+
+Wire 3.3 V TTL: Translation GPIO14 TX -> Voice GPIO15 RX; Translation GPIO15
+RX <- Voice GPIO14 TX; Translation GND <-> Voice GND. No flow control.

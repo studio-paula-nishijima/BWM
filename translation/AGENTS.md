@@ -16,3 +16,4 @@
 13. For live Voice/Whisper work, read `VOICE_ARCHITECTURE.md`: preserve its authoritative lifecycle and busy-admission semantics.  Only display completion normally releases an admitted interaction.
 14. Keep Voice boundaries separate: attach downstream work to structured ASR results, use the retrieval runtime adapter, keep retrieval response text opaque at the Voice/display boundary, and reuse `shared/messaging/` rather than a Voice MQTT stack.
 15. Voice publishes semantic lifecycle state only.  Translation owns reaction selection, modulation, safety, and hardware behaviour.
+16. Build one semantic event before MQTT/UART fan-out and preserve its ID/origin. UART resolves DT `uart0`, never `/dev/serial0`, and cannot bypass semantic ingress/deduplication/admission.

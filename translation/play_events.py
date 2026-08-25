@@ -127,16 +127,20 @@ def main():
         # MQTT is an optional semantic input. Failure to import/connect leaves
         # this persistent GPIO17-capable runtime untouched.
         try:
-            from shared.messaging.config import load_mqtt_settings
+            from shared.messaging.config import load_mqtt_settings, load_uart_settings
             from shared.messaging.mqtt_client import SemanticMQTTClient
             from shared.messaging.topics import TopicNamespace
+            from shared.messaging.uart import SemanticUARTTransport
             mqtt_settings, topic_base = load_mqtt_settings(REPOSITORY_ROOT)
             activation_topic = TopicNamespace(topic_base).installation_activation
             voice_state_topic = TopicNamespace(topic_base).voice_state
-            mqtt_client = SemanticMQTTClient(
-                mqtt_settings, TranslationMQTTAdapter(runtime, activation_topic, voice_state_topic).handle)
+            ingress = TranslationMQTTAdapter(runtime, activation_topic, voice_state_topic)
+            mqtt_client = SemanticMQTTClient(mqtt_settings, ingress.handle)
             mqtt_client.start([activation_topic, voice_state_topic])
             register_shutdown_hook(mqtt_client.close)
+            uart_client = SemanticUARTTransport(load_uart_settings(REPOSITORY_ROOT), ingress.handle_event)
+            uart_client.start()
+            register_shutdown_hook(uart_client.close)
         except Exception as exc:
             print(f"[MQTT] Unavailable; continuing with local activation: {exc}")
         run_session_runtime(runtime, playback_cfg["sleep_resolution"])
