@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / "translation" / "src")]
 
-from live.interaction import OracleInteractionController, retrieval_debug_line
+from live.interaction import OracleInteractionController, compact_preview, retrieval_debug_line
 from live.oracle_display import DisplayConfig, OracleDisplayController
 from live.voice_runtime import VoiceLifecycle, VoiceState
 from live.voice_messaging import VoiceStatePublisher
@@ -108,6 +108,9 @@ class RetrievalDebugTests(unittest.TestCase):
         self.assertIn("PDF page 251", retrieval_debug_line(self.result("x", pdf_pages=[251])))
         self.assertIn("book pages 237–238", retrieval_debug_line(self.result("x", printed_pages=[237, 238])))
         self.assertEqual(retrieval_debug_line(self.result("x")), '[Retrieval] chunk: "x"')
+    def test_response_preview_is_compact_without_changing_source(self):
+        text = "a" * 60 + "b" * 60
+        self.assertEqual(compact_preview(text), "a" * 50 + " ... " + "b" * 50)
 
 
 if __name__ == "__main__": unittest.main()

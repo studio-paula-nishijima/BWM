@@ -4,14 +4,18 @@ from __future__ import annotations
 from .voice_runtime import VoiceState
 
 
+def compact_preview(text: str) -> str:
+    text = " ".join(str(text).split())
+    return text if len(text) <= 100 else f"{text[:50]} ... {text[-50:]}"
+
+
 def retrieval_debug_line(result: dict) -> str | None:
     """Compact, provenance-preserving diagnostic for the returned top chunk."""
     raw = result.get("metadata", {}).get("raw_results", [])
     if not raw:
         return None
     chunk = raw[0]
-    text = " ".join(str(chunk.get("text", "")).split())
-    preview = text if len(text) <= 100 else f"{text[:50]} ... {text[-50:]}"
+    preview = compact_preview(chunk.get("text", ""))
     printed, pdf = chunk.get("printed_pages") or [], chunk.get("pdf_pages") or []
     def pages(label, values):
         values = [str(value) for value in values]
@@ -81,7 +85,7 @@ class OracleInteractionController:
         if submit and submit(reason)[1] == "accepted": return
         self._show_response(self.retrieval.fallback_response(reason)["response_text"])
     def _show_response(self, text):
-        self.emit(f"[Response] {text!r}")
+        self.emit(f'[Response] "{compact_preview(text)}"')
         self.coordinator.lifecycle.set(VoiceState.RESPONSE_DISPLAYED)
         try:
             self.display.show_response(text)
