@@ -608,9 +608,9 @@ def main():
             voice_mqtt = SemanticMQTTClient(settings, lambda *_: None)
             voice_mqtt.start([])
         if args.voice_uart:
-            # The CLI explicitly selects Voice UART publication.  The YAML still
-            # carries device/framing settings, while its default `enabled: false`
-            # keeps Translation's optional UART ingress off unless configured.
+            # The CLI explicitly selects Voice UART publication.  The YAML
+            # carries device/framing settings; Translation opens its enabled
+            # shared UART ingress independently.
             voice_uart = SemanticUARTTransport(
                 replace(load_uart_settings(Path(BASE_DIR).parent), enabled=True),
                 lambda *_: None,

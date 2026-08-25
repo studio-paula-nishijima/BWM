@@ -12,7 +12,7 @@ mqtt:
 # GPIO14/15 BWM inter-Pi UART.  uart0 is resolved from device tree; never use
 # /dev/serial0, which may be the Pi 5 debug UART.
 uart:
-  enabled: false
+  enabled: true
   device_mode: uart0
   baud_rate: 115200
   bytesize: 8

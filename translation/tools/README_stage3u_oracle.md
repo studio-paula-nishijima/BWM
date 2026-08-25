@@ -20,8 +20,10 @@ Voice still starts automatically through `idle -> initializing -> listening`;
 it does not consume installation activation and has no quiescent state.  Add
 `--voice-uart` to publish the same lifecycle event through the shared UART
 transport.  The flag explicitly enables UART publication while preserving the
-device and framing settings in `configs/mqtt.yaml`; it resolves DT `uart0` at
-runtime and never selects `/dev/serial0`.
+device and framing settings in `configs/mqtt.yaml`. Translation's shared UART
+ingress is enabled by default and is failure-isolated: an unavailable UART is
+logged while normal playback continues. It resolves DT `uart0` at runtime and
+never selects `/dev/serial0`.
 
 Use either transport independently, or both:
 
