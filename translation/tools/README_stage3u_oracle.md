@@ -25,6 +25,11 @@ also enabled by default and failure-isolated: an unavailable UART is logged
 while normal playback continues. It resolves DT `uart0` at runtime and never
 selects `/dev/serial0`.
 
+This default is operational convenience, not an architectural dependency:
+UART-only, MQTT-only, and MQTT-plus-UART deployments use the same semantic
+event and Translation reaction path. With both transports selected, one event
+ID is delivered redundantly and Translation reacts once after deduplication.
+
 Use either transport independently, or both:
 
 ```text

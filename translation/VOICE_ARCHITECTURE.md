@@ -156,6 +156,12 @@ builds one `voice.state` envelope per genuine transition and fans the same ID
 to MQTT and UART. UART transport failure is isolated degradation and cannot
 change lifecycle timing or busy admission; display completion remains release.
 
+UART is enabled by default for the deployed Stage V demonstrator, but that is
+an operational default rather than a semantic dependency. The same Voice
+event contract and Translation reaction path work with UART only, MQTT only,
+or both transports. When both are selected, they carry the same envelope and
+Translation deduplicates its ID before transition matching.
+
 Translation currently reacts by default to a transition into
 `capture_processing`, but transition matching, busy handling, reaction choice,
 and actuation remain Translation-owned.  See `ARCHITECTURE.md` and

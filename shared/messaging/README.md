@@ -57,6 +57,11 @@ deduplicate at semantic ingress, so delivery of the same ID by MQTT and UART
 executes application behaviour once. Received events are never blindly
 forwarded, preventing loops.
 
+Whether UART is enabled by default is a deployment/configuration choice, not
+a semantic requirement. The same event and receiver behaviour apply to
+UART-only, MQTT-only, and redundant MQTT-plus-UART deployments. Dual transport
+is for delivery redundancy; it does not create two application events.
+
 UART frames are compact UTF-8 JSON followed by a newline: default 115200 8N1,
 0.25-second read timeout, and 8192-byte maximum. Partial/multiple frames work;
 malformed or oversized frames are discarded through their next newline and
