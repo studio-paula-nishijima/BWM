@@ -23,6 +23,10 @@ class RiverCultureCorpusTests(unittest.TestCase):
     def test_normalise_text_joins_line_hyphenation(self) -> None:
         self.assertEqual(corpus.normalise_text("inter-\n national  river"), "international river")
 
+    def test_normalise_removes_only_pdf_controls_and_soft_hyphen(self) -> None:
+        text = "Jos\x07e\x08, \u201cRiver\u201d\u2014at 20\u00b0C: m\u00b3 and M\u0101ori\u00ad"
+        self.assertEqual(corpus.normalise_text(text), "Jose, \u201cRiver\u201d\u2014at 20\u00b0C: m\u00b3 and M\u0101ori")
+
     def test_chunks_preserve_passage_ids_and_overlap(self) -> None:
         passages = [{"id": f"p{i}", "pdf_page": i, "printed_page": i, "chapter": None,
                      "text": "word " * 100} for i in range(1, 4)]
@@ -80,6 +84,36 @@ class RiverCultureCorpusTests(unittest.TestCase):
                                               regions=[], settings=self.FILTER)[0])
         self.assertEqual(corpus.content_type(bibliography, table_active=False, bibliography_active=False,
                                              regions=[], settings=self.FILTER)[0], "bibliography")
+
+    def test_bibliographie_and_reference_continuation_do_not_end_bibliography(self) -> None:
+        heading = self.block("Bibliographie")
+        self.assertEqual(corpus.content_type(heading, table_active=False, bibliography_active=False,
+                                             regions=[], settings=self.FILTER)[0], "bibliography")
+        self.assertFalse(corpus.credible_chapter_boundary("95 pp.", 10))
+        self.assertTrue(corpus.credible_chapter_boundary("12 River futures", 14))
+
+    def test_contents_and_front_matter_are_excluded(self) -> None:
+        self.assertEqual(corpus.content_type(self.block("Contents"), table_active=False, bibliography_active=False,
+                                             regions=[], settings=self.FILTER)[0], "contents")
+        self.assertEqual(corpus.content_type(self.block("ISBN 978-1-23456-789-0"), table_active=False,
+                                             bibliography_active=False, regions=[], settings=self.FILTER)[0], "front_matter")
+
+    def test_image_credit_near_image_is_excluded_but_photo_prose_is_retained(self) -> None:
+        images = [(10, 35, 100, 100)]
+        credit = self.block("Photo: A. Author", y0=102, y1=110)
+        prose = self.block("The photograph records the river changing over time.", y0=130, y1=150)
+        self.assertEqual(corpus.content_type(credit, table_active=False, bibliography_active=False, regions=[],
+                                             images=images, settings=self.FILTER)[0], "photo_credit")
+        self.assertIsNone(corpus.content_type(prose, table_active=False, bibliography_active=False, regions=[],
+                                               images=images, settings=self.FILTER)[0])
+
+    def test_eligibility_marks_headings_and_replacement_glyphs_without_rewriting_text(self) -> None:
+        heading = corpus.passage_eligibility({"id": "p1", "text": "RIVER FUTURES", "source_bbox": [0, 0, 10, 10]})
+        replacement = corpus.passage_eligibility({"id": "p2", "text": "River � knowledge.", "source_bbox": [0, 0, 10, 10]})
+        technical = corpus.passage_eligibility({"id": "p3", "text": "At 20\u00b0C the flow was 4 m\u00b3 s-1.", "source_bbox": [0, 0, 10, 10]})
+        self.assertFalse(heading["eligible_as_relevance_anchor"])
+        self.assertFalse(replacement["eligible_as_relevance_anchor"])
+        self.assertTrue(technical["eligible_as_relevance_anchor"])
 
 
 if __name__ == "__main__":

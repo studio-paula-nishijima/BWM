@@ -16,6 +16,15 @@ PROCESSING_TEXT = "The Oracle is considering your question..."
 RESPONSE_TITLE = "The Oracle responds"
 
 
+def sanitize_display_text(text: str) -> str:
+    """Remove only non-semantic controls at the display boundary.
+
+    Canonical corpus text is never changed here. This protects Pygame when an
+    older locally generated corpus still contains PDF control artifacts.
+    """
+    return "".join(char for char in text if ord(char) >= 32 or char in "\n\t")
+
+
 @dataclass(frozen=True)
 class DisplayConfig:
     width: int = 800
@@ -40,6 +49,7 @@ class OracleDisplayController:
     def show_processing(self): self.view, self._complete_at = "capture_processing", None
 
     def layout(self, text: str) -> dict:
+        text = sanitize_display_text(text)
         chars = self.config.chars_per_line or max(24, self.config.width // 18)
         lines = textwrap.wrap(text, width=chars, replace_whitespace=False) or [""]
         available_lines = max(2, (self.config.height - 150) // 30)
@@ -52,8 +62,9 @@ class OracleDisplayController:
         return {"lines": lines, "scrolling": scrolling, "duration": duration}
 
     def show_response(self, text: str):
-        self.view, self.response_text, self._completion_sent = "response", text, False
-        self._complete_at = self.clock() + self.layout(text)["duration"]
+        clean_text = sanitize_display_text(text)
+        self.view, self.response_text, self._completion_sent = "response", clean_text, False
+        self._complete_at = self.clock() + self.layout(clean_text)["duration"]
 
     def poll(self) -> bool:
         if self._complete_at is not None and not self._completion_sent and self.clock() >= self._complete_at:
@@ -82,6 +93,8 @@ class PygameOracleDisplayController(OracleDisplayController):
 
     def _draw_static(self, body, title=None, offset=0):
         pygame = self.pygame; self.surface.fill((8, 18, 28))
+        body = sanitize_display_text(body)
+        title = sanitize_display_text(title) if title else title
         y = max(24, self.config.height // 12) - offset
         if title:
             self.surface.blit(self.title_font.render(title, True, (198, 221, 227)), (self.config.width // 12, y)); y += self.title_font.get_height() * 2

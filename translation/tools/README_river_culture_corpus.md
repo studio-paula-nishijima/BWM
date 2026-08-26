@@ -61,15 +61,19 @@ page/chapter provenance. The JSON report records SHA-256, configuration,
 counts, distributions, missing metadata, and suspicious pages/passages.
 
 Before canonical passage construction, the extractor classifies and excludes
-figure captions, numbered table captions, and table content. It first uses
+contents listings, clear publication/source-credit apparatus, figure captions,
+image descriptions and photo credits spatially adjacent to embedded images,
+numbered table captions, and table content. It first uses
 PyMuPDF's `find_tables()` rectangles on pages with a strict numbered table
 caption, where available, to exclude intersecting
 table blocks. On pages without a detected rectangle, a strict numbered `Table
 N` caption starts a same-page fallback table-content boundary. This keeps prose
 outside a detected table rectangle, including prose immediately after it.
 Strict `Fig.`/`Figure` numbering identifies figure captions. Clearly headed
-`Bibliography`/`References` sections are also excluded until the next numbered
-chapter heading.
+`Bibliography`, `Bibliographie`, and `References` sections are excluded until a
+credible chapter boundary, rather than any line beginning with a number.
+Contents is identified from its heading and entry layout, not a fixed PDF-page
+range.
 
 The ignored `river_culture_excluded_units.jsonl` is a compact audit trail with
 each excluded block's classification, page, bounding box, and source-passage
@@ -79,6 +83,23 @@ is no second caption/table filter downstream.
 
 Stable IDs remain PDF-page/ordinal IDs. Ordinals include excluded split units,
 so unaffected passage IDs on the same page remain stable even when neighbouring
-non-prose material is newly excluded. The embedded text layer also contains a
-small number of replacement characters for unavailable glyph mappings; their
-count is reported so it can be assessed before quotation use.
+non-prose material is newly excluded.
+
+The derived, ignored `river_culture_eligibility.jsonl` remains separate from
+the canonical passage schema. Each record identifies its source passage,
+anchor/context eligibility, content categories, explicit reasons, and layout
+flags. Headings, acknowledgements, biographies, and metadata can remain
+canonical but are normally unsuitable relevance anchors. Numerical prose stays
+eligible by default with a quality flag. This prepares quotation selection but
+does not rank, select, or expand quotations.
+
+PDF C0 formatting debris and soft hyphens are removed before canonical text is
+written; high-confidence wrapped-word hyphenation is joined. Authentic Unicode
+is retained. Replacement glyphs are never guessed or silently removed: their
+count and passage IDs are reported and they make a passage ineligible as an
+anchor. The Oracle defensively removes non-semantic controls when displaying an
+older corpus without mutating source records. Font selection is unchanged in
+this stage; installed-display font coverage remains a deployment check.
+
+Stage 2 is intentionally deferred: no sentence units, semantic quotation
+ranking, contextual expansion, thresholds, or generated rewriting is present.

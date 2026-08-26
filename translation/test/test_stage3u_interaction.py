@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / "translation" / "src")]
 
 from live.interaction import OracleInteractionController, compact_preview, retrieval_debug_line
-from live.oracle_display import DisplayConfig, OracleDisplayController
+from live.oracle_display import DisplayConfig, OracleDisplayController, sanitize_display_text
 from live.voice_runtime import VoiceLifecycle, VoiceState
 from live.voice_messaging import VoiceStatePublisher
 
@@ -80,6 +80,10 @@ class Stage3UInteractionTests(unittest.TestCase):
         self.assertEqual(display.layout(text)["duration"], 8)
         display.show_response(text)
         self.assertEqual(display.response_text, text)
+
+    def test_display_sanitizer_removes_controls_but_keeps_authentic_unicode(self):
+        text = "Jos\x07e\x08 \u201cRiver\u201d\u2014at 20\u00b0C, m\u00b3, M\u0101ori"
+        self.assertEqual(sanitize_display_text(text), "Jose \u201cRiver\u201d\u2014at 20\u00b0C, m\u00b3, M\u0101ori")
 
 
 class VoiceMessagingTests(unittest.TestCase):
