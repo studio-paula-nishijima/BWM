@@ -14,6 +14,7 @@
 #include "stage2a_config.h"
 #include "stage2b_config.h"
 #include "trigger_zone_config.h"
+#include "wifi_provisioning.h"
 
 namespace {
 constexpr char kTag[] = "bwm.stage2b";
@@ -122,7 +123,7 @@ void logMotionScan(const MotionDetection &detection, uint64_t total_scans,
 
 extern "C" void app_main(void)
 {
-    ESP_LOGI(kTag, "BWM Vision Node - Stage 3A rectangle trigger calibration");
+    ESP_LOGI(kTag, "BWM Vision Node - Stage 5 runtime Wi-Fi provisioning");
     ESP_LOGI(kTag, "detection_mode=%s camera=%ux%u format=JPEG", detectionModeName(),
              static_cast<unsigned>(sourceFrameWidth()), static_cast<unsigned>(sourceFrameHeight()));
     if (motionModeEnabled()) {
@@ -181,10 +182,14 @@ extern "C" void app_main(void)
     RecentHits<kRecentScanWindow> recent_person;
     RecentHits<kMotionConfirmationWindow> recent_motion;
     MqttActivationPublisher mqtt_activation;
+    WifiProvisioningManager wifi;
+    if (!wifi.begin()) {
+        ESP_LOGE(kTag, "Wi-Fi provisioning setup failed; detection continues locally");
+    }
     PreviewServer preview;
-    // Preview brings up the Wi-Fi station. MQTT then shares that connection,
-    // while the browser retains a reference for its manual test endpoint.
-    preview.begin(trigger_zone, mqtt_activation);
+    // The browser remains available on the station or temporary setup AP.
+    // MQTT shares the station connection and retains its existing semantics.
+    preview.begin(trigger_zone, mqtt_activation, wifi);
     mqtt_activation.begin();
     logMemory("after camera/detector/preview");
     uint64_t total_scans = 0;

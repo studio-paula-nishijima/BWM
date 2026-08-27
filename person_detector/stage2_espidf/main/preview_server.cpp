@@ -7,28 +7,16 @@
 #include <new>
 
 #include "cJSON.h"
-#include "esp_event.h"
 #include "esp_heap_caps.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_netif.h"
-#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/event_groups.h"
 #include "freertos/semphr.h"
 #include "stage2b_config.h"
 
-// Reuse the deliberately ignored local development credentials from Stage 1.
-#if __has_include("../../wifi_credentials.h")
-#include "../../wifi_credentials.h"
-#else
-#define BWM_WIFI_SSID ""
-#define BWM_WIFI_PASSWORD ""
-#endif
-
 class PreviewServer::Impl {
 public:
-    EventGroupHandle_t wifi_events = nullptr;
     SemaphoreHandle_t mutex = nullptr;
     uint8_t *frame = nullptr;
     size_t frame_length = 0;
@@ -36,13 +24,12 @@ public:
     MotionDetection motion_detection;
     TriggerZoneConfig *trigger_zone = nullptr;
     MqttActivationPublisher *activation_publisher = nullptr;
+    WifiProvisioningManager *wifi = nullptr;
     httpd_handle_t server = nullptr;
 };
 
 namespace {
 constexpr char kTag[] = "bwm.preview";
-constexpr EventBits_t kWifiConnectedBit = BIT0;
-constexpr TickType_t kWifiTimeout = pdMS_TO_TICKS(20000);
 constexpr size_t kPreviewCapacity = 128 * 1024;
 PreviewServer::Impl *gPreview = nullptr;
 
@@ -55,11 +42,11 @@ body{font:16px system-ui;margin:1.5rem;background:#111;color:#eee;max-width:56re
 <p>Orange: trigger zone. Cyan: accepted motion. Purple dashed: rejected likely shadow.</p>
 <div id="view"><img id="camera" src="/capture" alt="Live camera preview"><div id="zone" class="overlay zone"><i class="handle nw" data-handle="nw"></i><i class="handle ne" data-handle="ne"></i><i class="handle sw" data-handle="sw"></i><i class="handle se" data-handle="se"></i></div><div id="overlays"></div></div>
 <div class="controls"><button id="edit">Edit Trigger Zone</button><button id="apply" disabled>Apply</button><button id="save" disabled>Save</button><button id="cancel" disabled>Cancel</button><button id="reset">Reset to Default</button></div>
-<div class="controls"><button id="testActivation">Send Test Activation</button></div><p id="mqttStatus">MQTT test trigger ready.</p>
+<div class="controls"><button id="testActivation">Send Test Activation</button><button id="forgetWifi">Forget Wi-Fi / Change Venue</button></div><p id="mqttStatus">MQTT test trigger ready.</p>
 <p><code id="zoneValues">Loading trigger zone…</code></p><p id="status">Waiting for a frame…</p><p><a href="/capture">Open one snapshot</a> · <a href="/status">Detection JSON</a></p>
 <script>
 const camera=document.getElementById('camera'),overlays=document.getElementById('overlays'),status=document.getElementById('status'),zoneBox=document.getElementById('zone'),zoneValues=document.getElementById('zoneValues');
-const editButton=document.getElementById('edit'),applyButton=document.getElementById('apply'),saveButton=document.getElementById('save'),cancelButton=document.getElementById('cancel'),resetButton=document.getElementById('reset'),testActivationButton=document.getElementById('testActivation'),mqttStatus=document.getElementById('mqttStatus'),MIN_SIZE=.05;
+const editButton=document.getElementById('edit'),applyButton=document.getElementById('apply'),saveButton=document.getElementById('save'),cancelButton=document.getElementById('cancel'),resetButton=document.getElementById('reset'),testActivationButton=document.getElementById('testActivation'),forgetWifiButton=document.getElementById('forgetWifi'),mqttStatus=document.getElementById('mqttStatus'),MIN_SIZE=.05;
 let serverZone={x:.2,y:.2,w:.6,h:.6},editZone={...serverZone},preEditZone={...serverZone},editing=false,drag=null,framePending=false,statusPending=false;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function renderZone(z){zoneBox.style.left=(z.x*100)+'%';zoneBox.style.top=(z.y*100)+'%';zoneBox.style.width=(z.w*100)+'%';zoneBox.style.height=(z.h*100)+'%';zoneValues.textContent='x='+z.x.toFixed(3)+' y='+z.y.toFixed(3)+' w='+z.w.toFixed(3)+' h='+z.h.toFixed(3)}
@@ -74,6 +61,7 @@ saveButton.onclick=async()=>{try{let data=await api('/api/config/trigger-zone',e
 cancelButton.onclick=async()=>{try{const data=await api('/api/config/trigger-zone',preEditZone);serverZone={...data.trigger_zone};editZone={...serverZone};setEditing(false);renderZone(serverZone)}catch(error){status.textContent='Cancel failed: '+error.message}};
 resetButton.onclick=async()=>{try{const data=await api('/api/config/trigger-zone/reset');serverZone={...data.trigger_zone};editZone={...serverZone};renderZone(editing?editZone:serverZone)}catch(error){status.textContent='Reset failed: '+error.message}};
 testActivationButton.onclick=async()=>{testActivationButton.disabled=true;mqttStatus.textContent='Sending test activation…';try{const data=await api('/api/test/activation');mqttStatus.textContent='Test activation queued · event '+data.event_id}catch(error){mqttStatus.textContent='Test activation failed: '+error.message}finally{testActivationButton.disabled=false}};
+forgetWifiButton.onclick=async()=>{if(!confirm('Forget the saved Wi-Fi network and restart in setup mode?'))return;forgetWifiButton.disabled=true;mqttStatus.textContent='Clearing Wi-Fi credentials…';try{const response=await fetch('/api/wifi/forget',{method:'POST'});const data=await response.json();if(!response.ok)throw new Error(data.error||'request failed');mqttStatus.textContent=data.message}catch(error){mqttStatus.textContent='Could not clear Wi-Fi: '+error.message;forgetWifiButton.disabled=false}};
 zoneBox.addEventListener('pointerdown',event=>{if(!editing)return;event.preventDefault();zoneBox.setPointerCapture(event.pointerId);drag={handle:event.target.dataset.handle||'move',x:event.clientX,y:event.clientY,zone:{...editZone}}});
 zoneBox.addEventListener('pointermove',event=>{if(!drag)return;const image=camera.getBoundingClientRect();if(!image.width||!image.height)return;const dx=(event.clientX-drag.x)/image.width,dy=(event.clientY-drag.y)/image.height,s=drag.zone;let left=s.x,top=s.y,right=s.x+s.w,bottom=s.y+s.h;if(drag.handle==='move'){left=clamp(s.x+dx,0,1-s.w);top=clamp(s.y+dy,0,1-s.h);right=left+s.w;bottom=top+s.h}else{if(drag.handle.includes('w'))left=clamp(s.x+dx,0,right-MIN_SIZE);if(drag.handle.includes('e'))right=clamp(s.x+s.w+dx,left+MIN_SIZE,1);if(drag.handle.includes('n'))top=clamp(s.y+dy,0,bottom-MIN_SIZE);if(drag.handle.includes('s'))bottom=clamp(s.y+s.h+dy,top+MIN_SIZE,1)}editZone={x:left,y:top,w:right-left,h:bottom-top};renderZone(editZone)});
 zoneBox.addEventListener('pointerup',()=>drag=null);zoneBox.addEventListener('pointercancel',()=>drag=null);
@@ -83,18 +71,31 @@ function refresh(){refreshFrame();refreshStatus()}
 loadZone().catch(error=>status.textContent='Config load failed: '+error.message);refresh();setInterval(refresh,1000);
 </script></body></html>)HTML";
 
-void wifiEventHandler(void *, esp_event_base_t event_base, int32_t event_id, void *)
-{
-    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP && gPreview != nullptr) {
-        xEventGroupSetBits(gPreview->wifi_events, kWifiConnectedBit);
-    }
-}
+const char kProvisioningHtml[] = R"HTML(<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BWM vision node — Wi-Fi setup</title>
+<style>body{font:17px system-ui;margin:1.5rem;background:#111;color:#eee;max-width:38rem}label{display:block;margin:1rem 0 .35rem}select,input,button{box-sizing:border-box;width:100%;font:inherit;padding:.7rem;margin:.2rem 0}button{margin-top:1rem}button:disabled{opacity:.5}.hint{color:#bbb}#status{min-height:3rem;color:#9dd}</style>
+</head><body><h1>BWM vision node — Wi-Fi setup</h1>
+<p class="hint">Choose a venue network or enter its exact name. The device tests the connection before saving it.</p>
+<button id="scan">Scan for networks</button><label for="networks">Detected networks</label><select id="networks"><option value="">Select a network…</option></select>
+<label for="ssid">Wi-Fi name (SSID)</label><input id="ssid" maxlength="32" autocomplete="off">
+<label for="password">Password</label><input id="password" type="password" maxlength="63" autocomplete="new-password" placeholder="Leave empty for an open network">
+<button id="connect">Connect and save</button><p id="status">Ready.</p>
+<script>
+const scanButton=document.getElementById('scan'),connectButton=document.getElementById('connect'),networks=document.getElementById('networks'),ssid=document.getElementById('ssid'),password=document.getElementById('password'),status=document.getElementById('status');
+networks.onchange=()=>{if(networks.value)ssid.value=networks.value};
+scanButton.onclick=async()=>{scanButton.disabled=true;status.textContent='Scanning…';try{const response=await fetch('/api/wifi/scan?t='+Date.now());const data=await response.json();if(!response.ok)throw new Error(data.error||'scan failed');networks.replaceChildren(new Option('Select a network…',''));for(const network of data.networks){const suffix=network.secure?' · secured':' · open';networks.add(new Option(network.ssid+' ('+network.rssi+' dBm'+suffix+')',network.ssid))}status.textContent=data.networks.length?'Choose a network.':'No networks found; you can enter the SSID manually.'}catch(error){status.textContent='Scan failed: '+error.message}finally{scanButton.disabled=false}};
+connectButton.onclick=async()=>{connectButton.disabled=true;scanButton.disabled=true;status.textContent='Testing connection; this can take about 25 seconds…';try{const response=await fetch('/api/wifi/configure',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid:ssid.value,password:password.value})});const data=await response.json();if(!response.ok)throw new Error(data.error||'connection failed');status.textContent=data.message+' Reconnect your device to the venue network, then open the IP shown in the serial log.'}catch(error){status.textContent=error.message;connectButton.disabled=false;scanButton.disabled=false}};
+scanButton.click();
+</script></body></html>)HTML";
 
 esp_err_t indexHandler(httpd_req_t *request)
 {
     httpd_resp_set_type(request, "text/html");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store, no-cache, must-revalidate");
-    return httpd_resp_send(request, kIndexHtml, HTTPD_RESP_USE_STRLEN);
+    const char *page = gPreview != nullptr && gPreview->wifi != nullptr && gPreview->wifi->provisioning() ?
+        kProvisioningHtml : kIndexHtml;
+    return httpd_resp_send(request, page, HTTPD_RESP_USE_STRLEN);
 }
 
 esp_err_t unavailable(httpd_req_t *request, const char *message)
@@ -208,6 +209,102 @@ esp_err_t testActivationHandler(httpd_req_t *request)
     return httpd_resp_sendstr(request, json);
 }
 
+bool readWifiCredentials(httpd_req_t *request, char *ssid, size_t ssid_size,
+                         char *password, size_t password_size)
+{
+    if (request->content_len <= 0 || request->content_len > 256) return false;
+    char body[257];
+    size_t received = 0;
+    while (received < static_cast<size_t>(request->content_len)) {
+        const int count = httpd_req_recv(request, body + received, request->content_len - received);
+        if (count <= 0) return false;
+        received += count;
+    }
+    body[received] = '\0';
+    cJSON *root = cJSON_ParseWithLength(body, received);
+    if (root == nullptr) return false;
+    const cJSON *ssid_value = cJSON_GetObjectItemCaseSensitive(root, "ssid");
+    const cJSON *password_value = cJSON_GetObjectItemCaseSensitive(root, "password");
+    const bool valid = cJSON_IsString(ssid_value) && cJSON_IsString(password_value) &&
+        std::strlen(ssid_value->valuestring) < ssid_size &&
+        std::strlen(password_value->valuestring) < password_size;
+    if (valid) {
+        std::snprintf(ssid, ssid_size, "%s", ssid_value->valuestring);
+        std::snprintf(password, password_size, "%s", password_value->valuestring);
+    }
+    cJSON_Delete(root);
+    return valid;
+}
+
+esp_err_t wifiScanHandler(httpd_req_t *request)
+{
+    if (gPreview == nullptr || gPreview->wifi == nullptr || !gPreview->wifi->provisioning()) {
+        return sendApiError(request, "409 Conflict", "device is not in setup mode");
+    }
+    WifiNetworkInfo networks[16] = {};
+    const size_t count = gPreview->wifi->scan(networks, sizeof(networks) / sizeof(networks[0]));
+    cJSON *root = cJSON_CreateObject();
+    if (root == nullptr) {
+        return sendApiError(request, "500 Internal Server Error", "could not allocate scan response");
+    }
+    cJSON *array = cJSON_AddArrayToObject(root, "networks");
+    if (array == nullptr) {
+        cJSON_Delete(root);
+        return sendApiError(request, "500 Internal Server Error", "could not allocate scan response");
+    }
+    for (size_t index = 0; index < count; ++index) {
+        cJSON *network = cJSON_CreateObject();
+        if (network == nullptr) continue;
+        cJSON_AddStringToObject(network, "ssid", networks[index].ssid);
+        cJSON_AddNumberToObject(network, "rssi", networks[index].rssi);
+        cJSON_AddBoolToObject(network, "secure", networks[index].secure);
+        cJSON_AddItemToArray(array, network);
+    }
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (json == nullptr) return sendApiError(request, "500 Internal Server Error", "scan response failed");
+    httpd_resp_set_type(request, "application/json");
+    httpd_resp_set_hdr(request, "Cache-Control", "no-store");
+    const esp_err_t result = httpd_resp_sendstr(request, json);
+    cJSON_free(json);
+    return result;
+}
+
+esp_err_t wifiConfigureHandler(httpd_req_t *request)
+{
+    if (gPreview == nullptr || gPreview->wifi == nullptr || !gPreview->wifi->provisioning()) {
+        return sendApiError(request, "409 Conflict", "device is not in setup mode");
+    }
+    char ssid[33] = {};
+    char password[65] = {};
+    if (!readWifiCredentials(request, ssid, sizeof(ssid), password, sizeof(password))) {
+        return sendApiError(request, "400 Bad Request", "invalid Wi-Fi request");
+    }
+    char message[128] = {};
+    if (!gPreview->wifi->provision(ssid, password, message, sizeof(message))) {
+        return sendApiError(request, "422 Unprocessable Entity", message);
+    }
+    char json[192];
+    std::snprintf(json, sizeof(json), "{\"success\":true,\"message\":\"%s\"}", message);
+    httpd_resp_set_type(request, "application/json");
+    httpd_resp_set_hdr(request, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(request, json);
+}
+
+esp_err_t wifiForgetHandler(httpd_req_t *request)
+{
+    if (gPreview == nullptr || gPreview->wifi == nullptr) return httpd_resp_send_404(request);
+    char message[128] = {};
+    if (!gPreview->wifi->forgetAndRestart(message, sizeof(message))) {
+        return sendApiError(request, "500 Internal Server Error", message);
+    }
+    char json[192];
+    std::snprintf(json, sizeof(json), "{\"success\":true,\"message\":\"%s\"}", message);
+    httpd_resp_set_type(request, "application/json");
+    httpd_resp_set_hdr(request, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(request, json);
+}
+
 esp_err_t captureHandler(httpd_req_t *request)
 {
     if (gPreview == nullptr) return httpd_resp_send_404(request);
@@ -305,48 +402,26 @@ esp_err_t statusHandler(httpd_req_t *request)
 }  // namespace
 
 bool PreviewServer::begin(TriggerZoneConfig &trigger_zone,
-                          MqttActivationPublisher &activation_publisher)
+                          MqttActivationPublisher &activation_publisher,
+                          WifiProvisioningManager &wifi)
 {
-    if (std::strlen(BWM_WIFI_SSID) == 0) {
-        ESP_LOGW(kTag, "Wi-Fi is not configured; preview server disabled");
-        return false;
-    }
     impl_ = new (std::nothrow) Impl();
     if (impl_ == nullptr) return false;
     impl_->frame = static_cast<uint8_t *>(heap_caps_malloc(kPreviewCapacity, MALLOC_CAP_SPIRAM));
     impl_->mutex = xSemaphoreCreateMutex();
-    impl_->wifi_events = xEventGroupCreate();
     impl_->trigger_zone = &trigger_zone;
     impl_->activation_publisher = &activation_publisher;
-    if (impl_->frame == nullptr || impl_->mutex == nullptr || impl_->wifi_events == nullptr) {
+    impl_->wifi = &wifi;
+    if (impl_->frame == nullptr || impl_->mutex == nullptr) {
         ESP_LOGE(kTag, "could not allocate preview resources");
         return false;
     }
 
     gPreview = impl_;
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
-    wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&init));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifiEventHandler, nullptr, nullptr));
-
-    wifi_config_t config = {};
-    std::strncpy(reinterpret_cast<char *>(config.sta.ssid), BWM_WIFI_SSID, sizeof(config.sta.ssid) - 1);
-    std::strncpy(reinterpret_cast<char *>(config.sta.password), BWM_WIFI_PASSWORD, sizeof(config.sta.password) - 1);
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-    ESP_ERROR_CHECK(esp_wifi_connect());
-    if ((xEventGroupWaitBits(impl_->wifi_events, kWifiConnectedBit, pdFALSE, pdTRUE, kWifiTimeout) & kWifiConnectedBit) == 0) {
-        ESP_LOGW(kTag, "Wi-Fi did not connect within 20 seconds; preview server disabled");
-        return false;
-    }
 
     httpd_config_t server_config = HTTPD_DEFAULT_CONFIG();
     server_config.stack_size = 8192;
-    server_config.max_uri_handlers = 9;
+    server_config.max_uri_handlers = 13;
     server_config.max_open_sockets = 4;
     server_config.lru_purge_enable = true;
     if (httpd_start(&impl_->server, &server_config) != ESP_OK) return false;
@@ -358,6 +433,9 @@ bool PreviewServer::begin(TriggerZoneConfig &trigger_zone,
     const httpd_uri_t save_zone = {.uri = "/api/config/trigger-zone/save", .method = HTTP_POST, .handler = saveZoneHandler, .user_ctx = nullptr};
     const httpd_uri_t reset_zone = {.uri = "/api/config/trigger-zone/reset", .method = HTTP_POST, .handler = resetZoneHandler, .user_ctx = nullptr};
     const httpd_uri_t test_activation = {.uri = "/api/test/activation", .method = HTTP_POST, .handler = testActivationHandler, .user_ctx = nullptr};
+    const httpd_uri_t wifi_scan = {.uri = "/api/wifi/scan", .method = HTTP_GET, .handler = wifiScanHandler, .user_ctx = nullptr};
+    const httpd_uri_t wifi_configure = {.uri = "/api/wifi/configure", .method = HTTP_POST, .handler = wifiConfigureHandler, .user_ctx = nullptr};
+    const httpd_uri_t wifi_forget = {.uri = "/api/wifi/forget", .method = HTTP_POST, .handler = wifiForgetHandler, .user_ctx = nullptr};
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &index));
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &capture));
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &status));
@@ -366,10 +444,19 @@ bool PreviewServer::begin(TriggerZoneConfig &trigger_zone,
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &save_zone));
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &reset_zone));
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &test_activation));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &wifi_scan));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &wifi_configure));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &wifi_forget));
 
-    esp_netif_ip_info_t ip = {};
-    esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip);
-    ESP_LOGI(kTag, "preview ready: open http://" IPSTR "/", IP2STR(&ip.ip));
+    if (wifi.connected()) {
+        esp_netif_ip_info_t ip = {};
+        esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip);
+        ESP_LOGI(kTag, "preview ready: open http://" IPSTR "/", IP2STR(&ip.ip));
+    } else if (wifi.provisioning()) {
+        ESP_LOGI(kTag, "provisioning page ready on SSID=%s at http://192.168.4.1/", wifi.setupApSsid());
+    } else {
+        ESP_LOGW(kTag, "HTTP server started without an active network interface");
+    }
     return true;
 }
 

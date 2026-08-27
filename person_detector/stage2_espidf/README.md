@@ -44,12 +44,13 @@ idf.py -p COM3 flash monitor
 
 ## Browser preview
 
-Stage 2 reuses the ignored `../wifi_credentials.h` file created for Stage 1.
-When it connects, the monitor prints `bwm.preview: preview ready: open
-http://.../`. Open that address on the same Wi-Fi network. The page refreshes
-a copied camera JPEG at about 1.4 frames per second and overlays the latest
-detector box. This is intentionally a low-rate diagnostic view: browser
-requests do not acquire camera frames, so they do not interfere with inference.
+Wi-Fi is configured at runtime through the Stage 5 setup page; the ESP-IDF
+firmware no longer reads `../wifi_credentials.h`. When it connects, the monitor
+prints `bwm.preview: preview ready: open http://.../`. Open that address on the
+same Wi-Fi network. The page refreshes a copied camera JPEG at about 1.4 frames
+per second and overlays the latest detector box. This is intentionally a
+low-rate diagnostic view: browser requests do not acquire camera frames, so
+they do not interfere with inference.
 
 ## Stage 2A wide-scene experiment
 
@@ -358,3 +359,59 @@ the event and compare the ESP log's `source=camera_confirmation` with the
 same Pi receipt/admission sequence. The ESP timestamp requires valid wall-clock
 time on the board to be meaningful; admission and deduplication use the event
 ID and do not depend on timestamp freshness.
+
+## Stage 5 runtime Wi-Fi provisioning
+
+Wi-Fi credentials are no longer compiled into the firmware. They are stored in
+the dedicated `bwm_wifi` NVS namespace, separate from the trigger-zone record.
+The ESP-IDF Wi-Fi driver's own credential storage is set to RAM so an unverified
+password is not silently persisted by the SDK. Stage 5 writes the SSID and
+password to `bwm_wifi` only after the station obtains an IP address, then
+restarts into the normal runtime.
+
+Boot follows this flow:
+
+1. With valid saved credentials, the node joins that network and starts the
+   existing camera page and MQTT client unchanged.
+2. With no saved credentials, it immediately starts a WPA2 setup AP named
+   `BWM-Vision-xxxxxx` (the suffix identifies the board).
+3. If a saved network is unavailable, it makes five connection attempts,
+   separated by three seconds, before starting the same setup AP.
+
+Connect a phone or laptop to the setup AP with password `bwm-setup`, then open
+`http://192.168.4.1/`. The self-contained setup page scans nearby 2.4 GHz
+networks, allows manual SSID entry for hidden networks, accepts a password, and
+reports whether the connection test succeeded. The AP remains available while
+the connection is tested. On success the response confirms that credentials
+were saved, and the node restarts after a short delay. Rejoin the venue network
+and use the station IP printed in the serial log.
+
+The normal camera page includes **Forget Wi-Fi / Change Venue**. After
+confirmation it erases only the `bwm_wifi` namespace and restarts; the trigger
+zone is preserved and the setup AP returns. Erasing the board's NVS also gives
+the expected fresh-device setup flow.
+
+During temporary station loss, the ESP retries at three-second intervals.
+After five failed attempts it exposes the setup AP, keeping local provisioning
+usable even without venue Wi-Fi. The ESP MQTT client continues using its
+existing reconnect behaviour; detection, confirmation, preview buffering,
+trigger-zone persistence, event topic, envelope, and activation edge semantics
+are unchanged.
+
+The setup implementation adds one persistent manager object (roughly a few
+hundred bytes), an event group, inline HTML/JavaScript, and temporary 3 KB
+reconnect or 2 KB restart task stacks. Network scanning uses bounded local
+arrays and the existing HTTP task. It adds no camera or detector PSRAM buffers.
+The verified ESP-IDF 5.5.5 image is 981,024 bytes (`0xef820`), leaving 77 percent
+of the 4 MB application partition free. This figure is the complete Stage 5
+image rather than a controlled isolated delta from an identically configured
+Stage 4 build.
+
+Venue limitations remain: the ESP32-S3 supports 2.4 GHz Wi-Fi, not 5 GHz-only
+networks; this page supports open and ordinary personal-password networks, not
+enterprise/802.1X credentials or captive-portal acceptance. The configured
+MQTT broker must be reachable from the venue WLAN. Client isolation, firewalls,
+separate VLANs, or a changed Pi address can still prevent MQTT even when Wi-Fi
+association succeeds. Credentials are protected over the WPA2 setup AP but are
+plain NVS strings unless flash encryption/NVS encryption is enabled for the
+deployed device.
