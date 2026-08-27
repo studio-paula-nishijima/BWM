@@ -15,7 +15,7 @@ passes only a real emitted (post-cooldown) whisper trigger to Voice.  Servo
 actuation remains a parallel existing consumer of that emitted trigger; Voice
 does not change detector or actuation policy.
 
-For an admitted interaction the path is:
+For an admitted interaction the legacy Oracle demonstrator path is:
 
 ```text
 audio/detector pipeline -> emitted whisper trigger -> Voice admission
@@ -23,6 +23,21 @@ audio/detector pipeline -> emitted whisper trigger -> Voice admission
 -> retrieval adapter -> opaque response text -> Oracle display
 -> display completion -> complete_interaction() -> listening
 ```
+
+The normal exhibition composition is detector + local servo + conservative
+capture + persistent ASR.  It does not start Pygame, an Oracle display, or
+River Culture retrieval resources.  `--oracle` selects the retained legacy
+demonstrator path.  In exhibition mode each completed structured ASR result
+(including timeout/error) releases the admitted interaction directly from
+`capture_processing` to `listening`; it does not fabricate
+`response_displayed`.
+
+Servo feedback is scheduled directly at the real emitted detector trigger:
+`profile_decision.trigger and now - last_trigger_time > COOLDOWN_SECONDS`,
+immediately after `detector.record_trigger()` and timestamp update. It is not
+coupled to capture admission, so a busy interaction still gets local feedback
+but cannot start a second capture or ASR job. The 3.0-second configurable
+delay begins at that emitted trigger and delayed work is cancelled on shutdown.
 
 `LiveASRCoordinator` in `src/live/voice_runtime.py` owns admission, capture
 submission, ASR-result collection, and the authoritative `VoiceLifecycle`.
@@ -142,9 +157,9 @@ Lifecycle states map to visitor views as follows:
 | `capture_processing` | “The Oracle is considering your question...” |
 | `response_displayed` | “The Oracle responds”, followed by the retrieval response text |
 
-The integrated runtime and its visible Oracle display are enabled by default.
-`--no-oracle` is the explicit capture/ASR-only opt-out; `--oracle` remains a
-compatible explicit opt-in spelling. `--oracle-headless` selects the headless
+The integrated runtime and its visible Oracle display are enabled by explicit
+`--oracle` opt-in; the normal default is exhibition capture/ASR operation.
+`--no-oracle` remains a compatible explicit spelling. `--oracle-headless` selects the headless
 controller; `--oracle-width`, `--oracle-height`, `--oracle-fullscreen`, and
 `--oracle-response-seconds` control presentation. `display.poll()` emits
 completion only after the static/scroll presentation duration, and that event
@@ -202,6 +217,13 @@ capture/ASR status and raw result, retrieval response, and display completion.
 High-volume detector telemetry is opt-in with `--diagnostic-console`; live CSV
 logging and offline/analysis workflows remain supported through their existing
 tools and READMEs.
+
+Completed ASR results are also appended best-effort to
+`logs/live_asr_results.jsonl` (configurable as `asr.result_log_path`). Each
+JSONL object contains UTC `timestamp`, `capture_id`, `capture_index`,
+`detector_profile`, `recognized_text`, `detected_language`, `asr_status`,
+`inference_duration_seconds`, `timeout`, and `error`. Logging failure is
+reported but cannot interrupt the Voice runtime.
 
 The integrated Pi smoke test is documented in `tools/README_stage3u_oracle.md`.
 `tools/README_stage3t_live_asr.md` covers the capture/ASR operational path,

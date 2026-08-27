@@ -54,7 +54,7 @@ class LiveASRCoordinator:
     def __init__(self, capture, worker=None, *, lifecycle=None, emit=print,
                  source_id="live", detector_profile="", output_mode="transcribe", language=None,
                  release_after_asr=False, startup_ready=None, inference_timeout_seconds=None,
-                 on_capture_started=None):
+                 on_capture_started=None, on_asr_result=None, release_on_asr_result=False):
         self.capture = capture
         self.worker = worker
         self.lifecycle = lifecycle or VoiceLifecycle(emit)
@@ -62,12 +62,15 @@ class LiveASRCoordinator:
         self.source_id, self.detector_profile = source_id, detector_profile
         self.output_mode, self.language = output_mode, language
         self._submitted = {}
+        self._submitted_metadata = {}
         self.results = []
         self._asr_status = None
         self._startup_failure_reported = False
         self.release_after_asr = release_after_asr
         self.inference_timeout_seconds = inference_timeout_seconds
         self.on_capture_started = on_capture_started
+        self.on_asr_result = on_asr_result
+        self.release_on_asr_result = release_on_asr_result
         self._inference_started = {}
         self.startup_ready = startup_ready or (lambda: (True, ""))
 
@@ -121,7 +124,7 @@ class LiveASRCoordinator:
                 admitted_trigger = True
                 self.lifecycle.set(VoiceState.WHISPER_DETECTED)
             else:
-                self.emit(f"[Interaction] ignored: busy ({self.lifecycle.state.value})")
+                self.emit(f"[Interaction] capture ignored: busy ({self.lifecycle.state.value})")
         completed = self.capture.process_frame(frame, frame_number, admitted_trigger, temporal_candidate)
         if self.capture.is_capturing and admitted_trigger:
             self.emit("[Capture] started")
@@ -174,9 +177,12 @@ class LiveASRCoordinator:
         job_id, status = self.worker.submit(AudioSegment(capture.samples, capture.sample_rate, capture.source_id), metadata)
         if status != "accepted":
             self.emit(f"[ASR] busy: {status} ({capture_id})")
-            self.results.append({"capture_id": capture_id, "status": status, "error": status, "metadata": metadata})
+            self._complete_result({"capture_id": capture_id, "status": status, "error": status,
+                                   "metadata": metadata, "detector_profile": self.detector_profile,
+                                   "result": {"recognized_text": ""}, "inference_duration": None}, [])
             return
         self._submitted[job_id] = submitted
+        self._submitted_metadata[job_id] = metadata
         self.emit(f"[ASR] job submitted: {capture_id}")
         self.emit("[ASR] processing")
 
@@ -192,6 +198,7 @@ class LiveASRCoordinator:
             finished = time.monotonic()
             metadata = item["metadata"]
             submitted = self._submitted.pop(item["job_id"], metadata.get("capture_completion_monotonic", finished))
+            self._submitted_metadata.pop(item["job_id"], None)
             item.update({"capture_id": metadata.get("capture_id"), "source_id": metadata.get("source_id"),
                          "detector_profile": metadata.get("detector_profile"),
                          "asr_submitted_monotonic": submitted, "asr_completed_monotonic": finished,
@@ -209,9 +216,7 @@ class LiveASRCoordinator:
                 self.emit(f"[ASR] {result.get('recognized_text', '')!r}")
             else:
                 self.emit(f"[ASR] error after {item['inference_duration']:.2f} s: {item['error']}")
-            self.results.append(item); completed.append(item)
-            if self.release_after_asr:
-                self.complete_interaction("debug ASR completion")
+            self._complete_result(item, completed)
         if self.inference_timeout_seconds and self.inference_timeout_seconds > 0:
             now = time.monotonic()
             overdue = [job_id for job_id, started in self._inference_started.items()
@@ -219,14 +224,29 @@ class LiveASRCoordinator:
             if overdue:
                 job_id = overdue[0]; started = self._inference_started.pop(job_id)
                 submitted = self._submitted.pop(job_id, started)
+                metadata = self._submitted_metadata.pop(job_id, {})
                 self.emit(f"[ASR] timeout after {self.inference_timeout_seconds:.2f} s")
                 self.emit("[ASRWorker] recycling after timeout")
                 item = {"job_id": job_id, "status": "timeout", "error": "inference timeout",
-                        "result": {"recognized_text": ""}, "capture_id": None,
+                        "result": {"recognized_text": ""}, "capture_id": metadata.get("capture_id"),
+                        "source_id": metadata.get("source_id"), "detector_profile": metadata.get("detector_profile"),
+                        "metadata": metadata,
                         "asr_submitted_monotonic": submitted, "worker_started_monotonic": started,
                         "inference_duration": now - started, "timeout_derived": True}
-                self.worker.recycle_after_timeout(); self.results.append(item); completed.append(item)
+                self.worker.recycle_after_timeout(); self._complete_result(item, completed)
         return completed
+
+    def _complete_result(self, item, completed):
+        self.results.append(item)
+        completed.append(item)
+        if self.on_asr_result:
+            try:
+                self.on_asr_result(item)
+            except Exception as exc:
+                self.emit(f"[ASR] result observer failed: {exc}")
+        if self.release_after_asr or self.release_on_asr_result:
+            reason = "debug ASR completion" if self.release_after_asr else "ASR completion (exhibition)"
+            self.complete_interaction(reason)
 
     def shutdown(self):
         if self.worker:

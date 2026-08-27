@@ -5,6 +5,23 @@ import threading
 import time
 
 
+def nominal_sequence_durations(min_pulse, max_pulse, *, frame_seconds=.02):
+    """Return the current motion-program durations without changing the program.
+
+    This is observability for the detector's seven-second start-to-start
+    cooldown. Actual hardware execution remains protected by ``_busy``.
+    """
+    distance = max_pulse - min_pulse
+    constant = lambda speed: int(abs(distance) / (speed * frame_seconds)) * frame_seconds
+    return {
+        1: .5 + 3.0 + 1.5,
+        2: .3 + 1.5 + 1.5 + 2.0 + 1.5,
+        3: .3 + constant(800) + 1.0 + constant(500),
+        4: .3 + 1.5 + 1.8 + constant(1200) + .2 + constant(1000),
+        5: .3 + constant(500) + 1.5,
+    }
+
+
 class ServoActuationController:
     def __init__(self, config, *, servo_factory=None, random_choice=None, clock=time.monotonic):
         self.config = dict(config)

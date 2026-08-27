@@ -1,6 +1,7 @@
 import sys
 import time
 import unittest
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,7 @@ from audio.utterance_capture import CapturePolicy, UtteranceCaptureController
 from analysis.asr_evaluation import ASRResult
 from live.asr_worker import ASRWorkerConfig, PersistentASRWorker
 from live.voice_runtime import LiveASRCoordinator, VoiceLifecycle, VoiceState
+from live.asr_result_log import ASRResultLogger
 
 
 class FakeBackend:
@@ -106,7 +108,7 @@ class VoiceRuntimeTests(unittest.TestCase):
             self.assertEqual(runtime.lifecycle.state, VoiceState.CAPTURE_PROCESSING)
             self.feed(runtime, start=8, count=2, trigger_at=8)
             self.assertEqual(len(runtime.capture.completed), 1)
-            self.assertTrue(any("[Interaction] ignored: busy (capture_processing)" in item for item in events))
+            self.assertTrue(any("[Interaction] capture ignored: busy (capture_processing)" in item for item in events))
             self.assertTrue(runtime.complete_interaction("test release"))
             self.feed(runtime, start=10, count=8, trigger_at=10)
             self.assertEqual(len(runtime.capture.completed), 2)
@@ -124,6 +126,35 @@ class VoiceRuntimeTests(unittest.TestCase):
         ring.append(frame)
         runtime.process_frame(frame, 1, emitted_trigger=False, temporal_candidate=False)
         self.assertIn("[ASR] busy: worker_unavailable (live:0)", events)
+
+    def test_exhibition_releases_after_asr_without_response_displayed(self):
+        runtime, _ = self.make()
+        runtime.release_on_asr_result = True
+        try:
+            self.feed(runtime)
+            for _ in range(100):
+                runtime.poll()
+                if runtime.lifecycle.state is VoiceState.LISTENING: break
+                time.sleep(.02)
+            self.assertEqual(runtime.lifecycle.state, VoiceState.LISTENING)
+            self.assertNotIn(VoiceState.RESPONSE_DISPLAYED, [runtime.lifecycle.state])
+        finally:
+            runtime.shutdown()
+
+    def test_completed_and_timeout_results_are_logged_without_affecting_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "results.jsonl"
+            logger = ASRResultLogger(path, emit=lambda _: None)
+            logger({"capture_id": "live:3", "detector_profile": "p", "status": "ok",
+                    "inference_duration": .25, "result": {"recognized_text": "water", "detected_language": "en"},
+                    "metadata": {"capture": {"capture_index": 3}}})
+            logger({"capture_id": "live:4", "detector_profile": "p", "status": "timeout",
+                    "inference_duration": 10, "error": "inference timeout", "result": {}})
+            import json
+            records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(records[0]["recognized_text"], "water")
+            self.assertEqual(records[0]["capture_index"], 3)
+            self.assertTrue(records[1]["timeout"])
 
 
 if __name__ == "__main__":

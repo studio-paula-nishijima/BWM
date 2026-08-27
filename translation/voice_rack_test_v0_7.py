@@ -102,6 +102,7 @@ from live.oracle_display import DisplayConfig, OracleDisplayController, PygameOr
 from live.retrieval_adapter import RiverCultureRetrievalAdapter
 from live.retrieval_worker import PersistentRetrievalWorker
 from live.voice_messaging import VoiceStatePublisher
+from live.asr_result_log import ASRResultLogger
 from configs.runtime_config import load_asr_config
 
 from app_logging.csv_logger import WhisperCSVLogger
@@ -181,10 +182,10 @@ def parse_arguments():
     parser.add_argument("--no-live-asr", action="store_true", help="Capture normally but do not start the live ASR worker")
     parser.add_argument("--asr-model", choices=("tiny", "base", "small"), default=None, help="Override the configured live Faster-Whisper model")
     parser.add_argument("--release-after-asr", action="store_true", help="Debug only: reopen interaction admission after each ASR result")
-    parser.add_argument("--oracle", dest="oracle", action="store_true", default=True,
-                        help="Enable Oracle response integration (the default)")
+    parser.add_argument("--oracle", dest="oracle", action="store_true", default=False,
+                        help="Enable the legacy Oracle retrieval/display demonstrator")
     parser.add_argument("--no-oracle", dest="oracle", action="store_false",
-                        help="Disable retrieval and the Oracle display for capture/ASR-only runs")
+                        help="Disable retrieval and the Oracle display (the exhibition default)")
     parser.add_argument("--oracle-headless", action="store_true", help="Use the deterministic no-screen Oracle display controller")
     parser.add_argument("--oracle-width", type=int, default=800, help="Oracle window/test width")
     parser.add_argument("--oracle-height", type=int, default=480, help="Oracle window/test height")
@@ -603,7 +604,11 @@ def main():
                                          source_id=args.wav or "live_respeaker", detector_profile=detector_profile,
                                          release_after_asr=args.release_after_asr, startup_ready=retrieval_ready,
                                          inference_timeout_seconds=asr_config.get("inference_timeout_seconds"),
-                                         on_capture_started=interaction_servo.schedule)
+                                         on_asr_result=ASRResultLogger(
+                                             asr_config.get("result_log_path", "logs/live_asr_results.jsonl")),
+                                         release_on_asr_result=not args.oracle)
+    print("[Runtime] Oracle/Pygame/retrieval enabled" if args.oracle else
+          "[Runtime] exhibition mode: ASR enabled; Oracle/Pygame/retrieval disabled")
     if args.oracle:
         display_config = DisplayConfig(width=args.oracle_width, height=args.oracle_height,
             fullscreen=args.oracle_fullscreen, enabled=not args.oracle_headless,
@@ -787,6 +792,9 @@ def main():
                 detector.record_trigger()
                 last_trigger_time = now
                 result.trigger_route = profile_decision.trigger_route
+                # This is the sole physical-feedback seam: a real emitted
+                # trigger schedules feedback before capture admission is tried.
+                interaction_servo.schedule()
             elif profile_decision.trigger:
                 # A threshold crossing is still logged, but it is not an
                 # emitted trigger while the actuator cooldown is active.
