@@ -96,9 +96,9 @@ def build_halo60x_demo(*, fade_seconds: float = 4.0, hold_seconds: float = 5.0,
         raise ValueError("demo timings must be non-negative")
 
     looks = (
-        (15, 2700, "dim warm"), (15, 4200, "dim neutral"), (15, 6500, "dim cool"),
-        (45, 2700, "medium warm"), (45, 4200, "medium neutral"), (45, 6500, "medium cool"),
-        (70, 2700, "bright warm"), (70, 4200, "bright neutral"), (70, 6500, "bright cool"),
+        (100, 2700, "bright warm"), (100, 4200, "bright neutral"), (100, 6500, "bright cool"),
+        (70, 2700, "medium warm"), (70, 4200, "medium neutral"), (70, 6500, "medium cool"),
+        (45, 2700, "dim warm"), (45, 4200, "dim neutral"), (45, 6500, "dim cool"),
     )
     cues: list[Halo60xCue] = [_cue("begin blackout", BLACKOUT, BLACKOUT, 0, blackout_hold_seconds)]
     current = BLACKOUT
@@ -107,19 +107,19 @@ def build_halo60x_demo(*, fade_seconds: float = 4.0, hold_seconds: float = 5.0,
         cues.append(_cue(label, current, target, fade_seconds, hold_seconds))
         current = target
 
-    # The first check changes only CCT while brightness remains exactly 45%.
-    medium_warm = Halo60xState(45, 2700)
-    cues.append(_cue("transition check setup: 45% warm", current, medium_warm, fade_seconds, hold_seconds))
-    medium_cool = Halo60xState(45, 6500)
-    cues.append(_cue("CCT check: 2700 K to 6500 K at 45%", medium_warm, medium_cool, check_fade_seconds, hold_seconds))
-    cues.append(_cue("CCT check: 6500 K back to 2700 K at 45%", medium_cool, medium_warm, check_fade_seconds, hold_seconds))
+    # The first check changes only CCT while brightness remains exactly 70%.
+    medium_warm = Halo60xState(70, 2700)
+    cues.append(_cue("transition check setup: 70% warm", current, medium_warm, fade_seconds, hold_seconds))
+    medium_cool = Halo60xState(70, 6500)
+    cues.append(_cue("CCT check: 2700 K to 6500 K at 70%", medium_warm, medium_cool, check_fade_seconds, hold_seconds))
+    cues.append(_cue("CCT check: 6500 K back to 2700 K at 70%", medium_cool, medium_warm, check_fade_seconds, hold_seconds))
 
     # The second check changes only brightness while CCT remains exactly 4200 K.
-    dim_neutral = Halo60xState(15, 4200)
-    cues.append(_cue("transition check setup: 15% neutral", medium_warm, dim_neutral, fade_seconds, hold_seconds))
-    bright_neutral = Halo60xState(70, 4200)
-    cues.append(_cue("brightness check: 15% to 70% at 4200 K", dim_neutral, bright_neutral, check_fade_seconds, hold_seconds))
-    cues.append(_cue("brightness check: 70% back to 15% at 4200 K", bright_neutral, dim_neutral, check_fade_seconds, hold_seconds))
+    dim_neutral = Halo60xState(45, 4200)
+    cues.append(_cue("transition check setup: 45% neutral", medium_warm, dim_neutral, fade_seconds, hold_seconds))
+    bright_neutral = Halo60xState(100, 4200)
+    cues.append(_cue("brightness check: 45% to 100% at 4200 K", dim_neutral, bright_neutral, check_fade_seconds, hold_seconds))
+    cues.append(_cue("brightness check: 100% back to 45% at 4200 K", bright_neutral, dim_neutral, check_fade_seconds, hold_seconds))
 
     cues.append(_cue("fade to blackout", dim_neutral, BLACKOUT, fade_seconds, blackout_hold_seconds))
     return tuple(cues)
