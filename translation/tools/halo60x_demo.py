@@ -19,6 +19,30 @@ def send_open_dmx_frame(serial_port, channels: tuple[int, int, int], start_addre
     frame[start_address - 1:start_address + 2] = bytes(channels)
     serial_port.send_break(duration=0.0001)
     serial_port.write(bytes([0]) + frame)
+    # Do not queue obsolete fade frames behind a slow FTDI/Open-DMX adapter.
+    serial_port.flush()
+
+
+def play_cue(serial_port, cue, start_address: int, interval: float, *, clock=time.monotonic,
+             sleep=time.sleep, send_frame=send_open_dmx_frame) -> None:
+    """Transmit the current cue state without allowing slow I/O to extend it."""
+    started = clock()
+    deadline = started + cue.fade_seconds + cue.hold_seconds
+    next_frame_at = started
+    while True:
+        now = clock()
+        if now >= deadline:
+            break
+        send_frame(serial_port, state_to_dmx_channels(cue.state_at(now - started)), start_address)
+        next_frame_at += interval
+        delay = next_frame_at - clock()
+        if delay > 0:
+            sleep(delay)
+        else:
+            # A host-timed Open DMX cable cannot keep up with this requested
+            # rate. Drop stale intermediate frames and use the newest state.
+            next_frame_at = clock()
+    send_frame(serial_port, state_to_dmx_channels(cue.end), start_address)
 
 
 def run_live(port: str, start_address: int, interval: float, *, fade_seconds: float,
@@ -41,9 +65,7 @@ def run_live(port: str, start_address: int, interval: float, *, fade_seconds: fl
                 blackout_hold_seconds=blackout_hold_seconds,
             ):
                 print(f"[Halo 60x] {cue.label}", flush=True)
-                for state in cue.frames(interval):
-                    send_open_dmx_frame(serial_port, state_to_dmx_channels(state), start_address)
-                    time.sleep(interval)
+                play_cue(serial_port, cue, start_address, interval)
         finally:
             send_open_dmx_frame(serial_port, (0, 0, 0), start_address)
 

@@ -1,10 +1,17 @@
 import sys
+import importlib.util
 from pathlib import Path
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lighting.halo60x_demo import BLACKOUT, Halo60xState, build_halo60x_demo, state_to_dmx_channels
+
+
+TOOL_PATH = Path(__file__).resolve().parents[1] / "tools" / "halo60x_demo.py"
+tool_spec = importlib.util.spec_from_file_location("halo60x_demo_tool", TOOL_PATH)
+halo_tool = importlib.util.module_from_spec(tool_spec)
+tool_spec.loader.exec_module(halo_tool)
 
 
 class Halo60xDemoTests(unittest.TestCase):
@@ -58,6 +65,20 @@ class Halo60xDemoTests(unittest.TestCase):
         self.assertEqual(state_to_dmx_channels(Halo60xState(45, 2700)), (115, 0, 0))
         self.assertEqual(state_to_dmx_channels(Halo60xState(70, 4600)), (178, 128, 0))
         self.assertEqual(state_to_dmx_channels(Halo60xState(100, 6500)), (255, 255, 0))
+
+    def test_slow_open_dmx_output_does_not_extend_cue_duration(self):
+        class Clock:
+            now = 0.0
+            def __call__(self): return self.now
+            def sleep(self, seconds): self.now += seconds
+        clock, sent = Clock(), []
+        def slow_send(_port, channels, _address):
+            sent.append(channels); clock.now += 0.25
+        cue = build_halo60x_demo(fade_seconds=1, hold_seconds=2)[1]
+        halo_tool.play_cue(None, cue, 1, 0.033, clock=clock, sleep=clock.sleep, send_frame=slow_send)
+        self.assertLessEqual(clock.now, 3.3)
+        self.assertLess(len(sent), 20)
+        self.assertEqual(sent[-1], state_to_dmx_channels(cue.end))
 
 
 if __name__ == "__main__":
