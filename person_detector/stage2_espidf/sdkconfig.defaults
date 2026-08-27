@@ -13,6 +13,10 @@ CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 
+# Stage 3B keeps polygon configuration alive while Wi-Fi and the preview server
+# initialise. The ESP-IDF default 3584-byte main stack is too tight on-device.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
+
 # The XIAO camera is stable with normal PSRAM frame-buffer transfers. Avoid
 # the optional PSRAM-DMA path, which can corrupt JPEG capture on this board.
 # CONFIG_CAMERA_PSRAM_DMA is not set

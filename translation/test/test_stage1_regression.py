@@ -30,6 +30,9 @@ def event(playback_time, timestamp, target="solenoid_1"):
 
 
 class Stage1RegressionTests(unittest.TestCase):
+    def test_production_runtime_remains_initially_active(self):
+        self.assertIs(RUNTIME_CONFIG["playback"]["initially_active"], True)
+
     def test_scheduler_preserves_release_event_schema_and_order(self):
         events = generate_events(
             np.array(["2003-01-01", "2003-01-02"], dtype="datetime64[D]"),

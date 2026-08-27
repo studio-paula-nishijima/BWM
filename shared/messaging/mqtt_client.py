@@ -41,7 +41,7 @@ class SemanticMQTTClient:
                 self._client = self._client_factory(self.settings.client_id)
             self._client.reconnect_delay_set(self.settings.reconnect_min_seconds, self.settings.reconnect_max_seconds)
             self._client.on_connect = lambda client, userdata, flags, reason_code, properties=None: self._connected(client, subscriptions, reason_code)
-            self._client.on_disconnect = lambda client, userdata, flags, reason_code, properties=None: LOG.warning("MQTT disconnected: %s", reason_code)
+            self._client.on_disconnect = self._disconnected
             self._client.on_message = self._message
             self._client.connect_async(self.settings.host, self.settings.port)
             self._client.loop_start()
@@ -59,12 +59,23 @@ class SemanticMQTTClient:
             client.subscribe(topic, qos=self.settings.qos)
         self._connected_event.set()
         LOG.info("MQTT connected; subscribed to %s", ", ".join(subscriptions))
+        print(f"[MQTT] CONNECTED subscriptions={','.join(subscriptions) or '(none)'} qos={self.settings.qos}")
+
+    def _disconnected(self, client, userdata, flags, reason_code, properties=None):
+        self._connected_event.clear()
+        LOG.warning("MQTT disconnected: %s", reason_code)
+        print(f"[MQTT] DISCONNECTED reason={reason_code}; reconnecting")
 
     def _message(self, client, userdata, message):
+        print(f"[MQTT] RECEIVED topic={message.topic} bytes={len(message.payload)}")
         try:
-            self._on_event(message.topic, SemanticEvent.from_json(message.payload))
+            event = SemanticEvent.from_json(message.payload)
+            print(f"[MQTT] ENVELOPE valid id={event.id} type={event.event_type} "
+                  f"origin={event.origin} timestamp={event.timestamp}")
+            self._on_event(message.topic, event)
         except Exception as exc:
             LOG.warning("Rejected MQTT semantic event on %s: %s", message.topic, exc)
+            print(f"[MQTT] ENVELOPE rejected topic={message.topic} reason={exc}")
 
     def publish(self, topic: str, event: SemanticEvent) -> bool:
         if self._client is None:

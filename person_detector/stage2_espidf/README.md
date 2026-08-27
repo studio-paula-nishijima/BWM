@@ -98,3 +98,263 @@ dependencies and should be retained after the first successful build.
 The generic pedestrian model is a starting point. Test seated, partially framed,
 and backlit visitors before relying on it in an exhibit; a venue-trained model
 can later replace this class without changing its caller.
+
+## Stage 2B motion-feasibility mode
+
+`main/stage2b_config.h` selects one detector at build time. The checked-in
+default is motion detection:
+
+```cpp
+constexpr DetectionMode kDetectionMode = DetectionMode::Motion;
+```
+
+Change `Motion` to `Person`, rebuild, and flash to repeat the existing Stage 2A
+person-detector test. Only the selected detector is instantiated, avoiding two
+large simultaneous PSRAM workspaces.
+
+Motion mode keeps the VGA JPEG camera and browser preview. Each frame is
+decoded once, averaged into an 80x60 grayscale grid, and compared with the
+previous grid. A 3x3 neighbourhood filter removes isolated changed cells and
+8-connected components produce motion boxes in normalised full-frame
+coordinates. Static objects naturally disappear after the reference frame
+updates.
+
+The orange browser overlay is the runtime rectangular trigger zone in
+normalized full-frame `x/y/w/h` coordinates. Cyan rectangles are accepted
+motion blobs and red dots are their centres. A scan is an in-zone hit when at
+least one blob centre is inside the rectangle. The initial confirmation rule
+is two positive scans in the last four; it is deliberately non-consecutive and
+configured by `kMotionConfirmationHits` and `kMotionConfirmationWindow`.
+
+Frames with at least 55 percent changed pixels are flagged as global
+illumination changes and rejected. The detector also rejects a lower 35 percent
+changed fraction when accompanied by a mean luminance shift of at least 30
+levels. These starting thresholds, the per-cell difference threshold, minimum
+blob size, grid dimensions, and zone are all in `main/stage2b_config.h`.
+
+Serial output includes changed-pixel percentage, luminance shift, largest blob
+area, every box and centre, zone result, recent hit count, confirmation state,
+timing, and periodic internal-heap/PSRAM readings. A newly confirmed result
+also prints `MOTION TRIGGER`. If MQTT is enabled, confirmation drives the
+existing activation state publisher; the Pi remains responsible for its own
+active-session policy.
+
+### Stage 2B test sequence
+
+1. Let the empty scene settle for several scans. Expect no continuing boxes.
+2. Walk into the orange zone from each edge and confirm a cyan box follows the
+   changed region and `MOTION TRIGGER` appears after two of four positive scans.
+3. Stand still, then move again. Pure motion should settle while stationary and
+   respond to renewed movement.
+4. Switch the room lights. Expect `illumination_change=true`, no accepted boxes,
+   and no new confirmed trigger from that scan.
+5. Repeat at close/horizontal, distant/oblique, and high/downward positions.
+   Record `changed_pct`, box area, `scene_ms`, and whether each entry confirmed.
+
+Motion mode's explicitly allocated workspace is 950,400 bytes at the default
+VGA/grid settings: 921,600 bytes for decoded RGB888 plus 28,800 bytes for two
+grayscale frames, two masks, and the connected-component queue. Boot logs
+report the allocator-observed detector delta and remaining memory. Final scan
+rate, sensitivity, and false-positive conclusions require the physical tests
+above; they cannot be established by a desktop build alone.
+
+## Stage 2C strength and shadow experiment
+
+Stage 2C keeps the Stage 2B geometry and buffers. For every meaningful blob it
+also compares horizontal/vertical gradient magnitude between the current and
+previous 80x60 grayscale grids. This inexpensive structure signal is computed
+only while visiting blob cells; it adds no image buffer.
+
+A localised accepted in-zone blob confirms immediately when its changed-cell
+fraction is at least 1.2 percent, mean luminance difference is at least 28,
+mean gradient difference is at least 9, and its bounding rectangle covers no
+more than 45 percent of the frame. Other accepted in-zone motion retains the
+2-of-4 path. There is no candidate hold: immediate confirmation already solves
+the strong enter-then-freeze case without extending weak noise into later
+scans.
+
+A local blob with mean luminance change of at least 20 but mean gradient
+change below 6 is marked as a likely shadow and does not enter confirmation.
+The browser draws these rejected candidates as purple dashed boxes; accepted
+motion remains cyan. Serial and JSON diagnostics report luminance/structure
+values, strong/shadow classification, and a confirmation reason. Thresholds
+are initial test values in `main/stage2b_config.h`, not final museum tuning.
+
+The only planned persistent memory increase is approximately 2 KB for the
+larger HTTP-server task stack used to format the richer diagnostic JSON.
+Record `processing_ms`, `scene_hz`, and the periodic free-memory logs before
+and after flashing to measure the actual device cost.
+
+## Stage 3A browser trigger-zone calibration (historical format)
+
+The trigger rectangle is now runtime configuration rather than a compiled-only
+value. `TriggerZoneConfig` owns the normalized `x/y/w/h` rectangle and stores a
+versioned, checksummed 28-byte record in the existing NVS partition under the
+`bwm_config` namespace. Missing, corrupt, non-finite, out-of-range, or smaller
+than 5 percent rectangles fall back to the compiled central default. An NVS
+failure disables saving but does not stop detection.
+
+The preview exposes same-origin JSON routes:
+
+- `GET /api/config/trigger-zone` returns the active rectangle.
+- `POST /api/config/trigger-zone` validates and applies a rectangle in memory.
+- `POST /api/config/trigger-zone/save` commits the active rectangle to NVS.
+- `POST /api/config/trigger-zone/reset` applies the default without saving it.
+
+Select **Edit Trigger Zone** to drag the rectangle or resize it from four corner
+handles. Browser pointer coordinates are divided by the currently displayed
+camera-image dimensions and converted to normalized coordinates. **Apply**
+changes the detector immediately but remains unsaved. **Save** applies and
+persists. **Cancel** reapplies the rectangle captured on entering edit mode,
+including after an Apply. **Reset to Default** is immediate but deliberately
+requires Save before it survives reboot.
+
+No external JavaScript or CSS dependency is used. Current Chromium, Firefox,
+and Safari-family browsers with Pointer Events and object-spread support are
+expected; very old embedded browsers are not targeted. The Stage 3A API adds
+no image buffer and leaves the existing 8 KB HTTP task stack unchanged. NVS
+adds only its small handle/mutex plus the 28-byte record; the larger embedded
+HTML primarily affects flash. Build-time image size and device free-memory
+deltas must be recorded after compiling and flashing.
+
+## Stage 3B polygon trigger geometry (reverted experiment)
+
+Stage 3B replaces the rectangle model with one shared polygon representation:
+a required inclusion polygon and an optional exclusion polygon, each containing
+3–8 normalized full-frame points. The default Stage 3A rectangle is represented
+as an ordinary four-point inclusion polygon. The exclusion polygon has an
+explicit enabled flag and retains its points while disabled.
+
+The detector continues to test only the motion-box centre. It accepts the
+centre when it is inside inclusion and not inside an enabled exclusion polygon.
+Both zones use the same boundary-inclusive ray-casting test. No box overlap,
+polygon clipping, or image-processing behaviour changed.
+
+The existing API routes remain, with payloads shaped as:
+
+```json
+{
+  "trigger_geometry": {
+    "inclusion": [{"x": 0.2, "y": 0.2}, {"x": 0.8, "y": 0.2}, {"x": 0.8, "y": 0.8}],
+    "exclusion": {
+      "enabled": false,
+      "points": [{"x": 0.4, "y": 0.4}, {"x": 0.6, "y": 0.4}, {"x": 0.6, "y": 0.6}]
+    }
+  }
+}
+```
+
+The browser uses a lightweight inline SVG. Select inclusion or exclusion,
+drag individual vertices, add a midpoint to the selected (or longest) edge,
+and remove the selected vertex. Counts are constrained to 3–8. Exclusion is
+enabled independently. Apply, Save, Cancel, and Reset retain their Stage 3A
+semantics, and the cyan motion and purple shadow overlays remain visible.
+
+Validation is server-authoritative and rejects non-finite/out-of-frame points,
+adjacent duplicates or near-zero edges, polygons below the minimum area,
+self-intersecting edges, and invalid counts. A complete geometry is validated
+before it can replace the active copy.
+
+NVS record version 2 stores both fixed-capacity polygons, counts, exclusion
+state, and checksum in 144 bytes. At boot, a valid Stage 3A version-1 rectangle
+is migrated in memory to four inclusion vertices with exclusion disabled; the
+next explicit Save writes version 2. Missing, corrupt, or invalid data still
+falls back to defaults.
+
+The runtime geometry is about 140 bytes plus the existing mutex/NVS handle.
+There are no new camera, grayscale, or PSRAM buffers, and the HTTP task remains
+at 8 KB. The main task stack is raised from the ESP-IDF default 3584 bytes to
+6144 bytes because Wi-Fi startup overflowed the default once Stage 3B geometry
+state was live. The inline SVG/JavaScript and validation code increase flash; use
+`idf.py size` and the existing boot/periodic heap logs for the exact build and
+device deltas.
+
+The verified ESP-IDF 5.5.5 motion build is 1,078,352 bytes (`0x107450`), leaving
+74 percent of the 4 MB application partition free. This is 38,992 bytes above
+the last recorded Stage 2B image, a combined delta that also includes the
+intervening Stage 2C and Stage 3A features; it is not an isolated Stage 3B delta.
+
+The polygon experiment was reverted after device testing because its SVG
+vertex controls were not reliably draggable in the installation browser. The
+current firmware again uses the proven Stage 3A rectangle editor and 28-byte
+version-1 NVS record. If a version-2 polygon record was saved, boot converts
+the inclusion polygon's bounds into a rectangle; the next Save writes version
+1. The 6144-byte main stack and HTTP connection safeguards remain: browser
+frame/status requests cannot overlap, refresh runs once per second, the server
+allows four client sockets, and least-recently-used session purging is enabled.
+The verified rollback build is 1,061,360 bytes (`0x1031f0`), leaving 75 percent
+of the 4 MB application partition free.
+
+## Stage 4 ESP-to-Pi activation test
+
+The browser now includes **Send Test Activation**. Its POST
+`/api/test/activation` request bypasses only camera detection and calls the
+same envelope builder and MQTT publisher used by a newly confirmed camera
+result. Every click creates one new event ID and publishes:
+
+```text
+topic: bwm/installation/activation
+QoS: 1
+retained: false
+{"version":1,"id":"<uuid>","type":"installation.activation",
+ "origin":"person_detector","timestamp":"<ISO-8601>",
+ "payload":{"state":"active"}}
+```
+
+Camera publishing is now activation-only: one event is emitted on each
+inactive-to-confirmed edge. Returning to unconfirmed rearms the next edge but
+does not publish `inactive`, because the Translation Pi owns the admitted
+session's ten-minute lifetime. Manual clicks always emit a fresh event and do
+not alter camera edge state.
+
+The ESP serial log identifies `source=manual_test` or
+`source=camera_confirmation`, event ID, type, origin, timestamp, topic, MQTT
+message ID, and current connection state. A disabled/unavailable MQTT client
+returns HTTP 503 to the browser and logs why no event was queued.
+
+The Translation production runtime remains initially active by default. For
+this Stage 4 test, use the existing semantic `inactive` test control to end
+that initial session and enter the normal hardware-quiescent admission state.
+Its ordinary shared MQTT client subscribes to the same topic, validates the
+common envelope, and routes it through the existing semantic ingress. Console
+diagnostics distinguish
+receipt, envelope validation, duplicate ID rejection, admission, an activation
+ignored while already active, session start, teardown, and the return to
+hardware-quiescent idle.
+
+For the physical test, the Pi and ESP must use the same reachable broker. The
+Pi's checked-in `configs/mqtt.yaml` uses a broker on the Pi itself
+(`localhost:1883`), so the ESP deployment-local `mqtt_config.h` should use
+the Pi's LAN address, for example:
+
+```cpp
+#define BWM_MQTT_BROKER_URI "mqtt://192.168.1.50:1883"
+#define BWM_MQTT_TOPIC_BASE "bwm"
+```
+
+Run the normal Translation runtime on the Pi and wait for
+`[MQTT] CONNECTED`. From a second terminal, use the existing semantic test
+control to end the initially active session without changing production
+configuration:
+
+```bash
+python translation/tools/simulate_person_activation.py inactive
+```
+
+Wait for `[Session] IDLE: session state cleared; hardware quiescent`, then
+use the browser button. The first event should log
+`admitted_session_started`; another click during the session should log
+`ignored_already_active` and must not reset its start time. To use the
+existing semantic test control to end the session without shortening
+production timeout settings, run from the repository root:
+
+```bash
+python translation/tools/simulate_person_activation.py inactive
+```
+
+Wait for `[Session] IDLE: session state cleared; hardware quiescent`, click
+again and expect another admission. Finally, let camera confirmation generate
+the event and compare the ESP log's `source=camera_confirmation` with the
+same Pi receipt/admission sequence. The ESP timestamp requires valid wall-clock
+time on the board to be meaningful; admission and deduplication use the event
+ID and do not depend on timestamp freshness.

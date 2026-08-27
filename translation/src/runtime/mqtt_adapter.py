@@ -23,25 +23,34 @@ class TranslationSemanticIngress:
                 return "rejected_invalid"
             return self._runtime.observe_voice_state(state)
         if topic != self._activation_topic or event.event_type != INSTALLATION_ACTIVATION:
+            print(f"[Semantic ingress] REJECTED routing topic={topic} id={event.id} "
+                  f"type={event.event_type} origin={event.origin}")
             return False
         if self._recent_ids.seen(event.id):
             LOG.info("Duplicate semantic event ignored: %s", event.id)
-            print(f"[Semantic ingress] Duplicate event ignored: {event.id}")
+            print(f"[Semantic ingress] DEDUPLICATION duplicate id={event.id} "
+                  f"type={event.event_type} origin={event.origin}; ignored")
             return False
         state = event.payload.get("state")
+        if state not in {"active", "inactive"}:
+            LOG.warning("Rejected installation activation with invalid state: %r", state)
+            print(f"[Semantic ingress] VALIDATION rejected id={event.id} type={event.event_type} "
+                  f"origin={event.origin} timestamp={event.timestamp} state={state!r}")
+            return False
+        print(f"[Semantic ingress] VALIDATION accepted id={event.id} type={event.event_type} "
+              f"origin={event.origin} timestamp={event.timestamp} state={state} deduplication=new")
         if state == "active":
             changed = self._runtime.activate()
             LOG.info("Remote activation %s", "started session" if changed else "ignored; already active")
-            print("[Semantic ingress] installation active: " + ("started session" if changed else "already active"))
+            print(f"[Semantic ingress] ADMISSION id={event.id} result=" +
+                  ("admitted_session_started" if changed else "ignored_already_active"))
             return changed
         if state == "inactive":
             changed = self._runtime.deactivate()
             LOG.info("Remote deactivation %s", "cancelled session" if changed else "ignored; already idle")
-            print("[Semantic ingress] installation inactive: " + ("cancelled session" if changed else "already idle"))
+            print(f"[Semantic ingress] ADMISSION id={event.id} result=" +
+                  ("admitted_session_cancelled" if changed else "ignored_already_quiescent"))
             return changed
-        LOG.warning("Rejected installation activation with invalid state: %r", state)
-        print(f"[Semantic ingress] Rejected invalid installation state: {state!r}")
-        return False
 
     def handle_event(self, event: SemanticEvent) -> bool:
         """Accept a decoded event from any transport without transport policy."""

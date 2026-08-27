@@ -54,10 +54,10 @@ bool CameraSource::initialise()
     config.pin_reset = kPinReset;
     config.xclk_freq_hz = 20000000;
 
-    // Tiled mode uses VGA so each crop retains more distant-person detail;
-    // full-frame mode preserves the original QVGA baseline.
+    // Motion and tiled-person modes use VGA; full-frame person mode preserves
+    // the original QVGA baseline.
     config.pixel_format = PIXFORMAT_JPEG;
-    config.frame_size = tiledModeEnabled() ? FRAMESIZE_VGA : FRAMESIZE_QVGA;
+    config.frame_size = sourceFrameWidth() == kTiledFrameWidth ? FRAMESIZE_VGA : FRAMESIZE_QVGA;
     config.jpeg_quality = 12;
     // Match the proven Stage 1 capture pipeline. Two PSRAM buffers let the
     // driver acquire the next JPEG while the previous one is decoded.

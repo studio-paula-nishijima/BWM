@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "stage2b_config.h"
+
 enum class InferenceMode : uint8_t { FullFrame = 0, Tiled = 1 };
 
 // Change this one setting to compare the original baseline and tiled mode.
@@ -23,5 +25,13 @@ constexpr uint32_t kMinimumSceneIntervalMs = 500;
 
 constexpr bool tiledModeEnabled() { return kInferenceMode == InferenceMode::Tiled; }
 constexpr const char *inferenceModeName() { return tiledModeEnabled() ? "tiled" : "full_frame"; }
-constexpr uint16_t sourceFrameWidth() { return tiledModeEnabled() ? kTiledFrameWidth : kFullFrameWidth; }
-constexpr uint16_t sourceFrameHeight() { return tiledModeEnabled() ? kTiledFrameHeight : kFullFrameHeight; }
+constexpr uint16_t sourceFrameWidth()
+{
+    return motionModeEnabled() ? kMotionFrameWidth :
+        (tiledModeEnabled() ? kTiledFrameWidth : kFullFrameWidth);
+}
+constexpr uint16_t sourceFrameHeight()
+{
+    return motionModeEnabled() ? kMotionFrameHeight :
+        (tiledModeEnabled() ? kTiledFrameHeight : kFullFrameHeight);
+}
