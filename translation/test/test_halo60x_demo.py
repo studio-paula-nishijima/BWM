@@ -48,6 +48,12 @@ class Halo60xDemoTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Halo60xState(15, 2700, strobe=1)
 
+    def test_demo_timings_are_configurable(self):
+        cues = build_halo60x_demo(fade_seconds=1, hold_seconds=2,
+                                  check_fade_seconds=3, blackout_hold_seconds=4)
+        self.assertEqual((cues[0].hold_seconds, cues[1].fade_seconds, cues[1].hold_seconds), (4, 1, 2))
+        self.assertEqual(cues[11].fade_seconds, 3)
+
     def test_dmx_profile_one_maps_intensity_cct_and_strobe(self):
         self.assertEqual(state_to_dmx_channels(Halo60xState(45, 2700)), (115, 0, 0))
         self.assertEqual(state_to_dmx_channels(Halo60xState(70, 4600)), (178, 128, 0))
