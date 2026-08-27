@@ -31,6 +31,23 @@ Faster-Whisper child process and a bounded request queue.  `OracleInteractionCon
 in `src/live/interaction.py` owns a separate, single-worker retrieval executor
 and display scheduling.  It must not change Voice admission or ASR ownership.
 
+## Independent autostart and future quiescence
+
+Voice autostarts and operates according to its own configuration. It does not
+wait for Translation to become active, an `installation.activation` event,
+MQTT, UART, the person detector, or any other peer before the detector, servo
+path, capture admission, ASR, and local runtime can operate. Translation and
+Voice/Whisper are independent runtimes; peer absence or transport loss is
+isolated degradation, never an implicit local `inactive` or quiescence state.
+
+No Voice quiescence policy is implemented today. If one is added, it must
+follow an explicit semantic instruction or explicit deployment policy, never
+the absence of a message. It may block new interactions and deliberately
+stop/restart heavy ASR or retrieval resources, while normally allowing an
+already-admitted interaction to finish and preserving appropriate lightweight
+local/hardware state. Explicit reactivation must restart cleanly. Translation
+session timing does not create a separate Voice-side timer.
+
 ## Lifecycle and admission
 
 The authoritative lifecycle is:
@@ -136,8 +153,10 @@ is what calls `complete_interaction()`.
 ## Shared Voice-state messaging
 
 Voice uses the repo-wide `shared/messaging/` implementation; it does not own a
-second MQTT stack.  With `--voice-mqtt`, `VoiceStatePublisher` observes genuine
-lifecycle transitions and publishes one shared envelope per transition:
+second MQTT stack. UART Voice semantic publication is enabled by default in
+the live runner. `--voice-mqtt` additionally enables MQTT publication;
+`VoiceStatePublisher` observes genuine lifecycle transitions and builds one
+shared envelope per transition:
 
 ```text
 topic: bwm/voice/state
@@ -146,15 +165,17 @@ payload: {"state": "<VoiceState>"}
 ```
 
 The shared envelope supplies IDs, origin, timestamp, version, QoS, and
-reconnection conventions.  Same-state assignments publish nothing.  MQTT
+reconnection conventions. Same-state assignments publish nothing. MQTT
 publication failure is logged but cannot alter or corrupt the local lifecycle.
 Voice publishes semantic state only: it neither selects Translation reactions
-nor sends solenoid, GPIO, or modulation instructions.
+nor sends solenoid, GPIO, or modulation instructions. Transport selection
+controls semantic publication only; it does not control Voice lifecycle.
 
-When UART is configured, this existing authoritative lifecycle observer still
-builds one `voice.state` envelope per genuine transition and fans the same ID
-to MQTT and UART. UART transport failure is isolated degradation and cannot
-change lifecycle timing or busy admission; display completion remains release.
+When either or both transports are selected, this existing authoritative
+lifecycle observer fans the same `voice.state` envelope, including its ID,
+origin, timestamp, type, and payload, to each selected transport. UART and
+MQTT failure are isolated degradation and cannot change lifecycle timing or
+busy admission; display completion remains release.
 
 UART is enabled by default for the deployed Stage V demonstrator, but that is
 an operational default rather than a semantic dependency. The same Voice

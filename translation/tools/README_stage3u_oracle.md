@@ -16,9 +16,11 @@ and omit `--voice-mqtt` for standalone broker-free operation.
 
 ## Stage V Voice-state demonstrator
 
-Voice still starts automatically through `idle -> initializing -> listening`;
-it does not consume installation activation and has no quiescent state. The
-shared UART transport publishes the same lifecycle event by default. Use
+Voice starts automatically through `idle -> initializing -> listening`; it
+does not consume installation activation and has no implemented quiescence
+state. It remains locally operable without Translation, MQTT, UART, or the
+person detector. The shared UART transport publishes the same lifecycle event
+by default. `--voice-mqtt` additionally enables MQTT publication. Use
 `--no-voice-uart` only for an MQTT-only or standalone run; `--voice-uart`
 remains an explicit compatible spelling. Translation's shared UART ingress is
 also enabled by default and failure-isolated: an unavailable UART is logged
@@ -29,6 +31,8 @@ This default is operational convenience, not an architectural dependency:
 UART-only, MQTT-only, and MQTT-plus-UART deployments use the same semantic
 event and Translation reaction path. With both transports selected, one event
 ID is delivered redundantly and Translation reacts once after deduplication.
+Transport selection does not control Voice lifecycle, and transport loss never
+means inactive or quiescent.
 
 Use either transport independently, or both:
 

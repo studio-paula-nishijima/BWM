@@ -8,7 +8,9 @@ files:
 
 playback:
 
-  # Application state: the process remains alive when this is false.
+  # Deliberate default exhibition/test posture: boot active to demonstrate
+  # playback/hardware without a person detector or remote subsystem. False is
+  # an explicit deployment choice; application state never controls process lifecycle.
   initially_active: true
 
   enable_date_filter: true

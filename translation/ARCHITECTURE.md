@@ -10,6 +10,26 @@ never regenerates or rewrites the score. Hardware topology is loaded from
 `configs/hardware.yaml`; its six current solenoids are not an architectural
 channel-count limit.
 
+## Subsystem availability and session activation
+
+Translation and Voice/Whisper are independent runtimes. Each must be able to
+boot and perform its own local function without the other subsystem, the
+person detector, MQTT, UART, or any other remote peer being present, healthy,
+or reachable. Transport loss is isolated degradation; it never means that an
+installation session is inactive or that either process should stop operating.
+
+`playback.initially_active: true` is the deliberate default exhibition and
+test posture. On boot, Translation immediately demonstrates playback and
+hardware operation even when the person detector is unavailable. GPIO17 and
+person-detector `installation.activation` remain useful explicit controls for
+later sessions and deployment, but neither is a prerequisite for basic
+runtime operation. `initially_active: false` is an optional explicit
+deployment configuration, not the default architectural posture.
+
+`installation.activation` controls Translation session semantics where it is
+used; it does not define process availability. In particular, a missing,
+delayed, or disconnected activation transport is not an implicit `inactive`.
+
 `PlaybackSessionRuntime` keeps the process and GPIO17 listener alive while
 idle. Activation creates a new score/session; deactivation is explicit
 cancellation, not a playback pause. A session uses wall-clock lifetime
@@ -205,6 +225,17 @@ the Oracle display. Voice remains responsible for its own admission and
 lifecycle, including waiting for display completion before releasing an
 interaction. Its optional shared `voice.state` publication is semantic only;
 Translation's existing reaction path above remains Translation-owned.
+
+Voice and Translation do not gate one another's startup or normal local
+operation. A future explicit Voice quiescence instruction may change Voice
+admission or resource policy, but it must not be inferred from an absent
+message, a failed transport, Translation state, or person-detector state. Such
+future work must normally let an already-admitted interaction finish, may
+deliberately reduce heavy resources such as ASR or retrieval, preserves
+appropriate lightweight local/hardware state, and restarts cleanly on explicit
+reactivation. Translation owns installation/session timing; Voice must not add
+a separate implied ten-minute timer. This is future architectural intent, not
+implemented quiescence behaviour.
 
 The following are future multilingual retrieval alternatives, not a description
 of the current integrated `transcribe` runtime. The English River Culture corpus

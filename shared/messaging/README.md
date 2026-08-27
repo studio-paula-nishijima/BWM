@@ -4,6 +4,17 @@
 detector, and the Voice/Oracle runtime use it without importing one
 another's runtime internals.
 
+Messaging transport is not runtime lifecycle control. Translation and
+Voice/Whisper boot and operate independently of each other, the person
+detector, MQTT, UART, and remote-peer health. MQTT and UART are sibling
+transports for a transport-neutral semantic envelope: one event may fan out
+over both with the same ID, origin, timestamp, type, and payload, and a
+receiver deduplicates once at semantic ingress. The origin names the producing
+subsystem, not a transport. Transport absence or failure is isolated
+degradation; it never implies semantic `inactive`, activation, or quiescence.
+Do not derive activation or quiescence from a heartbeat or from a missing
+message.
+
 Each message is compact JSON with `version`, `id`, `type`, `origin`,
 `timestamp`, and object `payload`. IDs are UUIDs; origins name the emitting
 component (for example `person_detector`). The Stage 6 event is
@@ -32,6 +43,8 @@ local operation.
 
 The initial common namespace also reserves `bwm/system/status/<origin>` for a
 future availability/LWT convention. It does not yet impose a health protocol.
+Availability information is not an instruction to activate, deactivate, or
+quiesce another subsystem.
 
 ## Subsystem handoffs
 
