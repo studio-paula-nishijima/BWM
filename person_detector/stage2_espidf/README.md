@@ -1,5 +1,71 @@
 # BWM vision node — Stage 2 (ESP-IDF / ESP-DL)
 
+## Stage 6 BLE activation transport
+
+Activation transport is persisted independently of Wi-Fi and defaults to
+**MQTT**. The camera-confirmed edge and **Send Test Activation** both construct
+one `installation.activation` event before dispatching to the selected MQTT or
+BLE transport. Select **MQTT** or **BLE** in the local browser UI; a restart
+applies the saved selection. BLE mode leaves detector operation and the Stage
+5B local Wi-Fi/recovery UI intact, but does not start MQTT for activation.
+
+The ESP advertises as `BWM Vision` and exposes a notification-only GATT
+activation characteristic. Its exact Pi-side contract, framing, reconnection
+behaviour, and diagnostic client usage are in
+[`../BLE_ACTIVATION_CONTRACT.md`](../BLE_ACTIVATION_CONTRACT.md).
+
+### Windows hardware build folder
+
+On the BWM Windows development workstation, always build and flash the physical
+vision node from the stable folder:
+
+```text
+BWM-review/person_detector/stage2_espidf
+```
+
+Task worktrees remain the implementation and Git publishing source, but their
+finished vision-node files must be mirrored into this stable folder before a
+hardware build is handed back. This keeps the VS Code ESP-IDF project and its
+deployment-local `mqtt_config.h` in one consistent location.
+
+Maintainers must also synchronize the ignored generated `sdkconfig` whenever
+`sdkconfig.defaults` gains required options. `idf.py fullclean` deliberately
+preserves `sdkconfig`, so it cannot enable a newly introduced subsystem such as
+NimBLE by itself. The normal hardware build commands remain unchanged once the
+stable folder has been synchronized.
+
+### MQTT deployment preflight
+
+`mqtt_config.h` is deliberately Git-ignored because its broker address is
+deployment-local. Before building from **any** checkout or copied ESP-IDF
+project, ensure this file exists beside this project's `CMakeLists.txt`:
+
+```cpp
+#pragma once
+#define BWM_MQTT_BROKER_URI "mqtt://bwm-translation.local:1883"
+#define BWM_MQTT_TOPIC_BASE "bwm"
+```
+
+From the exact directory that will be flashed, check it and force a clean build
+after creating or changing the local file:
+
+```powershell
+Get-Content .\mqtt_config.h
+idf.py fullclean
+idf.py build flash monitor
+```
+
+The firmware deliberately fails compilation if this local file is missing;
+it must never silently flash with MQTT disabled. In MQTT mode, a correct boot
+must report `MQTT starting broker=mqtt://bwm-translation.local:1883` and then
+`MQTT connected` with the same broker. The preview and `/status` diagnostics
+also show the configured broker. On the Pi, inspect the
+released topic with:
+
+```bash
+mosquitto_sub -h localhost -t 'bwm/installation/activation' -v
+```
+
 This is a separate Stage 2 project. It does not replace the verified Arduino /
 PlatformIO Stage 1 camera and browser-preview baseline in the parent folder.
 
@@ -326,10 +392,10 @@ hardware-quiescent idle.
 For the physical test, the Pi and ESP must use the same reachable broker. The
 Pi's checked-in `configs/mqtt.yaml` uses a broker on the Pi itself
 (`localhost:1883`), so the ESP deployment-local `mqtt_config.h` should use
-the Pi's LAN address, for example:
+the Pi's unique mDNS hostname, for example:
 
 ```cpp
-#define BWM_MQTT_BROKER_URI "mqtt://192.168.1.50:1883"
+#define BWM_MQTT_BROKER_URI "mqtt://bwm-translation.local:1883"
 #define BWM_MQTT_TOPIC_BASE "bwm"
 ```
 
@@ -427,7 +493,9 @@ Venue limitations remain: the ESP32-S3 supports 2.4 GHz Wi-Fi, not 5 GHz-only
 networks; this page supports open and ordinary personal-password networks, not
 enterprise/802.1X credentials or captive-portal acceptance. The configured
 MQTT broker must be reachable from the venue WLAN. Client isolation, firewalls,
-separate VLANs, or a changed Pi address can still prevent MQTT even when Wi-Fi
-association succeeds. Credentials are protected over the WPA2 setup AP but are
+separate VLANs, or blocked mDNS can still prevent MQTT even when Wi-Fi
+association succeeds. Give the broker Pi a unique hostname and keep
+`avahi-daemon` active; using `.local` then tolerates DHCP address changes.
+Credentials are protected over the WPA2 setup AP but are
 plain NVS strings unless flash encryption/NVS encryption is enabled for the
 deployed device.

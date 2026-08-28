@@ -8,7 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "motion_detector.h"
-#include "mqtt_activation_publisher.h"
+#include "activation_transport.h"
 #include "person_detector.h"
 #include "preview_server.h"
 #include "stage2a_config.h"
@@ -181,7 +181,7 @@ extern "C" void app_main(void)
 
     RecentHits<kRecentScanWindow> recent_person;
     RecentHits<kMotionConfirmationWindow> recent_motion;
-    MqttActivationPublisher mqtt_activation;
+    ActivationTransport activation_transport;
     WifiProvisioningManager wifi;
     if (!wifi.begin()) {
         ESP_LOGE(kTag, "Wi-Fi provisioning setup failed; detection continues locally");
@@ -189,8 +189,8 @@ extern "C" void app_main(void)
     PreviewServer preview;
     // The browser remains available on the station or temporary setup AP.
     // MQTT shares the station connection and retains its existing semantics.
-    preview.begin(trigger_zone, mqtt_activation, wifi);
-    mqtt_activation.begin();
+    preview.begin(trigger_zone, activation_transport, wifi);
+    activation_transport.begin();
     logMemory("after camera/detector/preview");
     uint64_t total_scans = 0;
     int64_t previous_scan_started_us = 0;
@@ -230,7 +230,7 @@ extern "C" void app_main(void)
                     detection.confirmation_reason = MotionConfirmationReason::RejectedNoise;
                 }
                 preview.publishMotionDetection(detection);
-                mqtt_activation.publishStateIfChanged(detection.confirmed);
+                activation_transport.publishStateIfChanged(detection.confirmed);
                 const uint32_t scene_ms = static_cast<uint32_t>((esp_timer_get_time() - scan_started_us) / 1000);
                 logMotionScan(detection, total_scans, scene_ms, period_ms);
                 if (detection.confirmed && !previous_motion_confirmation) {
@@ -245,7 +245,7 @@ extern "C" void app_main(void)
                 camera.release(frame);
                 preview.publishPersonDetection(detection);
                 recent_person.add(detection.person);
-                mqtt_activation.publishStateIfChanged(detection.person);
+                activation_transport.publishStateIfChanged(detection.person);
                 const uint32_t scene_ms = static_cast<uint32_t>((esp_timer_get_time() - scan_started_us) / 1000);
                 logPersonScan(detection, total_scans, recent_person, scene_ms, period_ms);
             }

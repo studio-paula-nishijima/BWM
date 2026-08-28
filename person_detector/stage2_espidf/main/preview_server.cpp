@@ -11,8 +11,10 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "stage2b_config.h"
 
 class PreviewServer::Impl {
@@ -23,7 +25,7 @@ public:
     PersonDetection person_detection;
     MotionDetection motion_detection;
     TriggerZoneConfig *trigger_zone = nullptr;
-    MqttActivationPublisher *activation_publisher = nullptr;
+    ActivationTransport *activation_transport = nullptr;
     WifiProvisioningManager *wifi = nullptr;
     httpd_handle_t server = nullptr;
 };
@@ -41,13 +43,13 @@ body{font:16px system-ui;margin:1.5rem;background:#111;color:#eee;max-width:56re
 </style></head><body><h1>BWM vision node — rectangle calibration</h1>
 <p>Orange: trigger zone. Cyan: accepted motion. Purple dashed: rejected likely shadow.</p>
 <div id="view"><img id="camera" src="/capture" alt="Live camera preview"><div id="zone" class="overlay zone"><i class="handle nw" data-handle="nw"></i><i class="handle ne" data-handle="ne"></i><i class="handle sw" data-handle="sw"></i><i class="handle se" data-handle="se"></i></div><div id="overlays"></div></div>
-<section class="diagnostics" aria-label="Live diagnostics"><p id="status">Waiting for a frame…</p><p id="networkStatus">Checking venue Wi-Fi and MQTT…</p><p id="mqttStatus">MQTT test trigger ready.</p></section>
+<section class="diagnostics" aria-label="Live diagnostics"><p id="status">Waiting for a frame…</p><p id="networkStatus">Checking venue Wi-Fi and transport…</p><p id="transportStatus">Activation transport loading…</p><p id="mqttStatus">Activation test trigger ready.</p></section>
 <div class="controls"><button id="edit">Edit Trigger Zone</button><button id="apply" disabled>Apply</button><button id="save" disabled>Save</button><button id="cancel" disabled>Cancel</button><button id="reset">Reset to Default</button></div>
-<p><code id="zoneValues">Loading trigger zone…</code></p><div class="controls"><button id="testActivation">Send Test Activation</button><button id="forgetWifi">Forget Wi-Fi / Change Venue</button></div>
+<p><code id="zoneValues">Loading trigger zone…</code></p><div class="controls"><button id="testActivation">Send Test Activation</button><button id="forgetWifi">Forget Wi-Fi / Change Venue</button></div><label>Activation transport <select id="transport"><option value="mqtt">MQTT</option><option value="ble">BLE</option></select></label><button id="saveTransport">Save transport and restart</button>
 <p><a href="/capture">Open one snapshot</a> · <a href="/status">Detection JSON</a></p>
 <script>
 const camera=document.getElementById('camera'),overlays=document.getElementById('overlays'),status=document.getElementById('status'),networkStatus=document.getElementById('networkStatus'),zoneBox=document.getElementById('zone'),zoneValues=document.getElementById('zoneValues');
-const editButton=document.getElementById('edit'),applyButton=document.getElementById('apply'),saveButton=document.getElementById('save'),cancelButton=document.getElementById('cancel'),resetButton=document.getElementById('reset'),testActivationButton=document.getElementById('testActivation'),forgetWifiButton=document.getElementById('forgetWifi'),mqttStatus=document.getElementById('mqttStatus'),MIN_SIZE=.05;
+const editButton=document.getElementById('edit'),applyButton=document.getElementById('apply'),saveButton=document.getElementById('save'),cancelButton=document.getElementById('cancel'),resetButton=document.getElementById('reset'),testActivationButton=document.getElementById('testActivation'),forgetWifiButton=document.getElementById('forgetWifi'),mqttStatus=document.getElementById('mqttStatus'),transportStatus=document.getElementById('transportStatus'),transportSelect=document.getElementById('transport'),saveTransportButton=document.getElementById('saveTransport'),MIN_SIZE=.05;
 let serverZone={x:.2,y:.2,w:.6,h:.6},editZone={...serverZone},preEditZone={...serverZone},editing=false,drag=null,framePending=false,statusPending=false;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function renderZone(z){zoneBox.style.left=(z.x*100)+'%';zoneBox.style.top=(z.y*100)+'%';zoneBox.style.width=(z.w*100)+'%';zoneBox.style.height=(z.h*100)+'%';zoneValues.textContent='x='+z.x.toFixed(3)+' y='+z.y.toFixed(3)+' w='+z.w.toFixed(3)+' h='+z.h.toFixed(3)}
@@ -63,13 +65,14 @@ cancelButton.onclick=async()=>{try{const data=await api('/api/config/trigger-zon
 resetButton.onclick=async()=>{try{const data=await api('/api/config/trigger-zone/reset');serverZone={...data.trigger_zone};editZone={...serverZone};renderZone(editing?editZone:serverZone)}catch(error){status.textContent='Reset failed: '+error.message}};
 testActivationButton.onclick=async()=>{testActivationButton.disabled=true;mqttStatus.textContent='Sending test activation…';try{const data=await api('/api/test/activation');mqttStatus.textContent='Test activation queued · event '+data.event_id}catch(error){mqttStatus.textContent='Test activation failed: '+error.message}finally{testActivationButton.disabled=false}};
 forgetWifiButton.onclick=async()=>{if(!confirm('Forget the saved Wi-Fi network and restart in setup mode?'))return;forgetWifiButton.disabled=true;mqttStatus.textContent='Clearing Wi-Fi credentials…';try{const response=await fetch('/api/wifi/forget',{method:'POST'});const data=await response.json();if(!response.ok)throw new Error(data.error||'request failed');mqttStatus.textContent=data.message}catch(error){mqttStatus.textContent='Could not clear Wi-Fi: '+error.message;forgetWifiButton.disabled=false}};
+saveTransportButton.onclick=async()=>{saveTransportButton.disabled=true;transportStatus.textContent='Saving transport…';try{const response=await fetch('/api/config/activation-transport',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transport:transportSelect.value})});const data=await response.json();if(!response.ok)throw new Error(data.error||'request failed');transportStatus.textContent='Restarting with '+data.transport.toUpperCase()+'…'}catch(error){transportStatus.textContent='Transport save failed: '+error.message;saveTransportButton.disabled=false}};
 zoneBox.addEventListener('pointerdown',event=>{if(!editing)return;event.preventDefault();zoneBox.setPointerCapture(event.pointerId);drag={handle:event.target.dataset.handle||'move',x:event.clientX,y:event.clientY,zone:{...editZone}}});
 zoneBox.addEventListener('pointermove',event=>{if(!drag)return;const image=camera.getBoundingClientRect();if(!image.width||!image.height)return;const dx=(event.clientX-drag.x)/image.width,dy=(event.clientY-drag.y)/image.height,s=drag.zone;let left=s.x,top=s.y,right=s.x+s.w,bottom=s.y+s.h;if(drag.handle==='move'){left=clamp(s.x+dx,0,1-s.w);top=clamp(s.y+dy,0,1-s.h);right=left+s.w;bottom=top+s.h}else{if(drag.handle.includes('w'))left=clamp(s.x+dx,0,right-MIN_SIZE);if(drag.handle.includes('e'))right=clamp(s.x+s.w+dx,left+MIN_SIZE,1);if(drag.handle.includes('n'))top=clamp(s.y+dy,0,bottom-MIN_SIZE);if(drag.handle.includes('s'))bottom=clamp(s.y+s.h+dy,top+MIN_SIZE,1)}editZone={x:left,y:top,w:right-left,h:bottom-top};renderZone(editZone)});
 zoneBox.addEventListener('pointerup',()=>drag=null);zoneBox.addEventListener('pointercancel',()=>drag=null);
 function refreshFrame(){if(framePending)return;framePending=true;camera.onload=()=>framePending=false;camera.onerror=()=>framePending=false;camera.src='/capture?t='+Date.now()}
-async function refreshStatus(){if(statusPending)return;statusPending=true;try{const response=await fetch('/status?t='+Date.now());if(!response.ok)throw new Error();const d=await response.json();overlays.replaceChildren();if(d.mode==='motion'){if(!editing&&d.zone){serverZone={...d.zone};editZone={...serverZone};renderZone(serverZone)}for(const b of d.boxes){rect('motion',b.x,b.y,b.w,b.h);point(b.cx,b.cy)}for(const b of(d.rejected_boxes||[]))rect('shadow',b.x,b.y,b.w,b.h);status.textContent='MOTION '+(d.motion?'yes':'no')+' · changed '+(d.changed_fraction*100).toFixed(2)+'% · in-zone '+(d.in_zone_hit?'yes':'no')+' · confirmed '+(d.confirmed?'YES':'no')+' · '+d.reason}else{if(d.person)rect('person',d.x,d.y,d.w,d.h);status.textContent=(d.person?'PERSON':'no person')+' · confidence '+d.confidence.toFixed(3)+' · inference '+d.inference_ms+' ms'}if(d.network){if(d.network.mode==='recovery'){const next=d.network.retry_seconds?(' · next retry in about '+d.network.retry_seconds+'s'):'';networkStatus.textContent='RECOVERY · venue Wi-Fi disconnected · MQTT unavailable · automatic retry every 5 minutes'+next}else if(d.network.mode==='normal'){networkStatus.textContent='Venue Wi-Fi connected · MQTT '+(d.network.mqtt_connected?'connected':'reconnecting')}else{networkStatus.textContent='Wi-Fi '+d.network.mode+' · MQTT '+(d.network.mqtt_connected?'connected':'unavailable')}}}catch(error){status.textContent='Waiting for detector…';networkStatus.textContent='Waiting for network diagnostics…'}finally{statusPending=false}}
-function refresh(){refreshFrame();refreshStatus()}
-loadZone().catch(error=>status.textContent='Config load failed: '+error.message);refresh();setInterval(refresh,1000);
+async function refreshStatus(){if(statusPending)return;statusPending=true;try{const response=await fetch('/status?t='+Date.now());if(!response.ok)throw new Error();const d=await response.json();overlays.replaceChildren();if(d.mode==='motion'){if(!editing&&d.zone){serverZone={...d.zone};editZone={...serverZone};renderZone(serverZone)}for(const b of d.boxes){rect('motion',b.x,b.y,b.w,b.h);point(b.cx,b.cy)}for(const b of(d.rejected_boxes||[]))rect('shadow',b.x,b.y,b.w,b.h);status.textContent='MOTION '+(d.motion?'yes':'no')+' · changed '+(d.changed_fraction*100).toFixed(2)+'% · in-zone '+(d.in_zone_hit?'yes':'no')+' · confirmed '+(d.confirmed?'YES':'no')+' · '+d.reason}else{if(d.person)rect('person',d.x,d.y,d.w,d.h);status.textContent=(d.person?'PERSON':'no person')+' · confidence '+d.confidence.toFixed(3)+' · inference '+d.inference_ms+' ms'}if(d.network){const broker=d.network.mqtt_broker||'not configured';if(d.network.mode==='recovery'){const next=d.network.retry_seconds?(' · next retry in about '+d.network.retry_seconds+'s'):'';networkStatus.textContent='RECOVERY · venue Wi-Fi disconnected · MQTT unavailable · broker '+broker+' · automatic retry every 5 minutes'+next}else if(d.network.mode==='normal'){networkStatus.textContent='Venue Wi-Fi connected · MQTT '+(d.network.mqtt_connected?'connected':'reconnecting')+' · broker '+broker}else{networkStatus.textContent='Wi-Fi '+d.network.mode+' · MQTT '+(d.network.mqtt_connected?'connected':'unavailable')+' · broker '+broker}}if(d.transport){transportStatus.textContent='Transport: '+d.transport.selected.toUpperCase()+' · BLE '+(d.transport.ble_connected?'connected':d.transport.ble_advertising?'advertising':'idle')+' · '+d.transport.last_result}}catch(error){status.textContent='Waiting for detector…';networkStatus.textContent='Waiting for network diagnostics…'}finally{statusPending=false}}
+async function loadTransport(){const response=await fetch('/api/config/activation-transport');const data=await response.json();transportSelect.value=data.transport;transportStatus.textContent='Transport: '+data.transport.toUpperCase()}function refresh(){refreshFrame();refreshStatus()}
+loadZone().catch(error=>status.textContent='Config load failed: '+error.message);loadTransport().catch(error=>transportStatus.textContent='Transport config unavailable');refresh();setInterval(refresh,1000);
 </script></body></html>)HTML";
 
 const char kProvisioningHtml[] = R"HTML(<!doctype html>
@@ -193,13 +196,13 @@ esp_err_t resetZoneHandler(httpd_req_t *request)
 
 esp_err_t testActivationHandler(httpd_req_t *request)
 {
-    if (gPreview == nullptr || gPreview->activation_publisher == nullptr) {
+    if (gPreview == nullptr || gPreview->activation_transport == nullptr) {
         return sendApiError(request, "503 Service Unavailable", "activation publisher unavailable");
     }
     char event_id[37] = {};
-    if (!gPreview->activation_publisher->publishManualActivation(event_id, sizeof(event_id))) {
+    if (!gPreview->activation_transport->publishManualActivation(event_id, sizeof(event_id))) {
         return sendApiError(request, "503 Service Unavailable",
-                            "MQTT activation was not queued; check serial log");
+                            "activation was not delivered; check transport diagnostics");
     }
     char json[128];
     std::snprintf(json, sizeof(json),
@@ -208,6 +211,53 @@ esp_err_t testActivationHandler(httpd_req_t *request)
     httpd_resp_set_type(request, "application/json");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
     return httpd_resp_sendstr(request, json);
+}
+
+void restartAfterTransportChange(void *)
+{
+    vTaskDelay(pdMS_TO_TICKS(1200));
+    esp_restart();
+}
+
+bool readTransportMode(httpd_req_t *request, ActivationTransportMode &mode)
+{
+    if (request->content_len <= 0 || request->content_len > 64) return false;
+    char body[65] = {};
+    const int received = httpd_req_recv(request, body, request->content_len);
+    if (received != request->content_len) return false;
+    cJSON *root = cJSON_ParseWithLength(body, received);
+    if (root == nullptr) return false;
+    const cJSON *value = cJSON_GetObjectItemCaseSensitive(root, "transport");
+    const bool valid = cJSON_IsString(value) &&
+        (std::strcmp(value->valuestring, "mqtt") == 0 || std::strcmp(value->valuestring, "ble") == 0);
+    if (valid) mode = std::strcmp(value->valuestring, "ble") == 0 ?
+        ActivationTransportMode::Ble : ActivationTransportMode::Mqtt;
+    cJSON_Delete(root);
+    return valid;
+}
+
+esp_err_t transportConfigHandler(httpd_req_t *request)
+{
+    if (gPreview == nullptr || gPreview->activation_transport == nullptr) return httpd_resp_send_404(request);
+    if (request->method == HTTP_GET) {
+        char json[32];
+        std::snprintf(json, sizeof(json), "{\"transport\":\"%s\"}",
+                      gPreview->activation_transport->modeName());
+        httpd_resp_set_type(request, "application/json");
+        return httpd_resp_sendstr(request, json);
+    }
+    ActivationTransportMode mode;
+    if (!readTransportMode(request, mode)) return sendApiError(request, "400 Bad Request", "transport must be mqtt or ble");
+    if (!gPreview->activation_transport->selectMode(mode)) {
+        return sendApiError(request, "500 Internal Server Error", "could not save transport selection");
+    }
+    char json[64];
+    std::snprintf(json, sizeof(json), "{\"transport\":\"%s\",\"restarting\":true}",
+                  gPreview->activation_transport->modeName());
+    httpd_resp_set_type(request, "application/json");
+    const esp_err_t result = httpd_resp_sendstr(request, json);
+    xTaskCreate(restartAfterTransportChange, "transport_restart", 2048, nullptr, 4, nullptr);
+    return result;
 }
 
 bool readWifiCredentials(httpd_req_t *request, char *ssid, size_t ssid_size,
@@ -349,7 +399,13 @@ esp_err_t statusHandler(httpd_req_t *request)
         kDefaultMotionTriggerZone : impl->trigger_zone->current();
     const char *network_mode = impl->wifi == nullptr ? "unavailable" : impl->wifi->operatingModeName();
     const bool wifi_connected = impl->wifi != nullptr && impl->wifi->connected();
-    const bool mqtt_connected = impl->activation_publisher != nullptr && impl->activation_publisher->connected();
+    const bool mqtt_connected = impl->activation_transport != nullptr && impl->activation_transport->mqttConnected();
+    const char *mqtt_broker = impl->activation_transport == nullptr ? "" : impl->activation_transport->mqttBrokerUri();
+    const char *transport = impl->activation_transport == nullptr ? "unavailable" : impl->activation_transport->modeName();
+    const bool ble_advertising = impl->activation_transport != nullptr && impl->activation_transport->bleAdvertising();
+    const bool ble_connected = impl->activation_transport != nullptr && impl->activation_transport->bleConnected();
+    const char *last_event_id = impl->activation_transport == nullptr ? "" : impl->activation_transport->lastEventId();
+    const char *last_result = impl->activation_transport == nullptr ? "unavailable" : impl->activation_transport->lastResult();
     const uint32_t retry_seconds = impl->wifi == nullptr ? 0 : impl->wifi->recoveryRetrySeconds();
 
     char json[4096];
@@ -401,10 +457,12 @@ esp_err_t statusHandler(httpd_req_t *request)
     }
     complete = complete && appendJson(
         json, sizeof(json), used,
-        ",\"network\":{\"mode\":\"%s\",\"wifi_connected\":%s,\"mqtt_connected\":%s,"
-        "\"retry_seconds\":%u,\"retry_cadence_seconds\":300}}",
-        network_mode, wifi_connected ? "true" : "false", mqtt_connected ? "true" : "false",
-        static_cast<unsigned>(retry_seconds));
+        ",\"network\":{\"mode\":\"%s\",\"wifi_connected\":%s,\"mqtt_connected\":%s,\"mqtt_broker\":\"%s\","
+        "\"retry_seconds\":%u,\"retry_cadence_seconds\":300},\"transport\":{\"selected\":\"%s\","
+        "\"ble_advertising\":%s,\"ble_connected\":%s,\"last_event_id\":\"%s\",\"last_result\":\"%s\"}}",
+        network_mode, wifi_connected ? "true" : "false", mqtt_connected ? "true" : "false", mqtt_broker,
+        static_cast<unsigned>(retry_seconds), transport, ble_advertising ? "true" : "false",
+        ble_connected ? "true" : "false", last_event_id, last_result);
     if (!complete) return sendApiError(request, "500 Internal Server Error", "status JSON overflow");
     httpd_resp_set_type(request, "application/json");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
@@ -413,7 +471,7 @@ esp_err_t statusHandler(httpd_req_t *request)
 }  // namespace
 
 bool PreviewServer::begin(TriggerZoneConfig &trigger_zone,
-                          MqttActivationPublisher &activation_publisher,
+                          ActivationTransport &activation_transport,
                           WifiProvisioningManager &wifi)
 {
     impl_ = new (std::nothrow) Impl();
@@ -421,7 +479,7 @@ bool PreviewServer::begin(TriggerZoneConfig &trigger_zone,
     impl_->frame = static_cast<uint8_t *>(heap_caps_malloc(kPreviewCapacity, MALLOC_CAP_SPIRAM));
     impl_->mutex = xSemaphoreCreateMutex();
     impl_->trigger_zone = &trigger_zone;
-    impl_->activation_publisher = &activation_publisher;
+    impl_->activation_transport = &activation_transport;
     impl_->wifi = &wifi;
     if (impl_->frame == nullptr || impl_->mutex == nullptr) {
         ESP_LOGE(kTag, "could not allocate preview resources");
@@ -432,7 +490,7 @@ bool PreviewServer::begin(TriggerZoneConfig &trigger_zone,
 
     httpd_config_t server_config = HTTPD_DEFAULT_CONFIG();
     server_config.stack_size = 8192;
-    server_config.max_uri_handlers = 13;
+    server_config.max_uri_handlers = 15;
     server_config.max_open_sockets = 4;
     server_config.lru_purge_enable = true;
     if (httpd_start(&impl_->server, &server_config) != ESP_OK) return false;
@@ -444,6 +502,8 @@ bool PreviewServer::begin(TriggerZoneConfig &trigger_zone,
     const httpd_uri_t save_zone = {.uri = "/api/config/trigger-zone/save", .method = HTTP_POST, .handler = saveZoneHandler, .user_ctx = nullptr};
     const httpd_uri_t reset_zone = {.uri = "/api/config/trigger-zone/reset", .method = HTTP_POST, .handler = resetZoneHandler, .user_ctx = nullptr};
     const httpd_uri_t test_activation = {.uri = "/api/test/activation", .method = HTTP_POST, .handler = testActivationHandler, .user_ctx = nullptr};
+    const httpd_uri_t transport_get = {.uri = "/api/config/activation-transport", .method = HTTP_GET, .handler = transportConfigHandler, .user_ctx = nullptr};
+    const httpd_uri_t transport_post = {.uri = "/api/config/activation-transport", .method = HTTP_POST, .handler = transportConfigHandler, .user_ctx = nullptr};
     const httpd_uri_t wifi_scan = {.uri = "/api/wifi/scan", .method = HTTP_GET, .handler = wifiScanHandler, .user_ctx = nullptr};
     const httpd_uri_t wifi_configure = {.uri = "/api/wifi/configure", .method = HTTP_POST, .handler = wifiConfigureHandler, .user_ctx = nullptr};
     const httpd_uri_t wifi_forget = {.uri = "/api/wifi/forget", .method = HTTP_POST, .handler = wifiForgetHandler, .user_ctx = nullptr};
@@ -455,6 +515,8 @@ bool PreviewServer::begin(TriggerZoneConfig &trigger_zone,
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &save_zone));
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &reset_zone));
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &test_activation));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &transport_get));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &transport_post));
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &wifi_scan));
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &wifi_configure));
     ESP_ERROR_CHECK(httpd_register_uri_handler(impl_->server, &wifi_forget));

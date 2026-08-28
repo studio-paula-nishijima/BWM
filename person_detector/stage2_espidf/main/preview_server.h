@@ -2,7 +2,7 @@
 
 #include "esp_camera.h"
 #include "motion_detector.h"
-#include "mqtt_activation_publisher.h"
+#include "activation_transport.h"
 #include "person_detector.h"
 #include "trigger_zone_config.h"
 #include "wifi_provisioning.h"
@@ -13,7 +13,7 @@ class PreviewServer {
 public:
     class Impl;
 
-    bool begin(TriggerZoneConfig &trigger_zone, MqttActivationPublisher &activation_publisher,
+    bool begin(TriggerZoneConfig &trigger_zone, ActivationTransport &activation_transport,
                WifiProvisioningManager &wifi);
     void publishFrame(const camera_fb_t &frame);
     void publishPersonDetection(const PersonDetection &detection);

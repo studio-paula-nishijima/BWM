@@ -1,5 +1,6 @@
 // Deployment-local MQTT settings. Copy to mqtt_config.h; it is intentionally
-// ignored by Git. Empty URI leaves all existing detector behaviour unchanged.
+// ignored by Git. Prefer a unique mDNS hostname so DHCP address changes do not
+// require a firmware rebuild. Empty URI leaves MQTT disabled.
 #pragma once
-#define BWM_MQTT_BROKER_URI ""
+#define BWM_MQTT_BROKER_URI "mqtt://bwm-translation.local:1883"
 #define BWM_MQTT_TOPIC_BASE "bwm"
