@@ -11,6 +11,7 @@
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -26,10 +27,16 @@ public:
     bool wifi_started = false;
     std::atomic_bool connected{false};
     std::atomic_bool provisioning{false};
+    std::atomic_bool recovering{false};
     std::atomic_bool provisioning_attempt{false};
     std::atomic_bool reconnect_scheduled{false};
+    std::atomic_bool recovery_task_started{false};
+    std::atomic_bool ap_stop_scheduled{false};
     std::atomic_bool restart_scheduled{false};
     std::atomic_uint retry_count{0};
+    std::atomic_uint recovery_generation{0};
+    std::atomic_llong next_recovery_retry_us{0};
+    TaskHandle_t recovery_task = nullptr;
     char saved_ssid[33] = {};
     char saved_password[65] = {};
     char setup_ap_ssid[33] = {};
@@ -46,6 +53,7 @@ constexpr EventBits_t kFailedBit = BIT1;
 constexpr unsigned kMaximumConnectionAttempts = 5;
 constexpr TickType_t kReconnectDelay = pdMS_TO_TICKS(3000);
 constexpr TickType_t kConnectionTimeout = pdMS_TO_TICKS(25000);
+constexpr TickType_t kRecoveryRetryDelay = pdMS_TO_TICKS(5 * 60 * 1000);
 
 void copyText(char *destination, size_t capacity, const char *source)
 {
@@ -128,6 +136,10 @@ bool startProvisioningMode(WifiProvisioningManager::Impl &impl)
 {
     impl.connected.store(false);
     impl.provisioning.store(true);
+    impl.recovering.store(false);
+    impl.recovery_generation.fetch_add(1);
+    impl.next_recovery_retry_us.store(0);
+    if (impl.recovery_task != nullptr) xTaskNotifyGive(impl.recovery_task);
     impl.provisioning_attempt.store(false);
     impl.retry_count.store(0);
     xEventGroupClearBits(impl.events, kConnectedBit);
@@ -147,6 +159,101 @@ bool startProvisioningMode(WifiProvisioningManager::Impl &impl)
              "setup mode active: join SSID=%s password=%s then open http://192.168.4.1/",
              impl.setup_ap_ssid, kSetupPassword);
     return true;
+}
+
+void recoveryRetryTask(void *argument)
+{
+    auto *impl = static_cast<WifiProvisioningManager::Impl *>(argument);
+    for (;;) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        while (impl->recovering.load()) {
+            const unsigned generation = impl->recovery_generation.load();
+            impl->next_recovery_retry_us.store(
+                esp_timer_get_time() + static_cast<int64_t>(5 * 60 * 1000000LL));
+            ESP_LOGI(kTag, "saved network retry scheduled in 5 minutes");
+            if (ulTaskNotifyTake(pdTRUE, kRecoveryRetryDelay) != 0) continue;
+
+            if (!impl->recovering.load() || generation != impl->recovery_generation.load()) continue;
+            impl->next_recovery_retry_us.store(0);
+            ESP_LOGI(kTag, "recovery retry: attempting saved SSID=%s", impl->saved_ssid);
+            const esp_err_t result = esp_wifi_connect();
+            if (result != ESP_OK) {
+                ESP_LOGW(kTag, "recovery connection request failed: %s", esp_err_to_name(result));
+            }
+        }
+        impl->next_recovery_retry_us.store(0);
+    }
+}
+
+bool ensureRecoveryTask(WifiProvisioningManager::Impl &impl)
+{
+    if (impl.recovery_task_started.exchange(true)) return true;
+    if (xTaskCreate(recoveryRetryTask, "wifi_recovery", 3072, &impl, 4,
+                    &impl.recovery_task) != pdPASS) {
+        impl.recovery_task_started.store(false);
+        ESP_LOGE(kTag, "could not start saved-network recovery task");
+        return false;
+    }
+    return true;
+}
+
+bool startRecoveryMode(WifiProvisioningManager::Impl &impl)
+{
+    if (impl.recovering.load()) return true;
+    impl.connected.store(false);
+    impl.provisioning.store(false);
+    impl.provisioning_attempt.store(false);
+    impl.recovering.store(true);
+    impl.retry_count.store(0);
+    impl.recovery_generation.fetch_add(1);
+    impl.next_recovery_retry_us.store(0);
+    xEventGroupClearBits(impl.events, kConnectedBit);
+
+    wifi_config_t station_config = stationConfig(impl.saved_ssid, impl.saved_password);
+    wifi_config_t ap_config = setupApConfig(impl.setup_ap_ssid);
+    esp_err_t result = esp_wifi_set_mode(WIFI_MODE_APSTA);
+    if (result == ESP_OK) result = esp_wifi_set_config(WIFI_IF_STA, &station_config);
+    if (result == ESP_OK) result = esp_wifi_set_config(WIFI_IF_AP, &ap_config);
+    if (result == ESP_OK && !impl.wifi_started) {
+        result = esp_wifi_start();
+        if (result == ESP_OK) impl.wifi_started = true;
+    }
+    if (result == ESP_OK) result = esp_wifi_set_ps(WIFI_PS_NONE);
+    if (result != ESP_OK) {
+        impl.recovering.store(false);
+        ESP_LOGE(kTag, "could not start recovery AP: %s", esp_err_to_name(result));
+        return false;
+    }
+
+    if (!ensureRecoveryTask(impl)) return false;
+    xTaskNotifyGive(impl.recovery_task);
+    ESP_LOGW(kTag,
+             "recovery mode active: saved SSID=%s unavailable; join SSID=%s password=%s and open http://192.168.4.1/",
+             impl.saved_ssid, impl.setup_ap_ssid, kSetupPassword);
+    return true;
+}
+
+void stopRecoveryApTask(void *argument)
+{
+    auto *impl = static_cast<WifiProvisioningManager::Impl *>(argument);
+    const esp_err_t result = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (result == ESP_OK) {
+        ESP_LOGI(kTag, "saved network recovered; temporary recovery AP stopped");
+    } else {
+        ESP_LOGW(kTag, "saved network recovered but recovery AP stop failed: %s",
+                 esp_err_to_name(result));
+    }
+    impl->ap_stop_scheduled.store(false);
+    vTaskDelete(nullptr);
+}
+
+void scheduleRecoveryApStop(WifiProvisioningManager::Impl &impl)
+{
+    if (impl.ap_stop_scheduled.exchange(true)) return;
+    if (xTaskCreate(stopRecoveryApTask, "wifi_ap_stop", 2048, &impl, 4, nullptr) != pdPASS) {
+        impl.ap_stop_scheduled.store(false);
+        ESP_LOGW(kTag, "could not schedule recovery AP shutdown");
+    }
 }
 
 void restartTask(void *)
@@ -170,14 +277,15 @@ void reconnectTask(void *argument)
     auto *impl = static_cast<WifiProvisioningManager::Impl *>(argument);
     vTaskDelay(kReconnectDelay);
     impl->reconnect_scheduled.store(false);
-    if (impl->connected.load() || (impl->provisioning.load() && !impl->provisioning_attempt.load())) {
+    if (impl->connected.load() || impl->recovering.load() ||
+        (impl->provisioning.load() && !impl->provisioning_attempt.load())) {
         vTaskDelete(nullptr);
         return;
     }
 
     if (impl->retry_count.load() >= kMaximumConnectionAttempts) {
         xEventGroupSetBits(impl->events, kFailedBit);
-        if (!impl->provisioning_attempt.load()) startProvisioningMode(*impl);
+        if (!impl->provisioning_attempt.load()) startRecoveryMode(*impl);
         vTaskDelete(nullptr);
         return;
     }
@@ -212,6 +320,12 @@ void wifiEventHandler(void *argument, esp_event_base_t event_base, int32_t event
         xEventGroupClearBits(impl.events, kFailedBit);
         xEventGroupSetBits(impl.events, kConnectedBit);
         ESP_LOGI(kTag, "station connected ip=" IPSTR, IP2STR(&event->ip_info.ip));
+        if (impl.recovering.exchange(false)) {
+            impl.recovery_generation.fetch_add(1);
+            impl.next_recovery_retry_us.store(0);
+            if (impl.recovery_task != nullptr) xTaskNotifyGive(impl.recovery_task);
+            scheduleRecoveryApStop(impl);
+        }
         return;
     }
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -219,7 +333,11 @@ void wifiEventHandler(void *argument, esp_event_base_t event_base, int32_t event
         impl.connected.store(false);
         xEventGroupClearBits(impl.events, kConnectedBit);
         ESP_LOGW(kTag, "station disconnected reason=%u", static_cast<unsigned>(event->reason));
-        if (!impl.provisioning.load() || impl.provisioning_attempt.load()) scheduleReconnect(impl);
+        if (impl.recovering.load()) {
+            ESP_LOGI(kTag, "saved-network retry will remain on the 5-minute recovery cadence");
+        } else if (!impl.provisioning.load() || impl.provisioning_attempt.load()) {
+            scheduleReconnect(impl);
+        }
     }
 }
 }  // namespace
@@ -278,13 +396,13 @@ bool WifiProvisioningManager::begin()
     impl_->wifi_started = true;
     if (esp_wifi_set_ps(WIFI_PS_NONE) != ESP_OK) return false;
     impl_->retry_count.store(1);
-    if (esp_wifi_connect() != ESP_OK) return startProvisioningMode(*impl_);
+    if (esp_wifi_connect() != ESP_OK) return startRecoveryMode(*impl_);
 
     const EventBits_t bits = xEventGroupWaitBits(
         impl_->events, kConnectedBit | kFailedBit, pdFALSE, pdFALSE, kConnectionTimeout);
     if ((bits & kConnectedBit) != 0) return true;
-    ESP_LOGW(kTag, "saved network unavailable after bounded retries; entering setup mode");
-    return startProvisioningMode(*impl_);
+    ESP_LOGW(kTag, "saved network unavailable after bounded retries; entering recovery mode");
+    return startRecoveryMode(*impl_);
 }
 
 bool WifiProvisioningManager::connected() const
@@ -297,6 +415,11 @@ bool WifiProvisioningManager::provisioning() const
     return impl_ != nullptr && impl_->provisioning.load();
 }
 
+bool WifiProvisioningManager::recovering() const
+{
+    return impl_ != nullptr && impl_->recovering.load();
+}
+
 bool WifiProvisioningManager::hasSavedCredentials() const
 {
     return impl_ != nullptr && impl_->saved_ssid[0] != '\0';
@@ -305,6 +428,22 @@ bool WifiProvisioningManager::hasSavedCredentials() const
 const char *WifiProvisioningManager::setupApSsid() const
 {
     return impl_ == nullptr ? "BWM-Vision" : impl_->setup_ap_ssid;
+}
+
+const char *WifiProvisioningManager::operatingModeName() const
+{
+    if (impl_ == nullptr) return "unavailable";
+    if (impl_->provisioning.load()) return "provisioning";
+    if (impl_->recovering.load()) return "recovery";
+    return impl_->connected.load() ? "normal" : "connecting";
+}
+
+uint32_t WifiProvisioningManager::recoveryRetrySeconds() const
+{
+    if (impl_ == nullptr || !impl_->recovering.load()) return 0;
+    const int64_t remaining = impl_->next_recovery_retry_us.load() - esp_timer_get_time();
+    if (remaining <= 0) return 0;
+    return static_cast<uint32_t>((remaining + 999999) / 1000000);
 }
 
 size_t WifiProvisioningManager::scan(WifiNetworkInfo *networks, size_t capacity)

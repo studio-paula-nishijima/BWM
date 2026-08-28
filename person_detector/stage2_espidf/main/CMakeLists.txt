@@ -11,5 +11,5 @@ idf_component_register(
     INCLUDE_DIRS "."
     # `esp_camera.h` is the public header, but the registry component itself
     # is named `esp32-camera`.
-    REQUIRES esp32-camera esp-dl pedestrian_detect esp_psram esp_wifi esp_netif esp_event esp_http_server esp_hw_support esp_system nvs_flash mqtt json
+    REQUIRES esp32-camera esp-dl pedestrian_detect esp_psram esp_wifi esp_netif esp_event esp_http_server esp_hw_support esp_system esp_timer nvs_flash mqtt json
 )

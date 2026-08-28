@@ -13,6 +13,7 @@ public:
     // Bypasses detector state only; it shares envelope construction and MQTT
     // publishing with camera-confirmed activation.
     bool publishManualActivation(char *event_id, size_t event_id_size);
+    bool connected() const { return connected_.load(); }
 private:
     bool publishActivation(const char *trigger_source, char *event_id, size_t event_id_size);
     void *client_ = nullptr;

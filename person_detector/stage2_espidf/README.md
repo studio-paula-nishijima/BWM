@@ -376,7 +376,8 @@ Boot follows this flow:
 2. With no saved credentials, it immediately starts a WPA2 setup AP named
    `BWM-Vision-xxxxxx` (the suffix identifies the board).
 3. If a saved network is unavailable, it makes five connection attempts,
-   separated by three seconds, before starting the same setup AP.
+   separated by three seconds, then enters recovery without deleting or
+   replacing the saved credentials.
 
 Connect a phone or laptop to the setup AP with password `bwm-setup`, then open
 `http://192.168.4.1/`. The self-contained setup page scans nearby 2.4 GHz
@@ -391,21 +392,36 @@ confirmation it erases only the `bwm_wifi` namespace and restarts; the trigger
 zone is preserved and the setup AP returns. Erasing the board's NVS also gives
 the expected fresh-device setup flow.
 
-During temporary station loss, the ESP retries at three-second intervals.
-After five failed attempts it exposes the setup AP, keeping local provisioning
-usable even without venue Wi-Fi. The ESP MQTT client continues using its
-existing reconnect behaviour; detection, confirmation, preview buffering,
-trigger-zone persistence, event topic, envelope, and activation edge semantics
-are unchanged.
+During temporary station loss, the ESP first retries at three-second intervals.
+After five failed attempts it enters recovery in simultaneous AP/station mode.
+The `BWM-Vision-xxxxxx` AP remains available at `http://192.168.4.1/`, but it
+serves the normal camera, trigger-zone, manual-activation, and diagnostics page
+rather than the credential-entry page. The diagnostic block immediately below
+the preview identifies the Wi-Fi/MQTT outage and counts down to the next retry.
+Detection continues locally, and **Forget Wi-Fi / Change Venue** remains
+available if the network really has changed.
+
+Recovery attempts the retained venue SSID once every five minutes. A successful
+station connection clears recovery, lets the existing MQTT client reconnect,
+and switches Wi-Fi back to station-only mode so the temporary AP disappears.
+No reboot is required. Failed recovery attempts neither clear NVS nor start a
+rapid retry loop. Missing credentials remain a distinct provisioning state and
+continue to serve only the setup page.
+
+The ESP MQTT client keeps its existing reconnect behaviour; detection,
+confirmation, preview buffering, trigger-zone persistence, event topic,
+envelope, and activation edge semantics are unchanged.
 
 The setup implementation adds one persistent manager object (roughly a few
 hundred bytes), an event group, inline HTML/JavaScript, and temporary 3 KB
-reconnect or 2 KB restart task stacks. Network scanning uses bounded local
-arrays and the existing HTTP task. It adds no camera or detector PSRAM buffers.
-The verified ESP-IDF 5.5.5 image is 981,024 bytes (`0xef820`), leaving 77 percent
-of the 4 MB application partition free. This figure is the complete Stage 5
-image rather than a controlled isolated delta from an identically configured
-Stage 4 build.
+reconnect or 2 KB restart task stacks. Stage 5B adds a 3 KB recovery task stack;
+the task blocks between state changes/retries and performs no tight polling.
+Network scanning uses bounded local arrays and the existing HTTP task. It adds
+no camera or detector PSRAM buffers. The verified ESP-IDF 5.5.5 Stage 5B image
+is 984,768 bytes (`0xf06c0`), leaving 77 percent of the 4 MB application
+partition free. Static D/IRAM use is 131,563 bytes; the recovery task's 3 KB
+stack is allocated dynamically only after recovery is first needed. The earlier
+Stage 5 image was 981,024 bytes (`0xef820`).
 
 Venue limitations remain: the ESP32-S3 supports 2.4 GHz Wi-Fi, not 5 GHz-only
 networks; this page supports open and ordinary personal-password networks, not

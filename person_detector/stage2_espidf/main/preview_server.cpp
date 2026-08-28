@@ -37,15 +37,16 @@ const char kIndexHtml[] = R"HTML(<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BWM vision node — rectangle calibration</title>
 <style>
-body{font:16px system-ui;margin:1.5rem;background:#111;color:#eee;max-width:56rem}#view{position:relative;line-height:0}img{width:100%;height:auto;border:1px solid #555}.overlay{position:absolute;box-sizing:border-box;pointer-events:none}.person{border:3px solid #58e06f}.motion{border:3px solid #35c9ff}.shadow{border:3px dashed #d76cff}.zone{border:3px dashed #ffb020;background:#ffb02018;z-index:3}.zone.editing{border-style:solid;background:#ffb02030;pointer-events:auto;cursor:move;touch-action:none}.handle{display:none;position:absolute;width:16px;height:16px;background:#ffb020;border:2px solid #111;border-radius:50%}.editing .handle{display:block}.nw{left:-10px;top:-10px;cursor:nwse-resize}.ne{right:-10px;top:-10px;cursor:nesw-resize}.sw{left:-10px;bottom:-10px;cursor:nesw-resize}.se{right:-10px;bottom:-10px;cursor:nwse-resize}.centre{width:9px;height:9px;margin:-4px 0 0 -4px;border-radius:50%;background:#ff496c}.controls{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}.controls button{font:inherit;padding:.5rem .8rem}.controls button:disabled{opacity:.45}code{color:#9dd}
+body{font:16px system-ui;margin:1.5rem;background:#111;color:#eee;max-width:56rem}#view{position:relative;line-height:0}img{width:100%;height:auto;border:1px solid #555}.overlay{position:absolute;box-sizing:border-box;pointer-events:none}.person{border:3px solid #58e06f}.motion{border:3px solid #35c9ff}.shadow{border:3px dashed #d76cff}.zone{border:3px dashed #ffb020;background:#ffb02018;z-index:3}.zone.editing{border-style:solid;background:#ffb02030;pointer-events:auto;cursor:move;touch-action:none}.handle{display:none;position:absolute;width:16px;height:16px;background:#ffb020;border:2px solid #111;border-radius:50%}.editing .handle{display:block}.nw{left:-10px;top:-10px;cursor:nwse-resize}.ne{right:-10px;top:-10px;cursor:nesw-resize}.sw{left:-10px;bottom:-10px;cursor:nesw-resize}.se{right:-10px;bottom:-10px;cursor:nwse-resize}.centre{width:9px;height:9px;margin:-4px 0 0 -4px;border-radius:50%;background:#ff496c}.diagnostics{margin:.5rem 0 1rem;padding:.7rem .9rem;background:#1b1b1b;border-left:4px solid #35c9ff}.diagnostics p{margin:.25rem 0}.controls{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}.controls button{font:inherit;padding:.5rem .8rem}.controls button:disabled{opacity:.45}code{color:#9dd}
 </style></head><body><h1>BWM vision node — rectangle calibration</h1>
 <p>Orange: trigger zone. Cyan: accepted motion. Purple dashed: rejected likely shadow.</p>
 <div id="view"><img id="camera" src="/capture" alt="Live camera preview"><div id="zone" class="overlay zone"><i class="handle nw" data-handle="nw"></i><i class="handle ne" data-handle="ne"></i><i class="handle sw" data-handle="sw"></i><i class="handle se" data-handle="se"></i></div><div id="overlays"></div></div>
+<section class="diagnostics" aria-label="Live diagnostics"><p id="status">Waiting for a frame…</p><p id="networkStatus">Checking venue Wi-Fi and MQTT…</p><p id="mqttStatus">MQTT test trigger ready.</p></section>
 <div class="controls"><button id="edit">Edit Trigger Zone</button><button id="apply" disabled>Apply</button><button id="save" disabled>Save</button><button id="cancel" disabled>Cancel</button><button id="reset">Reset to Default</button></div>
-<div class="controls"><button id="testActivation">Send Test Activation</button><button id="forgetWifi">Forget Wi-Fi / Change Venue</button></div><p id="mqttStatus">MQTT test trigger ready.</p>
-<p><code id="zoneValues">Loading trigger zone…</code></p><p id="status">Waiting for a frame…</p><p><a href="/capture">Open one snapshot</a> · <a href="/status">Detection JSON</a></p>
+<p><code id="zoneValues">Loading trigger zone…</code></p><div class="controls"><button id="testActivation">Send Test Activation</button><button id="forgetWifi">Forget Wi-Fi / Change Venue</button></div>
+<p><a href="/capture">Open one snapshot</a> · <a href="/status">Detection JSON</a></p>
 <script>
-const camera=document.getElementById('camera'),overlays=document.getElementById('overlays'),status=document.getElementById('status'),zoneBox=document.getElementById('zone'),zoneValues=document.getElementById('zoneValues');
+const camera=document.getElementById('camera'),overlays=document.getElementById('overlays'),status=document.getElementById('status'),networkStatus=document.getElementById('networkStatus'),zoneBox=document.getElementById('zone'),zoneValues=document.getElementById('zoneValues');
 const editButton=document.getElementById('edit'),applyButton=document.getElementById('apply'),saveButton=document.getElementById('save'),cancelButton=document.getElementById('cancel'),resetButton=document.getElementById('reset'),testActivationButton=document.getElementById('testActivation'),forgetWifiButton=document.getElementById('forgetWifi'),mqttStatus=document.getElementById('mqttStatus'),MIN_SIZE=.05;
 let serverZone={x:.2,y:.2,w:.6,h:.6},editZone={...serverZone},preEditZone={...serverZone},editing=false,drag=null,framePending=false,statusPending=false;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -66,7 +67,7 @@ zoneBox.addEventListener('pointerdown',event=>{if(!editing)return;event.preventD
 zoneBox.addEventListener('pointermove',event=>{if(!drag)return;const image=camera.getBoundingClientRect();if(!image.width||!image.height)return;const dx=(event.clientX-drag.x)/image.width,dy=(event.clientY-drag.y)/image.height,s=drag.zone;let left=s.x,top=s.y,right=s.x+s.w,bottom=s.y+s.h;if(drag.handle==='move'){left=clamp(s.x+dx,0,1-s.w);top=clamp(s.y+dy,0,1-s.h);right=left+s.w;bottom=top+s.h}else{if(drag.handle.includes('w'))left=clamp(s.x+dx,0,right-MIN_SIZE);if(drag.handle.includes('e'))right=clamp(s.x+s.w+dx,left+MIN_SIZE,1);if(drag.handle.includes('n'))top=clamp(s.y+dy,0,bottom-MIN_SIZE);if(drag.handle.includes('s'))bottom=clamp(s.y+s.h+dy,top+MIN_SIZE,1)}editZone={x:left,y:top,w:right-left,h:bottom-top};renderZone(editZone)});
 zoneBox.addEventListener('pointerup',()=>drag=null);zoneBox.addEventListener('pointercancel',()=>drag=null);
 function refreshFrame(){if(framePending)return;framePending=true;camera.onload=()=>framePending=false;camera.onerror=()=>framePending=false;camera.src='/capture?t='+Date.now()}
-async function refreshStatus(){if(statusPending)return;statusPending=true;try{const response=await fetch('/status?t='+Date.now());if(!response.ok)throw new Error();const d=await response.json();overlays.replaceChildren();if(d.mode==='motion'){if(!editing&&d.zone){serverZone={...d.zone};editZone={...serverZone};renderZone(serverZone)}for(const b of d.boxes){rect('motion',b.x,b.y,b.w,b.h);point(b.cx,b.cy)}for(const b of(d.rejected_boxes||[]))rect('shadow',b.x,b.y,b.w,b.h);status.textContent='MOTION '+(d.motion?'yes':'no')+' · changed '+(d.changed_fraction*100).toFixed(2)+'% · in-zone '+(d.in_zone_hit?'yes':'no')+' · confirmed '+(d.confirmed?'YES':'no')+' · '+d.reason}else{if(d.person)rect('person',d.x,d.y,d.w,d.h);status.textContent=(d.person?'PERSON':'no person')+' · confidence '+d.confidence.toFixed(3)+' · inference '+d.inference_ms+' ms'}}catch(error){status.textContent='Waiting for detector…'}finally{statusPending=false}}
+async function refreshStatus(){if(statusPending)return;statusPending=true;try{const response=await fetch('/status?t='+Date.now());if(!response.ok)throw new Error();const d=await response.json();overlays.replaceChildren();if(d.mode==='motion'){if(!editing&&d.zone){serverZone={...d.zone};editZone={...serverZone};renderZone(serverZone)}for(const b of d.boxes){rect('motion',b.x,b.y,b.w,b.h);point(b.cx,b.cy)}for(const b of(d.rejected_boxes||[]))rect('shadow',b.x,b.y,b.w,b.h);status.textContent='MOTION '+(d.motion?'yes':'no')+' · changed '+(d.changed_fraction*100).toFixed(2)+'% · in-zone '+(d.in_zone_hit?'yes':'no')+' · confirmed '+(d.confirmed?'YES':'no')+' · '+d.reason}else{if(d.person)rect('person',d.x,d.y,d.w,d.h);status.textContent=(d.person?'PERSON':'no person')+' · confidence '+d.confidence.toFixed(3)+' · inference '+d.inference_ms+' ms'}if(d.network){if(d.network.mode==='recovery'){const next=d.network.retry_seconds?(' · next retry in about '+d.network.retry_seconds+'s'):'';networkStatus.textContent='RECOVERY · venue Wi-Fi disconnected · MQTT unavailable · automatic retry every 5 minutes'+next}else if(d.network.mode==='normal'){networkStatus.textContent='Venue Wi-Fi connected · MQTT '+(d.network.mqtt_connected?'connected':'reconnecting')}else{networkStatus.textContent='Wi-Fi '+d.network.mode+' · MQTT '+(d.network.mqtt_connected?'connected':'unavailable')}}}catch(error){status.textContent='Waiting for detector…';networkStatus.textContent='Waiting for network diagnostics…'}finally{statusPending=false}}
 function refresh(){refreshFrame();refreshStatus()}
 loadZone().catch(error=>status.textContent='Config load failed: '+error.message);refresh();setInterval(refresh,1000);
 </script></body></html>)HTML";
@@ -346,6 +347,10 @@ esp_err_t statusHandler(httpd_req_t *request)
     xSemaphoreGive(impl->mutex);
     const NormalisedZone zone = impl->trigger_zone == nullptr ?
         kDefaultMotionTriggerZone : impl->trigger_zone->current();
+    const char *network_mode = impl->wifi == nullptr ? "unavailable" : impl->wifi->operatingModeName();
+    const bool wifi_connected = impl->wifi != nullptr && impl->wifi->connected();
+    const bool mqtt_connected = impl->activation_publisher != nullptr && impl->activation_publisher->connected();
+    const uint32_t retry_seconds = impl->wifi == nullptr ? 0 : impl->wifi->recoveryRetrySeconds();
 
     char json[4096];
     size_t used = 0;
@@ -353,7 +358,7 @@ esp_err_t statusHandler(httpd_req_t *request)
     if (!motionModeEnabled()) {
         complete = appendJson(json, sizeof(json), used,
                               "{\"mode\":\"person\",\"person\":%s,\"confidence\":%.4f,"
-                              "\"x\":%.4f,\"y\":%.4f,\"w\":%.4f,\"h\":%.4f,\"inference_ms\":%u}",
+                              "\"x\":%.4f,\"y\":%.4f,\"w\":%.4f,\"h\":%.4f,\"inference_ms\":%u",
                               person.person ? "true" : "false", person.confidence, person.x, person.y,
                               person.width, person.height, static_cast<unsigned>(person.inference_ms));
     } else {
@@ -392,8 +397,14 @@ esp_err_t statusHandler(httpd_req_t *request)
                                   box.centre_x, box.centre_y, box.area_fraction, box.mean_luminance_change,
                                   box.mean_structure_change, box.inside_trigger_zone ? "true" : "false");
         }
-        complete = complete && appendJson(json, sizeof(json), used, "]}");
+        complete = complete && appendJson(json, sizeof(json), used, "]");
     }
+    complete = complete && appendJson(
+        json, sizeof(json), used,
+        ",\"network\":{\"mode\":\"%s\",\"wifi_connected\":%s,\"mqtt_connected\":%s,"
+        "\"retry_seconds\":%u,\"retry_cadence_seconds\":300}}",
+        network_mode, wifi_connected ? "true" : "false", mqtt_connected ? "true" : "false",
+        static_cast<unsigned>(retry_seconds));
     if (!complete) return sendApiError(request, "500 Internal Server Error", "status JSON overflow");
     httpd_resp_set_type(request, "application/json");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
@@ -454,6 +465,9 @@ bool PreviewServer::begin(TriggerZoneConfig &trigger_zone,
         ESP_LOGI(kTag, "preview ready: open http://" IPSTR "/", IP2STR(&ip.ip));
     } else if (wifi.provisioning()) {
         ESP_LOGI(kTag, "provisioning page ready on SSID=%s at http://192.168.4.1/", wifi.setupApSsid());
+    } else if (wifi.recovering()) {
+        ESP_LOGW(kTag, "recovery camera/config UI ready on SSID=%s at http://192.168.4.1/",
+                 wifi.setupApSsid());
     } else {
         ESP_LOGW(kTag, "HTTP server started without an active network interface");
     }

@@ -20,8 +20,11 @@ public:
     bool begin();
     bool connected() const;
     bool provisioning() const;
+    bool recovering() const;
     bool hasSavedCredentials() const;
     const char *setupApSsid() const;
+    const char *operatingModeName() const;
+    uint32_t recoveryRetrySeconds() const;
 
     size_t scan(WifiNetworkInfo *networks, size_t capacity);
     bool provision(const char *ssid, const char *password, char *message, size_t message_size);
