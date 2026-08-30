@@ -100,6 +100,7 @@ void onSync()
         params.disc_mode = BLE_GAP_DISC_MODE_GEN;
         const int result = ble_gap_adv_start(address_type, nullptr, BLE_HS_FOREVER, &params, gapEvent, nullptr);
         if (gPublisher != nullptr) gPublisher->onConnectionChanged(false, result == 0);
+        ESP_LOGI(kTag, "BLE advertising %s", result == 0 ? "started" : "failed");
     }
 }
 
@@ -109,8 +110,16 @@ void hostTask(void *)
     nimble_port_freertos_deinit();
 }
 
+// NimBLE requires an access callback for every registered characteristic,
+// including notify-only values. The callback should never be reached because
+// this characteristic advertises neither read nor write access.
+int activationAccess(uint16_t, uint16_t, ble_gatt_access_ctxt *, void *)
+{
+    return BLE_ATT_ERR_READ_NOT_PERMITTED;
+}
+
 ble_gatt_chr_def kCharacteristics[] = {
-    {&kActivationUuid.u, nullptr, nullptr, nullptr, BLE_GATT_CHR_F_NOTIFY, 0, &gActivationHandle, nullptr},
+    {&kActivationUuid.u, activationAccess, nullptr, nullptr, BLE_GATT_CHR_F_NOTIFY, 0, &gActivationHandle, nullptr},
     {},
 };
 ble_gatt_svc_def kServices[] = {
@@ -128,7 +137,16 @@ bool BleActivationPublisher::begin()
     ble_svc_gatt_init();
     ble_svc_gap_device_name_set(kDeviceName);
     ble_hs_cfg.sync_cb = onSync;
-    if (ble_gatts_count_cfg(kServices) != 0 || ble_gatts_add_svcs(kServices) != 0) return false;
+    const int count_result = ble_gatts_count_cfg(kServices);
+    if (count_result != 0) {
+        ESP_LOGE(kTag, "GATT resource count failed rc=%d", count_result);
+        return false;
+    }
+    const int add_result = ble_gatts_add_svcs(kServices);
+    if (add_result != 0) {
+        ESP_LOGE(kTag, "GATT service registration failed rc=%d", add_result);
+        return false;
+    }
     nimble_port_freertos_init(hostTask);
     return true;
 }
