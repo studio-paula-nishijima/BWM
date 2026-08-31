@@ -605,7 +605,7 @@ def main():
                                          release_after_asr=args.release_after_asr, startup_ready=retrieval_ready,
                                          inference_timeout_seconds=asr_config.get("inference_timeout_seconds"),
                                          on_asr_result=ASRResultLogger(
-                                             asr_config.get("result_log_path", "logs/live_asr_results.jsonl")),
+                                             asr_config.get("result_log_path", "logs/live_transcripts.csv")),
                                          release_on_asr_result=not args.oracle)
     print("[Runtime] Oracle/Pygame/retrieval enabled" if args.oracle else
           "[Runtime] exhibition mode: ASR enabled; Oracle/Pygame/retrieval disabled")

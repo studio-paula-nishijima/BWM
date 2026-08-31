@@ -1,34 +1,30 @@
 """Best-effort append-only logging at the structured ASR result boundary."""
 from __future__ import annotations
 
+import csv
 from datetime import datetime, timezone
-import json
 from pathlib import Path
 
 
 class ASRResultLogger:
-    """Persist completed result metadata without making the Voice path depend on I/O."""
+    """Best-effort compact transcript persistence at the ASR result boundary."""
     def __init__(self, path, *, emit=print):
         self.path = Path(path)
         self.emit = emit
 
     def __call__(self, item):
         result = item.get("result") or {}
-        record = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "capture_id": item.get("capture_id"),
-            "capture_index": (item.get("metadata") or {}).get("capture", {}).get("capture_index"),
-            "detector_profile": item.get("detector_profile"),
-            "recognized_text": result.get("recognized_text", ""),
-            "detected_language": result.get("detected_language"),
-            "asr_status": item.get("status"),
-            "inference_duration_seconds": item.get("inference_duration"),
-            "timeout": item.get("status") == "timeout",
-            "error": item.get("error"),
-        }
+        text = result.get("recognized_text", "")
+        if item.get("status") != "ok" or not isinstance(text, str) or not text.strip():
+            return
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+            write_header = not self.path.exists() or self.path.stat().st_size == 0
+            with self.path.open("a", encoding="utf-8", newline="") as stream:
+                writer = csv.writer(stream)
+                if write_header:
+                    writer.writerow(("timestamp", "capture_id", "language", "text"))
+                writer.writerow((datetime.now(timezone.utc).isoformat(), item.get("capture_id") or "",
+                                 result.get("detected_language") or "", text))
         except Exception as exc:
             self.emit(f"[ASR] result log failed: {exc}")

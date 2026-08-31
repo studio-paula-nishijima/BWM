@@ -141,20 +141,26 @@ class VoiceRuntimeTests(unittest.TestCase):
         finally:
             runtime.shutdown()
 
-    def test_completed_and_timeout_results_are_logged_without_affecting_runtime(self):
+    def test_only_nonempty_successful_transcripts_are_logged_as_safe_csv(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "results.jsonl"
+            path = Path(directory) / "transcripts.csv"
             logger = ASRResultLogger(path, emit=lambda _: None)
             logger({"capture_id": "live:3", "detector_profile": "p", "status": "ok",
-                    "inference_duration": .25, "result": {"recognized_text": "water", "detected_language": "en"},
-                    "metadata": {"capture": {"capture_index": 3}}})
+                    "inference_duration": .25,
+                    "result": {"recognized_text": 'water, "river"\nand mist', "detected_language": "en"}})
             logger({"capture_id": "live:4", "detector_profile": "p", "status": "timeout",
                     "inference_duration": 10, "error": "inference timeout", "result": {}})
-            import json
-            records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
-            self.assertEqual(records[0]["recognized_text"], "water")
-            self.assertEqual(records[0]["capture_index"], 3)
-            self.assertTrue(records[1]["timeout"])
+            logger({"capture_id": "live:5", "status": "error", "error": "worker failed",
+                    "result": {"recognized_text": "water"}})
+            logger({"capture_id": "live:6", "status": "ok", "result": {"recognized_text": "  "}})
+            logger({"capture_id": "live:7", "status": "ok", "result": {"recognized_text": "second", "detected_language": "de"}})
+            import csv
+            with path.open(encoding="utf-8", newline="") as stream:
+                records = list(csv.reader(stream))
+            self.assertEqual(records[0], ["timestamp", "capture_id", "language", "text"])
+            self.assertEqual(records[1][1:], ["live:3", "en", 'water, "river"\nand mist'])
+            self.assertEqual(records[2][1:], ["live:7", "de", "second"])
+            self.assertEqual(len(records), 3)
 
 
 if __name__ == "__main__":

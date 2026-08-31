@@ -218,12 +218,13 @@ High-volume detector telemetry is opt-in with `--diagnostic-console`; live CSV
 logging and offline/analysis workflows remain supported through their existing
 tools and READMEs.
 
-Completed ASR results are also appended best-effort to
-`logs/live_asr_results.jsonl` (configurable as `asr.result_log_path`). Each
-JSONL object contains UTC `timestamp`, `capture_id`, `capture_index`,
-`detector_profile`, `recognized_text`, `detected_language`, `asr_status`,
-`inference_duration_seconds`, `timeout`, and `error`. Logging failure is
-reported but cannot interrupt the Voice runtime.
+For seven-month exhibition storage, successful non-empty transcripts are
+appended best-effort to `logs/live_transcripts.csv` (configurable as
+`asr.result_log_path`). The file has one CSV header and the minimal columns
+`timestamp,capture_id,language,text`; Python's CSV writer preserves commas,
+quotes, and embedded newlines in recognized text. Blank transcripts, timeouts,
+and failed/error-only ASR results remain console diagnostics but are not
+persisted. Logging failure is reported but cannot interrupt the Voice runtime.
 
 The integrated Pi smoke test is documented in `tools/README_stage3u_oracle.md`.
 `tools/README_stage3t_live_asr.md` covers the capture/ASR operational path,
