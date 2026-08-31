@@ -28,6 +28,7 @@ class SemanticEvent:
     id: str = field(default_factory=lambda: str(uuid4()))
     timestamp: str = field(default_factory=_timestamp)
     version: int = SCHEMA_VERSION
+    diagnostics: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.version != SCHEMA_VERSION:
@@ -40,6 +41,8 @@ class SemanticEvent:
             raise EventValidationError("Event origin must be a non-empty string")
         if not isinstance(self.payload, Mapping):
             raise EventValidationError("Event payload must be an object")
+        if not isinstance(self.diagnostics, Mapping):
+            raise EventValidationError("Event diagnostics must be an object")
         if not isinstance(self.timestamp, str) or not self.timestamp.strip():
             raise EventValidationError("Event timestamp must be a non-empty string")
         try:
@@ -48,8 +51,11 @@ class SemanticEvent:
             raise EventValidationError("Event timestamp must be ISO-8601") from exc
 
     def to_dict(self) -> dict[str, Any]:
-        return {"version": self.version, "id": self.id, "type": self.event_type,
+        data = {"version": self.version, "id": self.id, "type": self.event_type,
                 "origin": self.origin, "timestamp": self.timestamp, "payload": dict(self.payload)}
+        if self.diagnostics:
+            data["diagnostics"] = dict(self.diagnostics)
+        return data
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), separators=(",", ":"), sort_keys=True)
@@ -62,11 +68,12 @@ class SemanticEvent:
         missing = required.difference(data)
         if missing:
             raise EventValidationError(f"Event envelope is missing: {', '.join(sorted(missing))}")
-        unexpected = set(data).difference(required)
+        unexpected = set(data).difference(required | {"diagnostics"})
         if unexpected:
             raise EventValidationError(f"Event envelope has unsupported fields: {', '.join(sorted(unexpected))}")
         return cls(event_type=data["type"], origin=data["origin"], payload=data["payload"],
-                   id=data["id"], timestamp=data["timestamp"], version=data["version"])
+                   id=data["id"], timestamp=data["timestamp"], version=data["version"],
+                   diagnostics=data.get("diagnostics", {}))
 
     @classmethod
     def from_json(cls, raw: str | bytes) -> "SemanticEvent":

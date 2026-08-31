@@ -75,6 +75,24 @@ a semantic requirement. The same event and receiver behaviour apply to
 UART-only, MQTT-only, and redundant MQTT-plus-UART deployments. Dual transport
 is for delivery redundancy; it does not create two application events.
 
+## BLE activation transport
+
+Translation can optionally receive person-detector activation envelopes over
+BLE. The ESP is the `BWM Vision` peripheral/GATT server; Translation is the
+central/client. `SemanticBLETransport` reassembles the documented notification
+fragments, parses the normal `SemanticEvent`, and calls
+`TranslationSemanticIngress.handle_event`. It contains no installation or
+session policy. The ingress therefore shares its ID cache across BLE, MQTT and
+UART: an event delivered over BLE and MQTT with the same ID is interpreted once.
+
+BLE is configured in `configs/mqtt.yaml` and is disabled by default. Enable it
+only on the Pi that has BlueZ and the Python `bleak` dependency installed. The
+process starts independently of the ESP; a scan failure, disconnect, or missing
+notification only degrades this transport and never synthesizes an inactive
+installation state. It reconnects and resubscribes after a disconnect. There is
+no Pi-to-ESP activation-state feedback. For UUIDs, framing, and a hardware
+diagnostic, see `person_detector/BLE_ACTIVATION_CONTRACT.md`.
+
 UART frames are compact UTF-8 JSON followed by a newline: default 115200 8N1,
 0.25-second read timeout, and 8192-byte maximum. Partial/multiple frames work;
 malformed or oversized frames are discarded through their next newline and

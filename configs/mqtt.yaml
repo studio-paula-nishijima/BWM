@@ -20,3 +20,14 @@ uart:
   stopbits: 1
   timeout_seconds: 0.25
   max_frame_bytes: 8192
+
+# Optional Pi-central receiver for the BWM Vision ESP32 GATT notifications.
+# It is a semantic transport only; it has no session or inactive-state policy.
+ble:
+  enabled: false
+  service_uuid: "7a9e4c10-5b8d-4bd6-9c17-2f3e8a4b1001"
+  characteristic_uuid: "7a9e4c10-5b8d-4bd6-9c17-2f3e8a4b1002"
+  advertised_name: "BWM Vision"
+  scan_timeout_seconds: 8
+  reconnect_seconds: 5
+  max_message_bytes: 4096

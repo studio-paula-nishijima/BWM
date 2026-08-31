@@ -107,6 +107,17 @@ subsystems, but Stage 6 intentionally does not make local activation depend on
 that publication. UART and MQTT-to-UART bridging remain future work; the
 repo-wide IDs and origins prepare for transport-independent deduplication.
 
+The optional BLE receiver is another process-wide semantic transport, not a
+session component: `ESP32 BWM Vision peripheral -> BLE GATT notifications ->
+SemanticBLETransport -> TranslationSemanticIngress -> PlaybackSessionRuntime`.
+The Pi is the BLE central/client. Its bounded fragment reassembler follows
+`person_detector/BLE_ACTIVATION_CONTRACT.md`, then passes the same semantic ID
+to the ingress used by MQTT and UART. Consequently redundant BLE/MQTT delivery
+acts once. BLE scan/connect/disconnect failures do not gate startup, stop an
+open session, or infer `installation.activation: inactive`; only a received
+semantic event can request that state. BLE reconnects/resubscribes while the
+persistent process remains alive, including across normal session teardown.
+
 `button_service.py` remains superseded legacy GPIO17-to-systemd infrastructure.
 No service files are changed here. RuntimeSafety is the sole safety insertion
 point downstream of modulation, and never contains strategy-specific logic.
