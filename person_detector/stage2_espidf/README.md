@@ -5,12 +5,29 @@
 Activation transport now has three persistent policies in the camera page:
 
 - **MQTT only** preserves the released MQTT-only behaviour.
-- **BLE only** preserves the released BLE-only behaviour.
+- **BLE only** is the deliberate default for the current museum exhibition.
 - **Automatic** prefers MQTT and keeps BLE ready as a fallback.
 
 Existing stored values remain stable (`mqtt=0`, `ble=1`); `auto=2` is new, so
-an upgrade never silently changes an operator's explicit selection. MQTT
-remains the default for a fresh or invalid record.
+an upgrade never silently changes an operator's explicit selection. BLE is the
+default for a fresh, missing, unreadable, or invalid transport record. A device
+that already has an explicit saved MQTT, BLE, or automatic choice retains it.
+
+The exhibition path is intentionally independent of venue Wi-Fi:
+
+```text
+person detector
+-> BLE GATT
+-> rpi03 BLE adapter
+-> TranslationSemanticIngress
+-> existing installation.activation handling
+```
+
+The museum recommends wired networking for the Pi, while the ESP32 detector
+has no Ethernet interface. BLE therefore carries normal detector activations
+to `rpi03`. Wi-Fi provisioning/recovery and MQTT remain available for local
+configuration, testing, future venues, and an explicitly selected MQTT or
+automatic policy; they are not required for exhibition activation delivery.
 
 Automatic mode begins in `MQTT_PRIMARY`. MQTT is considered healthy only when
 the station has an IP address, the broker connection is established, and the
@@ -69,7 +86,7 @@ automatic BLE fallback operates on its separate three-second timer.
 ## Stage 6 BLE activation transport
 
 Activation transport is persisted independently of Wi-Fi and defaults to
-**MQTT**. The camera-confirmed edge and **Send Test Activation** both construct
+**BLE for the current exhibition**. The camera-confirmed edge and **Send Test Activation** both construct
 one `installation.activation` event before dispatching. Select **MQTT only**,
 **BLE only**, or **Automatic** in the local browser UI; a restart applies the
 saved selection. BLE-only mode leaves detector operation and the Stage 5B

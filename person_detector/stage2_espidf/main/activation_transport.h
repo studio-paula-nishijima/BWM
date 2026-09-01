@@ -40,7 +40,7 @@ private:
     MqttActivationPublisher mqtt_;
     BleActivationPublisher ble_;
     ActivationTransportPolicy automatic_policy_;
-    ActivationTransportMode mode_ = ActivationTransportMode::Mqtt;
+    ActivationTransportMode mode_ = ActivationTransportMode::Ble;
     std::atomic_bool mqtt_path_healthy_{false};
     std::atomic<AutomaticTransport> automatic_current_{AutomaticTransport::Mqtt};
     std::atomic_uint32_t fallback_remaining_ms_{0};

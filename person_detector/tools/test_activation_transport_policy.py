@@ -121,6 +121,16 @@ class TransportPolicyTests(unittest.TestCase):
         self.assertIn("Mqtt = 0, Ble = 1, Auto = 2", TRANSPORT_HEADER)
         self.assertIn("ActivationTransportMode::Auto", TRANSPORT)
 
+    def test_exhibition_default_is_ble_without_reinterpreting_saved_modes(self) -> None:
+        self.assertIn("uint8_t stored = static_cast<uint8_t>(ActivationTransportMode::Ble)", TRANSPORT)
+        self.assertIn('defaulting to BLE', TRANSPORT)
+        for mode in ("Mqtt", "Ble", "Auto"):
+            self.assertIn(
+                f"stored == static_cast<uint8_t>(ActivationTransportMode::{mode})",
+                TRANSPORT,
+            )
+            self.assertIn(f"mode_ = ActivationTransportMode::{mode}", TRANSPORT)
+
     def test_thresholds_are_explicit_contract_values(self) -> None:
         self.assertEqual(FALLBACK_MS, 3000)
         self.assertEqual(RECLAIM_MS, 10000)

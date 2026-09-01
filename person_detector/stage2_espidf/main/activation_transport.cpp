@@ -20,7 +20,7 @@ bool ActivationTransport::loadMode()
 {
     nvs_handle_t nvs;
     if (nvs_open(kNamespace, NVS_READWRITE, &nvs) != ESP_OK) return false;
-    uint8_t stored = static_cast<uint8_t>(ActivationTransportMode::Mqtt);
+    uint8_t stored = static_cast<uint8_t>(ActivationTransportMode::Ble);
     const esp_err_t result = nvs_get_u8(nvs, kModeKey, &stored);
     if (result == ESP_ERR_NVS_NOT_FOUND) {
         nvs_set_u8(nvs, kModeKey, stored);
@@ -28,12 +28,14 @@ bool ActivationTransport::loadMode()
     }
     nvs_close(nvs);
     if (result != ESP_OK && result != ESP_ERR_NVS_NOT_FOUND) return false;
-    if (stored == static_cast<uint8_t>(ActivationTransportMode::Ble)) {
+    if (stored == static_cast<uint8_t>(ActivationTransportMode::Mqtt)) {
+        mode_ = ActivationTransportMode::Mqtt;
+    } else if (stored == static_cast<uint8_t>(ActivationTransportMode::Ble)) {
         mode_ = ActivationTransportMode::Ble;
     } else if (stored == static_cast<uint8_t>(ActivationTransportMode::Auto)) {
         mode_ = ActivationTransportMode::Auto;
     } else {
-        mode_ = ActivationTransportMode::Mqtt;
+        mode_ = ActivationTransportMode::Ble;
     }
     return true;
 }
@@ -51,8 +53,8 @@ bool ActivationTransport::saveMode()
 bool ActivationTransport::begin()
 {
     if (!loadMode()) {
-        ESP_LOGW(kTag, "transport selection unavailable; defaulting to MQTT");
-        mode_ = ActivationTransportMode::Mqtt;
+        ESP_LOGW(kTag, "transport selection unavailable; defaulting to BLE");
+        mode_ = ActivationTransportMode::Ble;
     }
     ESP_LOGI(kTag, "selected activation transport=%s", modeName());
     const uint64_t now_ms = static_cast<uint64_t>(esp_timer_get_time() / 1000);
