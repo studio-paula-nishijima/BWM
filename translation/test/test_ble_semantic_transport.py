@@ -71,16 +71,27 @@ class BLEIngressTests(unittest.TestCase):
         self.assertEqual(self.runtime._started_at, started)
         self.assertEqual([item.id for item in self.received], ["ble-one", "ble-two"])
 
-    def test_idle_event_starts_and_cross_transport_ids_deduplicate_in_both_orders(self):
+    def test_ble_then_mqtt_same_id_deduplicates(self):
         event = installation_activation("person_detector", "active", id="same")
         self._notify(event.to_json().encode())
         self.assertFalse(self.ingress.handle(TopicNamespace().installation_activation, event))
         self.assertTrue(self.runtime.is_active)
+
+    def test_mqtt_then_ble_same_id_deduplicates(self):
+        event = installation_activation("person_detector", "active", id="other")
+        self.assertTrue(self.ingress.handle(TopicNamespace().installation_activation, event))
+        engine, started = self.runtime.engine, self.runtime._started_at
+        self.transport.notification(None, bytearray(frame(START | END, 0, event.to_json().encode())))
+        self.assertIs(self.runtime.engine, engine)
+        self.assertEqual(self.runtime._started_at, started)
+
+    def test_distinct_event_ids_remain_independent_after_a_session_ends(self):
+        event = installation_activation("person_detector", "active", id="same")
+        self._notify(event.to_json().encode())
         self.runtime.deactivate()
         event2 = installation_activation("person_detector", "active", id="other")
         self.assertTrue(self.ingress.handle(TopicNamespace().installation_activation, event2))
-        self.transport.notification(None, bytearray(frame(START | END, 0, event2.to_json().encode())))
-        self.assertEqual([item.id for item in self.received], ["same", "other"])
+        self.assertEqual([item.id for item in self.received], ["same"])
 
     def test_malformed_utf8_json_and_disconnect_never_create_inactive(self):
         self._notify(b"\xff")
@@ -110,7 +121,9 @@ class BLEIngressTests(unittest.TestCase):
             @classmethod
             async def find_device_by_filter(cls, predicate, timeout):
                 cls.calls += 1
-                if cls.calls == 3:
+                if cls.calls == 1:
+                    return None  # Translation started before the ESP appeared.
+                if cls.calls == 4:
                     transport._stop.set()
                     return None
                 return device
@@ -125,7 +138,7 @@ class BLEIngressTests(unittest.TestCase):
 
         transport._scanner, transport._client_factory = Scanner, Client
         asyncio.run(transport._run())
-        self.assertEqual(Scanner.calls, 3)
+        self.assertEqual(Scanner.calls, 4)
         self.assertEqual(len(Client.clients), 2)
         self.assertTrue(all(client.subscribed[0] == transport.settings.characteristic_uuid for client in Client.clients))
 

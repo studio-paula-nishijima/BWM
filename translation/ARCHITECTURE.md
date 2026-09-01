@@ -118,6 +118,34 @@ open session, or infer `installation.activation: inactive`; only a received
 semantic event can request that state. BLE reconnects/resubscribes while the
 persistent process remains alive, including across normal session teardown.
 
+### P1 BLE ingress and later detector fallback
+
+P1 is Pi-side BLE ingress only. Translation starts when BLE is absent, keeps
+scanning so an ESP which appears later can be connected, and tolerates MQTT and
+BLE being active together during any detector handover. MQTT failure does not
+change BLE behaviour, BLE failure does not change MQTT behaviour, and transport
+availability never represents detector or installation state. In particular,
+a BLE disconnect never synthesizes `inactive`.
+
+P1 does not select a transport, command the ESP to select a transport, or tie
+BLE retries to the five-minute Wi-Fi recovery interval. Those are detector-side
+policy concerns for P2. The intended later production topology is:
+
+```text
+ESP transport policy (P2)
+    MQTT preferred when usable
+    BLE fallback when Wi-Fi/MQTT unavailable
+
+MQTT --+
+       +-> TranslationSemanticIngress -> validation -> shared ID deduplication
+BLE  --+                                  -> installation.activation handling
+```
+
+During a P2 handover, the emitter must retain the same semantic ID if one
+event is delivered by both transports. P1's shared `RecentEventIds` cache then
+admits one application-level activation regardless of which transport arrives
+first.
+
 `button_service.py` remains superseded legacy GPIO17-to-systemd infrastructure.
 No service files are changed here. RuntimeSafety is the sole safety insertion
 point downstream of modulation, and never contains strategy-specific logic.

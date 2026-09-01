@@ -85,13 +85,19 @@ fragments, parses the normal `SemanticEvent`, and calls
 session policy. The ingress therefore shares its ID cache across BLE, MQTT and
 UART: an event delivered over BLE and MQTT with the same ID is interpreted once.
 
-BLE is configured in `configs/mqtt.yaml` and is disabled by default. Enable it
-only on the Pi that has BlueZ and the Python `bleak` dependency installed. The
-process starts independently of the ESP; a scan failure, disconnect, or missing
-notification only degrades this transport and never synthesizes an inactive
-installation state. It reconnects and resubscribes after a disconnect. There is
-no Pi-to-ESP activation-state feedback. For UUIDs, framing, and a hardware
-diagnostic, see `person_detector/BLE_ACTIVATION_CONTRACT.md`.
+BLE is configured in `configs/mqtt.yaml`. The process starts independently of
+the ESP; a scan failure, disconnect, or missing notification only degrades this
+transport and never synthesizes an inactive installation state. It reconnects
+and resubscribes after a disconnect, including when the ESP appears only after
+Translation is running. There is no Pi-to-ESP activation-state feedback.
+
+P1 deliberately contains no MQTT-to-BLE fallback policy and no coupling to
+Wi-Fi recovery timing: MQTT and BLE are independent ingress siblings. A later
+detector-side P2 stage may prefer MQTT and fall back to BLE when Wi-Fi/MQTT is
+unavailable. During that handover it must preserve a semantic event's ID;
+Translation's shared ingress then deduplicates MQTT-first and BLE-first
+delivery. For UUIDs, framing, and a hardware diagnostic, see
+`person_detector/BLE_ACTIVATION_CONTRACT.md`.
 
 UART frames are compact UTF-8 JSON followed by a newline: default 115200 8N1,
 0.25-second read timeout, and 8192-byte maximum. Partial/multiple frames work;
