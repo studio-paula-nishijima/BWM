@@ -20,6 +20,29 @@ without waiting for Stage 5B's five-minute saved-network retry. It returns to
 MQTT only after 10 seconds of continuous combined health. Any interruption
 resets the relevant timer.
 
+### MQTT publish-path operational definition
+
+`mqtt_path_healthy` is not a synonym for Wi-Fi association or the MQTT
+`connected` flag. It is true only when the Wi-Fi manager has received a station
+IP address, the ESP-MQTT client has an established broker session, and its
+separate publish-path gate is operational.
+
+At the start of a new broker session, the publish-path gate is provisionally
+operational because no activation has yet been available to test it. Once an
+activation is attempted, the synchronous result of
+`esp_mqtt_client_publish()` is authoritative: a non-negative MQTT message ID
+means the QoS 1 event was accepted into the ESP-MQTT client/outbox, while a
+negative result immediately marks the publish path unavailable. A broker
+disconnect also marks it unavailable; a successful reconnect restores the
+provisional state. This explicit gate must remain part of automatic health
+evaluation and must not be collapsed into connection-state-only logic.
+
+Synchronous acceptance is not proof that the Pi received or admitted the
+event, and it is not the same as observing a QoS 1 `PUBACK`. The current design
+does not send synthetic MQTT health events, track end-to-end Pi acknowledgement,
+or use Pi feedback. Stronger end-to-end health would require a separately
+designed acknowledgement or health-probe contract.
+
 Both transports receive the same already-constructed `ActivationEvent` object
 at a handover boundary. A synchronous MQTT publish failure in automatic mode
 gets one immediate BLE attempt using that same event and ID. There is no
