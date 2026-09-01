@@ -24,7 +24,7 @@ uart:
 # Optional Pi-central receiver for the BWM Vision ESP32 GATT notifications.
 # It is a semantic transport only; it has no session or inactive-state policy.
 ble:
-  enabled: false
+  enabled: true
   service_uuid: "7a9e4c10-5b8d-4bd6-9c17-2f3e8a4b1001"
   characteristic_uuid: "7a9e4c10-5b8d-4bd6-9c17-2f3e8a4b1002"
   advertised_name: "BWM Vision"
