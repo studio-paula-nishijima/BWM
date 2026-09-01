@@ -40,6 +40,14 @@ IDs are unique per constructed event. A future simultaneous MQTT+BLE mode must
 retain the same ID for the same constructed event so the production ingress can
 deduplicate it.
 
+The vision node's `auto` policy implements that simultaneous-readiness case:
+MQTT remains preferred, BLE becomes primary after three seconds of unhealthy
+MQTT delivery-path state, and MQTT reclaims primary only after ten seconds of
+continuous health. Both publishers are adapters beneath one event constructor.
+If a handover attempt touches both adapters, the exact same in-memory event and
+ID are reused. This changes neither the UUIDs nor the framing above, and the Pi
+receiver does not need to know which ESP policy selected BLE.
+
 ## Production semantic mapping
 
 For a complete, valid event, future Pi work must preserve `version`, `id`,

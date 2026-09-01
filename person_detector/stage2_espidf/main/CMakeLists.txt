@@ -4,6 +4,7 @@ idf_component_register(
         "camera_source.cpp"
         "activation_event.cpp"
         "activation_transport.cpp"
+        "activation_transport_policy.cpp"
         "ble_activation_publisher.cpp"
         "motion_detector.cpp"
         "person_detector.cpp"

@@ -13,22 +13,24 @@
 
 namespace {
 constexpr char kTag[] = "bwm.mqtt";
+}  // namespace
 
-void eventHandler(void *handler_args, esp_event_base_t, int32_t event_id, void *)
+void MqttActivationPublisher::eventHandler(void *handler_args, esp_event_base_t,
+                                           int32_t event_id, void *)
 {
-    auto *connected = static_cast<std::atomic_bool *>(handler_args);
+    auto *publisher = static_cast<MqttActivationPublisher *>(handler_args);
     if (event_id == MQTT_EVENT_CONNECTED) {
-        connected->store(true);
+        publisher->connected_.store(true);
+        publisher->publish_operational_.store(true);
         ESP_LOGI(kTag, "MQTT connected broker=%s topic=%s/installation/activation qos=1 retained=false",
                  BWM_MQTT_BROKER_URI, BWM_MQTT_TOPIC_BASE);
     }
     if (event_id == MQTT_EVENT_DISCONNECTED) {
-        connected->store(false);
+        publisher->connected_.store(false);
+        publisher->publish_operational_.store(false);
         ESP_LOGW(kTag, "MQTT disconnected broker=%s; retrying", BWM_MQTT_BROKER_URI);
     }
 }
-
-}  // namespace
 
 void MqttActivationPublisher::begin()
 {
@@ -44,7 +46,7 @@ void MqttActivationPublisher::begin()
         ESP_LOGW(kTag, "MQTT init failed; detection continues locally");
         return;
     }
-    esp_mqtt_client_register_event(mqtt, MQTT_EVENT_ANY, eventHandler, &connected_);
+    esp_mqtt_client_register_event(mqtt, MQTT_EVENT_ANY, eventHandler, this);
     if (esp_mqtt_client_start(mqtt) != ESP_OK) {
         ESP_LOGW(kTag, "MQTT start failed; detection continues locally");
         esp_mqtt_client_destroy(mqtt);
@@ -85,11 +87,13 @@ bool MqttActivationPublisher::publish(const ActivationEvent &event)
     const int message_id = esp_mqtt_client_publish(
         static_cast<esp_mqtt_client_handle_t>(client_), topic, payload, 0, 1, 0);
     if (message_id < 0) {
+        publish_operational_.store(false);
         ESP_LOGW(kTag,
                  "activation publish failed source=%s id=%s type=installation.activation origin=person_detector timestamp=%s topic=%s",
                  event.trigger_source, event.id, event.timestamp, topic);
         return false;
     }
+    publish_operational_.store(connected_.load());
     ESP_LOGI(kTag,
              "activation queued source=%s id=%s type=installation.activation origin=person_detector timestamp=%s topic=%s mqtt_message_id=%d connected=%s",
              event.trigger_source, event.id, event.timestamp, topic, message_id, connected_.load() ? "true" : "false");

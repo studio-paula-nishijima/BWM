@@ -123,7 +123,7 @@ void logMotionScan(const MotionDetection &detection, uint64_t total_scans,
 
 extern "C" void app_main(void)
 {
-    ESP_LOGI(kTag, "BWM Vision Node - Stage 5 runtime Wi-Fi provisioning");
+    ESP_LOGI(kTag, "BWM Vision Node - P2 automatic activation-transport fallback");
     ESP_LOGI(kTag, "detection_mode=%s camera=%ux%u format=JPEG", detectionModeName(),
              static_cast<unsigned>(sourceFrameWidth()), static_cast<unsigned>(sourceFrameHeight()));
     if (motionModeEnabled()) {
@@ -191,12 +191,16 @@ extern "C" void app_main(void)
     // MQTT shares the station connection and retains its existing semantics.
     preview.begin(trigger_zone, activation_transport, wifi);
     activation_transport.begin();
+    activation_transport.updateNetworkHealth(
+        wifi.connected(), static_cast<uint64_t>(esp_timer_get_time() / 1000));
     logMemory("after camera/detector/preview");
     uint64_t total_scans = 0;
     int64_t previous_scan_started_us = 0;
     bool previous_motion_confirmation = false;
     while (true) {
         const int64_t scan_started_us = esp_timer_get_time();
+        activation_transport.updateNetworkHealth(
+            wifi.connected(), static_cast<uint64_t>(scan_started_us / 1000));
         const uint32_t period_ms = previous_scan_started_us == 0 ? 0 :
             static_cast<uint32_t>((scan_started_us - previous_scan_started_us) / 1000);
         previous_scan_started_us = scan_started_us;

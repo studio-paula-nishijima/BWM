@@ -1,13 +1,56 @@
 # BWM vision node — Stage 2 (ESP-IDF / ESP-DL)
 
+## P2 automatic activation-transport fallback
+
+Activation transport now has three persistent policies in the camera page:
+
+- **MQTT only** preserves the released MQTT-only behaviour.
+- **BLE only** preserves the released BLE-only behaviour.
+- **Automatic** prefers MQTT and keeps BLE ready as a fallback.
+
+Existing stored values remain stable (`mqtt=0`, `ble=1`); `auto=2` is new, so
+an upgrade never silently changes an operator's explicit selection. MQTT
+remains the default for a fresh or invalid record.
+
+Automatic mode begins in `MQTT_PRIMARY`. MQTT is considered healthy only when
+the station has an IP address, the broker connection is established, and the
+publisher regards the publish path as operational. If that combined condition
+is continuously false for 3 seconds, the policy changes to `BLE_FALLBACK`
+without waiting for Stage 5B's five-minute saved-network retry. It returns to
+MQTT only after 10 seconds of continuous combined health. Any interruption
+resets the relevant timer.
+
+Both transports receive the same already-constructed `ActivationEvent` object
+at a handover boundary. A synchronous MQTT publish failure in automatic mode
+gets one immediate BLE attempt using that same event and ID. There is no
+backlog: if the current route cannot deliver (including BLE with no connected
+Pi), the activation is dropped, logged, and exposed in diagnostics; detector
+state and Wi-Fi recovery continue independently.
+
+`GET /status` exposes `transport.configured`, `current`,
+`mqtt_path_healthy`, `fallback_remaining_ms`, `reclaim_remaining_ms`, BLE
+advertising/connection state, last transport/result/event ID, and the most
+recent drop reason. The same concise state appears below the camera preview.
+The policy timings are named constants in
+`main/activation_transport_policy.h`; compile-time assertions and the
+hardware-free regression command exercise their hysteresis:
+
+```powershell
+& '..\..\.python311\python.exe' ..\tools\test_activation_transport_policy.py
+```
+
+Stage 5B recovery is unchanged: the recovery AP, camera/configuration UI,
+detection, retained credentials, and five-minute station retry continue while
+automatic BLE fallback operates on its separate three-second timer.
+
 ## Stage 6 BLE activation transport
 
 Activation transport is persisted independently of Wi-Fi and defaults to
 **MQTT**. The camera-confirmed edge and **Send Test Activation** both construct
-one `installation.activation` event before dispatching to the selected MQTT or
-BLE transport. Select **MQTT** or **BLE** in the local browser UI; a restart
-applies the saved selection. BLE mode leaves detector operation and the Stage
-5B local Wi-Fi/recovery UI intact, but does not start MQTT for activation.
+one `installation.activation` event before dispatching. Select **MQTT only**,
+**BLE only**, or **Automatic** in the local browser UI; a restart applies the
+saved selection. BLE-only mode leaves detector operation and the Stage 5B
+local Wi-Fi/recovery UI intact, but does not start MQTT for activation.
 
 The ESP advertises as `BWM Vision` and exposes a notification-only GATT
 activation characteristic. Its exact Pi-side contract, framing, reconnection

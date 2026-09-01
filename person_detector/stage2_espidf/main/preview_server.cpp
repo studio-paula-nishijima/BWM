@@ -12,6 +12,7 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -45,7 +46,7 @@ body{font:16px system-ui;margin:1.5rem;background:#111;color:#eee;max-width:56re
 <div id="view"><img id="camera" src="/capture" alt="Live camera preview"><div id="zone" class="overlay zone"><i class="handle nw" data-handle="nw"></i><i class="handle ne" data-handle="ne"></i><i class="handle sw" data-handle="sw"></i><i class="handle se" data-handle="se"></i></div><div id="overlays"></div></div>
 <section class="diagnostics" aria-label="Live diagnostics"><p id="status">Waiting for a frame…</p><p id="networkStatus">Checking venue Wi-Fi and transport…</p><p id="transportStatus">Activation transport loading…</p><p id="mqttStatus">Activation test trigger ready.</p></section>
 <div class="controls"><button id="edit">Edit Trigger Zone</button><button id="apply" disabled>Apply</button><button id="save" disabled>Save</button><button id="cancel" disabled>Cancel</button><button id="reset">Reset to Default</button></div>
-<p><code id="zoneValues">Loading trigger zone…</code></p><div class="controls"><button id="testActivation">Send Test Activation</button><button id="forgetWifi">Forget Wi-Fi / Change Venue</button></div><label>Activation transport <select id="transport"><option value="mqtt">MQTT</option><option value="ble">BLE</option></select></label><button id="saveTransport">Save transport and restart</button>
+<p><code id="zoneValues">Loading trigger zone…</code></p><div class="controls"><button id="testActivation">Send Test Activation</button><button id="forgetWifi">Forget Wi-Fi / Change Venue</button></div><label>Activation transport <select id="transport"><option value="mqtt">MQTT only</option><option value="ble">BLE only</option><option value="auto">Automatic (MQTT preferred, BLE fallback)</option></select></label><button id="saveTransport">Save transport and restart</button>
 <p><a href="/capture">Open one snapshot</a> · <a href="/status">Detection JSON</a></p>
 <script>
 const camera=document.getElementById('camera'),overlays=document.getElementById('overlays'),status=document.getElementById('status'),networkStatus=document.getElementById('networkStatus'),zoneBox=document.getElementById('zone'),zoneValues=document.getElementById('zoneValues');
@@ -70,7 +71,7 @@ zoneBox.addEventListener('pointerdown',event=>{if(!editing)return;event.preventD
 zoneBox.addEventListener('pointermove',event=>{if(!drag)return;const image=camera.getBoundingClientRect();if(!image.width||!image.height)return;const dx=(event.clientX-drag.x)/image.width,dy=(event.clientY-drag.y)/image.height,s=drag.zone;let left=s.x,top=s.y,right=s.x+s.w,bottom=s.y+s.h;if(drag.handle==='move'){left=clamp(s.x+dx,0,1-s.w);top=clamp(s.y+dy,0,1-s.h);right=left+s.w;bottom=top+s.h}else{if(drag.handle.includes('w'))left=clamp(s.x+dx,0,right-MIN_SIZE);if(drag.handle.includes('e'))right=clamp(s.x+s.w+dx,left+MIN_SIZE,1);if(drag.handle.includes('n'))top=clamp(s.y+dy,0,bottom-MIN_SIZE);if(drag.handle.includes('s'))bottom=clamp(s.y+s.h+dy,top+MIN_SIZE,1)}editZone={x:left,y:top,w:right-left,h:bottom-top};renderZone(editZone)});
 zoneBox.addEventListener('pointerup',()=>drag=null);zoneBox.addEventListener('pointercancel',()=>drag=null);
 function refreshFrame(){if(framePending)return;framePending=true;camera.onload=()=>framePending=false;camera.onerror=()=>framePending=false;camera.src='/capture?t='+Date.now()}
-async function refreshStatus(){if(statusPending)return;statusPending=true;try{const response=await fetch('/status?t='+Date.now());if(!response.ok)throw new Error();const d=await response.json();overlays.replaceChildren();if(d.mode==='motion'){if(!editing&&d.zone){serverZone={...d.zone};editZone={...serverZone};renderZone(serverZone)}for(const b of d.boxes){rect('motion',b.x,b.y,b.w,b.h);point(b.cx,b.cy)}for(const b of(d.rejected_boxes||[]))rect('shadow',b.x,b.y,b.w,b.h);status.textContent='MOTION '+(d.motion?'yes':'no')+' · changed '+(d.changed_fraction*100).toFixed(2)+'% · in-zone '+(d.in_zone_hit?'yes':'no')+' · confirmed '+(d.confirmed?'YES':'no')+' · '+d.reason}else{if(d.person)rect('person',d.x,d.y,d.w,d.h);status.textContent=(d.person?'PERSON':'no person')+' · confidence '+d.confidence.toFixed(3)+' · inference '+d.inference_ms+' ms'}if(d.network){const broker=d.network.mqtt_broker||'not configured';if(d.network.mode==='recovery'){const next=d.network.retry_seconds?(' · next retry in about '+d.network.retry_seconds+'s'):'';networkStatus.textContent='RECOVERY · venue Wi-Fi disconnected · MQTT unavailable · broker '+broker+' · automatic retry every 5 minutes'+next}else if(d.network.mode==='normal'){networkStatus.textContent='Venue Wi-Fi connected · MQTT '+(d.network.mqtt_connected?'connected':'reconnecting')+' · broker '+broker}else{networkStatus.textContent='Wi-Fi '+d.network.mode+' · MQTT '+(d.network.mqtt_connected?'connected':'unavailable')+' · broker '+broker}}if(d.transport){transportStatus.textContent='Transport: '+d.transport.selected.toUpperCase()+' · BLE '+(d.transport.ble_connected?'connected':d.transport.ble_advertising?'advertising':'idle')+' · '+d.transport.last_result}}catch(error){status.textContent='Waiting for detector…';networkStatus.textContent='Waiting for network diagnostics…'}finally{statusPending=false}}
+async function refreshStatus(){if(statusPending)return;statusPending=true;try{const response=await fetch('/status?t='+Date.now());if(!response.ok)throw new Error();const d=await response.json();overlays.replaceChildren();if(d.mode==='motion'){if(!editing&&d.zone){serverZone={...d.zone};editZone={...serverZone};renderZone(serverZone)}for(const b of d.boxes){rect('motion',b.x,b.y,b.w,b.h);point(b.cx,b.cy)}for(const b of(d.rejected_boxes||[]))rect('shadow',b.x,b.y,b.w,b.h);status.textContent='MOTION '+(d.motion?'yes':'no')+' · changed '+(d.changed_fraction*100).toFixed(2)+'% · in-zone '+(d.in_zone_hit?'yes':'no')+' · confirmed '+(d.confirmed?'YES':'no')+' · '+d.reason}else{if(d.person)rect('person',d.x,d.y,d.w,d.h);status.textContent=(d.person?'PERSON':'no person')+' · confidence '+d.confidence.toFixed(3)+' · inference '+d.inference_ms+' ms'}if(d.network){const broker=d.network.mqtt_broker||'not configured';if(d.network.mode==='recovery'){const next=d.network.retry_seconds?(' · next retry in about '+d.network.retry_seconds+'s'):'';networkStatus.textContent='RECOVERY · venue Wi-Fi disconnected · MQTT unavailable · broker '+broker+' · automatic Wi-Fi retry every 5 minutes'+next}else if(d.network.mode==='normal'){networkStatus.textContent='Venue Wi-Fi connected · MQTT '+(d.network.mqtt_connected?'connected':'reconnecting')+' · broker '+broker}else{networkStatus.textContent='Wi-Fi '+d.network.mode+' · MQTT '+(d.network.mqtt_connected?'connected':'unavailable')+' · broker '+broker}}if(d.transport){const timer=d.transport.fallback_remaining_ms?(' · BLE fallback in '+Math.ceil(d.transport.fallback_remaining_ms/1000)+'s'):d.transport.reclaim_remaining_ms?(' · MQTT reclaim in '+Math.ceil(d.transport.reclaim_remaining_ms/1000)+'s'):'';const dropped=d.transport.last_drop_reason&&d.transport.last_drop_reason!=='none'?(' · drop '+d.transport.last_drop_reason):'';transportStatus.textContent='Policy '+d.transport.configured.toUpperCase()+' · current '+d.transport.current.toUpperCase()+' · MQTT path '+(d.transport.mqtt_path_healthy?'healthy':'unhealthy')+' · BLE '+(d.transport.ble_connected?'connected':d.transport.ble_advertising?'advertising':'idle')+timer+' · last '+d.transport.last_activation_transport+' / '+d.transport.last_result+dropped}}catch(error){status.textContent='Waiting for detector…';networkStatus.textContent='Waiting for network diagnostics…'}finally{statusPending=false}}
 async function loadTransport(){const response=await fetch('/api/config/activation-transport');const data=await response.json();transportSelect.value=data.transport;transportStatus.textContent='Transport: '+data.transport.toUpperCase()}function refresh(){refreshFrame();refreshStatus()}
 loadZone().catch(error=>status.textContent='Config load failed: '+error.message);loadTransport().catch(error=>transportStatus.textContent='Transport config unavailable');refresh();setInterval(refresh,1000);
 </script></body></html>)HTML";
@@ -229,9 +230,13 @@ bool readTransportMode(httpd_req_t *request, ActivationTransportMode &mode)
     if (root == nullptr) return false;
     const cJSON *value = cJSON_GetObjectItemCaseSensitive(root, "transport");
     const bool valid = cJSON_IsString(value) &&
-        (std::strcmp(value->valuestring, "mqtt") == 0 || std::strcmp(value->valuestring, "ble") == 0);
-    if (valid) mode = std::strcmp(value->valuestring, "ble") == 0 ?
-        ActivationTransportMode::Ble : ActivationTransportMode::Mqtt;
+        (std::strcmp(value->valuestring, "mqtt") == 0 || std::strcmp(value->valuestring, "ble") == 0 ||
+         std::strcmp(value->valuestring, "auto") == 0);
+    if (valid) {
+        mode = std::strcmp(value->valuestring, "ble") == 0 ? ActivationTransportMode::Ble :
+            std::strcmp(value->valuestring, "auto") == 0 ? ActivationTransportMode::Auto :
+            ActivationTransportMode::Mqtt;
+    }
     cJSON_Delete(root);
     return valid;
 }
@@ -247,7 +252,7 @@ esp_err_t transportConfigHandler(httpd_req_t *request)
         return httpd_resp_sendstr(request, json);
     }
     ActivationTransportMode mode;
-    if (!readTransportMode(request, mode)) return sendApiError(request, "400 Bad Request", "transport must be mqtt or ble");
+    if (!readTransportMode(request, mode)) return sendApiError(request, "400 Bad Request", "transport must be mqtt, ble, or auto");
     if (!gPreview->activation_transport->selectMode(mode)) {
         return sendApiError(request, "500 Internal Server Error", "could not save transport selection");
     }
@@ -402,11 +407,24 @@ esp_err_t statusHandler(httpd_req_t *request)
     const bool mqtt_connected = impl->activation_transport != nullptr && impl->activation_transport->mqttConnected();
     const char *mqtt_broker = impl->activation_transport == nullptr ? "" : impl->activation_transport->mqttBrokerUri();
     const char *transport = impl->activation_transport == nullptr ? "unavailable" : impl->activation_transport->modeName();
+    const char *current_transport = impl->activation_transport == nullptr ? "unavailable" :
+        impl->activation_transport->currentTransportName();
+    const bool mqtt_path_healthy = impl->activation_transport != nullptr &&
+        impl->activation_transport->mqttPathHealthy();
     const bool ble_advertising = impl->activation_transport != nullptr && impl->activation_transport->bleAdvertising();
     const bool ble_connected = impl->activation_transport != nullptr && impl->activation_transport->bleConnected();
     const char *last_event_id = impl->activation_transport == nullptr ? "" : impl->activation_transport->lastEventId();
     const char *last_result = impl->activation_transport == nullptr ? "unavailable" : impl->activation_transport->lastResult();
+    const char *last_activation_transport = impl->activation_transport == nullptr ? "none" :
+        impl->activation_transport->lastActivationTransport();
+    const char *last_drop_reason = impl->activation_transport == nullptr ? "unavailable" :
+        impl->activation_transport->lastDropReason();
     const uint32_t retry_seconds = impl->wifi == nullptr ? 0 : impl->wifi->recoveryRetrySeconds();
+    const uint64_t now_ms = static_cast<uint64_t>(esp_timer_get_time() / 1000);
+    const uint32_t fallback_remaining_ms = impl->activation_transport == nullptr ? 0 :
+        impl->activation_transport->fallbackRemainingMs(now_ms);
+    const uint32_t reclaim_remaining_ms = impl->activation_transport == nullptr ? 0 :
+        impl->activation_transport->reclaimRemainingMs(now_ms);
 
     char json[4096];
     size_t used = 0;
@@ -459,10 +477,16 @@ esp_err_t statusHandler(httpd_req_t *request)
         json, sizeof(json), used,
         ",\"network\":{\"mode\":\"%s\",\"wifi_connected\":%s,\"mqtt_connected\":%s,\"mqtt_broker\":\"%s\","
         "\"retry_seconds\":%u,\"retry_cadence_seconds\":300},\"transport\":{\"selected\":\"%s\","
-        "\"ble_advertising\":%s,\"ble_connected\":%s,\"last_event_id\":\"%s\",\"last_result\":\"%s\"}}",
+        "\"configured\":\"%s\",\"current\":\"%s\",\"mqtt_path_healthy\":%s,"
+        "\"fallback_remaining_ms\":%u,\"reclaim_remaining_ms\":%u,"
+        "\"ble_advertising\":%s,\"ble_connected\":%s,\"last_activation_transport\":\"%s\","
+        "\"last_event_id\":\"%s\",\"last_result\":\"%s\",\"last_drop_reason\":\"%s\"}}",
         network_mode, wifi_connected ? "true" : "false", mqtt_connected ? "true" : "false", mqtt_broker,
-        static_cast<unsigned>(retry_seconds), transport, ble_advertising ? "true" : "false",
-        ble_connected ? "true" : "false", last_event_id, last_result);
+        static_cast<unsigned>(retry_seconds), transport, transport, current_transport,
+        mqtt_path_healthy ? "true" : "false", static_cast<unsigned>(fallback_remaining_ms),
+        static_cast<unsigned>(reclaim_remaining_ms), ble_advertising ? "true" : "false",
+        ble_connected ? "true" : "false", last_activation_transport, last_event_id, last_result,
+        last_drop_reason);
     if (!complete) return sendApiError(request, "500 Internal Server Error", "status JSON overflow");
     httpd_resp_set_type(request, "application/json");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
