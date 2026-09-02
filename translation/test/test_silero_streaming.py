@@ -1,8 +1,10 @@
 """Focused regression tests for the Silero 480-to-512 streaming adapter."""
 
 import sys
+import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
@@ -48,6 +50,29 @@ class SileroStreamingTests(unittest.TestCase):
         )
 
         self.assertIs(detector.model, self.model)
+
+    def test_default_torch_hub_load_is_noninteractive_for_systemd(self):
+        calls = []
+        loaded_model = RecordingSileroModel()
+
+        def load(**kwargs):
+            calls.append(kwargs)
+            return loaded_model, object()
+
+        fake_torch = types.SimpleNamespace(
+            set_num_threads=lambda _count: None,
+            hub=types.SimpleNamespace(load=load),
+        )
+        with mock.patch.dict(sys.modules, {"torch": fake_torch}):
+            detector = SileroSpeechDetector()
+
+        self.assertIs(detector.model, loaded_model)
+        self.assertEqual(calls, [{
+            "repo_or_dir": "snakers4/silero-vad",
+            "model": "silero_vad",
+            "force_reload": False,
+            "trust_repo": True,
+        }])
 
     def test_480_sample_frames_form_continuous_512_sample_windows(self):
         frames = [

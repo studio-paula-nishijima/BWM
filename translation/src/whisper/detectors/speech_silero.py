@@ -58,6 +58,10 @@ class SileroSpeechDetector(SpeechDetector):
             repo_or_dir="snakers4/silero-vad",
             model="silero_vad",
             force_reload=False,
+            # The production runner has no stdin under systemd.  Trust the
+            # reviewed, pinned repository identifier explicitly so Torch Hub
+            # never attempts an interactive confirmation prompt at startup.
+            trust_repo=True,
         )
         return model
 

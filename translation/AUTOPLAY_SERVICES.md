@@ -31,6 +31,20 @@ handlers: Voice cleans up its timer, workers, controls and hardware; Translation
 closes admission, cancels runtime work, stops playback, shuts down Halo lighting
 when present, and quiesces GPIO.
 
+Voice's Silero detector explicitly trusts its reviewed Torch Hub repository in
+code, so systemd never receives Torch Hub's interactive trust prompt.  On a
+new Pi, Torch may still need to download and cache the model once.  Provision
+that cache before relying on offline Voice startup, using the same root account
+as the unit:
+
+```bash
+sudo /home/raspi/BWM/translation/whisper_venv/bin/python -c \
+  'import torch; torch.hub.load("snakers4/silero-vad", "silero_vad", trust_repo=True, force_reload=False)'
+```
+
+This is one-time deployment provisioning, not a `network-online.target`
+dependency; normal boot does not wait for network initialization.
+
 ## Install and operate
 
 On the matching Pi, with the checkout and both required virtual environments
