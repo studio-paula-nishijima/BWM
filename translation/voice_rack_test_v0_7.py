@@ -21,6 +21,7 @@ from dataclasses import replace
 import time
 import signal
 import argparse
+import queue
 
 
 # -----------------------------
@@ -102,8 +103,12 @@ from live.oracle_display import DisplayConfig, OracleDisplayController, PygameOr
 from live.retrieval_adapter import RiverCultureRetrievalAdapter
 from live.retrieval_worker import PersistentRetrievalWorker
 from live.voice_messaging import VoiceStatePublisher
+from live.semantic_ingress import VoiceSemanticIngress
+from live.voice_session import VoiceSessionController
+from live.interaction_button import InteractionButton
 from live.asr_result_log import ASRResultLogger
 from configs.runtime_config import load_asr_config
+from shared.messaging.topics import TopicNamespace
 
 from app_logging.csv_logger import WhisperCSVLogger
 from actuation.runtime import resolve_actuation_enabled, DelayedInteractionServo
@@ -146,6 +151,9 @@ oracle_interaction = None
 voice_mqtt = None
 voice_uart = None
 interaction_servo = None
+voice_session = None
+interaction_button = None
+button_presses = queue.SimpleQueue()
 shutdown_started = False
 
 
@@ -231,7 +239,7 @@ def shutdown(*_):
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt, voice_uart, interaction_servo
+    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button
 
     if not _begin_shutdown():
         return
@@ -270,6 +278,10 @@ def shutdown(*_):
         except Exception:
             import traceback
             traceback.print_exc()
+    if voice_session:
+        voice_session.shutdown()
+    if interaction_button:
+        interaction_button.close()
     if oracle_interaction:
         oracle_interaction.close()
     if voice_mqtt:
@@ -343,7 +355,7 @@ def main():
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt, voice_uart, interaction_servo
+    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button
 
     args = parse_arguments()
     asr_config = load_asr_config().get("asr", {})
@@ -600,6 +612,7 @@ def main():
         if retrieval is None: return True, ""
         if retrieval.ready: return True, ""
         return False, retrieval.startup_error or ""
+    voice_config = asr_config.get("voice_session", {})
     asr_coordinator = LiveASRCoordinator(capture_controller, worker, lifecycle=lifecycle,
                                          source_id=args.wav or "live_respeaker", detector_profile=detector_profile,
                                          release_after_asr=args.release_after_asr, startup_ready=retrieval_ready,
@@ -607,6 +620,14 @@ def main():
                                          on_asr_result=ASRResultLogger(
                                              asr_config.get("result_log_path", "logs/live_transcripts.csv")),
                                          release_on_asr_result=not args.oracle)
+    voice_session = VoiceSessionController(
+        asr_coordinator,
+        active_period_seconds=voice_config.get("active_period_seconds", 600),
+        initially_active=voice_config.get("initially_active", True),
+        stop_asr_when_quiescent=voice_config.get("stop_asr_when_quiescent", True),
+    )
+    # The policy is Voice-local; it does not observe Translation or transport state.
+    asr_coordinator._interaction_admission = lambda: voice_session.admitting_interactions
     print("[Runtime] Oracle/Pygame/retrieval enabled" if args.oracle else
           "[Runtime] exhibition mode: ASR enabled; Oracle/Pygame/retrieval disabled")
     if args.oracle:
@@ -622,20 +643,32 @@ def main():
         from shared.messaging.mqtt_client import SemanticMQTTClient
         from shared.messaging.uart import SemanticUARTTransport
         settings, topic_base = load_mqtt_settings(Path(BASE_DIR).parent)
+        ingress = VoiceSemanticIngress(voice_session.activation_received)
+        topics = TopicNamespace(topic_base)
         if args.voice_mqtt:
-            voice_mqtt = SemanticMQTTClient(settings, lambda *_: None)
-            voice_mqtt.start([])
+            voice_mqtt = SemanticMQTTClient(
+                settings,
+                lambda topic, event: ingress.handle_event(event) if topic == topics.installation_activation else False,
+            )
+            voice_mqtt.start([topics.installation_activation])
         if args.voice_uart:
             # The CLI explicitly selects Voice UART publication.  The YAML
             # carries device/framing settings; Translation opens its enabled
             # shared UART ingress independently.
             voice_uart = SemanticUARTTransport(
                 replace(load_uart_settings(Path(BASE_DIR).parent), enabled=True),
-                lambda *_: None,
+                ingress.handle_event,
             )
             voice_uart.start()
         lifecycle.add_transition_observer(VoiceStatePublisher(voice_mqtt, uart_transport=voice_uart, topic_base=topic_base).publish_transition)
-    asr_coordinator.start()
+    button_config = voice_config.get("interaction_button", {})
+    if button_config.get("enabled", False):
+        interaction_button = InteractionButton(
+            button_config["gpio"], lambda: button_presses.put("button"),
+            debounce_seconds=button_config.get("debounce_seconds", .4),
+            pull_up=button_config.get("pull_up", True),
+        )
+    voice_session.start()
 
 
 
@@ -783,6 +816,7 @@ def main():
 
 
             triggered = False
+            trigger_source = "detector"
 
             now = time.time()
 
@@ -792,20 +826,38 @@ def main():
                 detector.record_trigger()
                 last_trigger_time = now
                 result.trigger_route = profile_decision.trigger_route
-                # This is the sole physical-feedback seam: a real emitted
-                # trigger schedules feedback before capture admission is tried.
-                interaction_servo.schedule()
+                # Physical feedback and capture share Voice's active admission
+                # gate; detector inference itself remains unchanged.
+                if voice_session.admitting_interactions:
+                    interaction_servo.schedule()
             elif profile_decision.trigger:
                 # A threshold crossing is still logged, but it is not an
                 # emitted trigger while the actuator cooldown is active.
                 result.trigger_suppression_reason = "cooldown"
+
+            # GPIO callbacks only enqueue.  Handle one logical press at the
+            # same frame-boundary occurrence seam as a real emitted trigger.
+            try:
+                button_presses.get_nowait()
+                if voice_session.admitting_interactions:
+                    print("[InteractionButton] source=button")
+                    interaction_servo.schedule()
+                    if not triggered:
+                        triggered, trigger_source = True, "button"
+                    else:
+                        print("[Interaction] capture ignored: busy (detector already admitted)")
+                else:
+                    print("[InteractionButton] ignored: Voice quiescent")
+            except queue.Empty:
+                pass
 
             actuation_result = None
 
             # Polling only reads already-completed results; ASR remains in its
             # persistent child process while the next detector frame proceeds.
             completed_asr = asr_coordinator.process_frame(frame, frame_number, emitted_trigger=triggered,
-                                                           temporal_candidate=bool(result.temporal_candidate))
+                                                           temporal_candidate=bool(result.temporal_candidate),
+                                                           trigger_source=trigger_source)
             if oracle_interaction:
                 oracle_interaction.on_asr_results(completed_asr)
                 oracle_interaction.poll()

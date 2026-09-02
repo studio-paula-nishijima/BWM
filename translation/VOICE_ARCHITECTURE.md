@@ -167,6 +167,36 @@ is what calls `complete_interaction()`.
 
 ## Shared Voice-state messaging
 
+## Voice active period and rpi02 interaction backup
+
+Voice boots independently into normal operation and owns a local monotonic
+active-period timer.  `configs/asr.yaml` supplies `voice_session` defaults:
+600 seconds, active at boot, and a restartable ASR worker suspension policy.
+The value intentionally aligns with Translation's installation duration, but
+the timers do not share runtime ownership.  MQTT/UART loss, Translation
+availability, detector availability, and BLE state never request quiescence.
+
+Voice subscribes through `VoiceSemanticIngress` to shared
+`installation.activation` envelopes on `bwm/installation/activation`.  An
+`active` envelope resets the local timer; from quiescence it restarts Voice's
+ASR worker and returns through `initializing` to `listening`.  `inactive` and
+timer expiry use the same graceful path: new interaction admission closes,
+an already admitted interaction completes normally, then the ASR child is
+stopped.  Semantic ingress, process, and lightweight GPIO/control paths stay
+alive so only an explicit `active` envelope can wake Voice.
+
+rpi02's legacy voice-rack button wiring is GPIO17 to GND, internal pull-up,
+falling-edge, 0.4-second debounce.  It is an interaction backup, never an
+installation activation input (rpi03 GPIO17 remains Translation's independent
+activation backup).  The Voice runner queues a valid button edge and handles
+it at the same frame-boundary occurrence seam as an emitted detector trigger:
+it schedules the existing delayed servo feedback and independently attempts
+capture admission.  While busy it still schedules feedback but starts no
+second capture; while quiescent it does neither and cannot wake Voice.
+
+The legacy `button-controller-voice.service` must be disabled on rpi02 before
+deployment because it separately claims GPIO17 to start/stop the old service.
+
 Voice uses the repo-wide `shared/messaging/` implementation; it does not own a
 second MQTT stack. UART Voice semantic publication is enabled by default in
 the live runner. `--voice-mqtt` additionally enables MQTT publication;

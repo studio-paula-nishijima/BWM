@@ -115,6 +115,12 @@ class PersistentASRWorker:
             except queue.Full: pass
             self._process.join(timeout)
             if self._process.is_alive(): self._process.terminate(); self._process.join()
+        # A quiescent Voice runtime may later reactivate.  ``Process`` objects
+        # cannot be started twice, so discard all process-specific state here.
+        self._process = None
+        self._requests, self._results = self._context.Queue(self.config.queue_size), self._context.Queue()
+        self._ready, self._startup_errors = self._context.Event(), self._context.Queue(1)
+        self._startup_error = None
 
     def recycle_after_timeout(self):
         """Kill a stuck inference and prewarm a fresh isolated worker."""

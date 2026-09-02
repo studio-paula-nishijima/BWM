@@ -10,3 +10,16 @@ asr:
   queue_size: 1
   inference_timeout_seconds: 10
   result_log_path: logs/live_transcripts.csv
+
+# Voice owns this local monotonic active-period timer.  The default deliberately
+# matches Translation's configured installation/session duration without
+# importing or depending on its runtime.
+voice_session:
+  active_period_seconds: 600
+  initially_active: true
+  stop_asr_when_quiescent: true
+  interaction_button:
+    enabled: true
+    gpio: 17
+    pull_up: true
+    debounce_seconds: 0.4

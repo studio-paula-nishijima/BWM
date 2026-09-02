@@ -82,6 +82,25 @@ class VoiceRuntimeTests(unittest.TestCase):
         finally:
             runtime.shutdown()
 
+    def test_quiescent_policy_blocks_new_trigger_without_waking_worker(self):
+        runtime, events = self.make()
+        runtime._interaction_admission = lambda: False
+        try:
+            self.feed(runtime)
+            self.assertEqual(runtime.capture.completed, [])
+            self.assertTrue(any("capture ignored: quiescent" in item for item in events))
+        finally:
+            runtime.shutdown()
+
+    def test_trigger_source_is_observable_without_changing_capture_path(self):
+        runtime, events = self.make()
+        try:
+            frame = np.zeros(10, np.float32); runtime.capture.ring_buffer.append(frame)
+            runtime.process_frame(frame, 0, emitted_trigger=True, temporal_candidate=False, trigger_source="button")
+            self.assertTrue(any("source=button" in item for item in events))
+        finally:
+            runtime.shutdown()
+
     def test_slow_asr_does_not_block_next_detector_frames(self):
         runtime, _ = self.make(slow_factory)
         try:

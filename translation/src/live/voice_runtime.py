@@ -54,7 +54,8 @@ class LiveASRCoordinator:
     def __init__(self, capture, worker=None, *, lifecycle=None, emit=print,
                  source_id="live", detector_profile="", output_mode="transcribe", language=None,
                  release_after_asr=False, startup_ready=None, inference_timeout_seconds=None,
-                 on_capture_started=None, on_asr_result=None, release_on_asr_result=False):
+                 on_capture_started=None, on_asr_result=None, release_on_asr_result=False,
+                 interaction_admission=None):
         self.capture = capture
         self.worker = worker
         self.lifecycle = lifecycle or VoiceLifecycle(emit)
@@ -73,10 +74,16 @@ class LiveASRCoordinator:
         self.release_on_asr_result = release_on_asr_result
         self._inference_started = {}
         self.startup_ready = startup_ready or (lambda: (True, ""))
+        self._interaction_admission = interaction_admission or (lambda: True)
 
     @property
     def accepting_interaction(self):
-        return self.lifecycle.state is VoiceState.LISTENING and not self.capture.is_capturing
+        return self._interaction_admission() and self.lifecycle.state is VoiceState.LISTENING and not self.capture.is_capturing
+
+    @property
+    def interaction_admitted(self):
+        return self.capture.is_capturing or self.lifecycle.state in (
+            VoiceState.WHISPER_DETECTED, VoiceState.CAPTURE_PROCESSING, VoiceState.RESPONSE_DISPLAYED)
 
     def start(self):
         self.lifecycle.set(VoiceState.INITIALIZING)
@@ -86,6 +93,20 @@ class LiveASRCoordinator:
             self.worker.start()
         else:
             self.emit("[Voice] ASR disabled; initialization complete")
+            self.lifecycle.set(VoiceState.LISTENING)
+
+    def quiesce(self):
+        """Suspend only the restartable heavy ASR child; ingress stays outside."""
+        if self.worker:
+            self.worker.shutdown()
+
+    def reactivate(self):
+        self.lifecycle.set(VoiceState.INITIALIZING)
+        if self.worker:
+            self.emit("[ASR] loading")
+            self._asr_status = "loading"
+            self.worker.start()
+        else:
             self.lifecycle.set(VoiceState.LISTENING)
 
     def ready_status(self):
@@ -112,19 +133,20 @@ class LiveASRCoordinator:
             self.emit(f"[RetrievalWorker] error: {dependency_error}")
         return status
 
-    def process_frame(self, frame, frame_number, *, emitted_trigger, temporal_candidate):
+    def process_frame(self, frame, frame_number, *, emitted_trigger, temporal_candidate, trigger_source="detector"):
         # Readiness is checked before admission, so the first trigger after the
         # persistent worker reports ready is eligible without faking startup.
         if self.lifecycle.state is VoiceState.INITIALIZING:
             self.ready_status()
         admitted_trigger = False
         if emitted_trigger:
-            self.emit("[Trigger] whisper detected")
+            self.emit(f"[Trigger] whisper detected source={trigger_source}")
             if self.accepting_interaction:
                 admitted_trigger = True
                 self.lifecycle.set(VoiceState.WHISPER_DETECTED)
             else:
-                self.emit(f"[Interaction] capture ignored: busy ({self.lifecycle.state.value})")
+                reason = "quiescent" if not self._interaction_admission() else f"busy ({self.lifecycle.state.value})"
+                self.emit(f"[Interaction] capture ignored: {reason}")
         completed = self.capture.process_frame(frame, frame_number, admitted_trigger, temporal_candidate)
         if self.capture.is_capturing and admitted_trigger:
             self.emit("[Capture] started")
