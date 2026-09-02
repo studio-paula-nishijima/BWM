@@ -1,0 +1,23 @@
+[Unit]
+Description=BWM Whisper Runtime
+After=local-fs.target
+
+[Service]
+Type=simple
+
+WorkingDirectory=/home/raspi/BWM/translation
+
+ExecStartPre=/bin/bash -c 'echo RUNNING > /run/whisper_runtime.state'
+
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/raspi/BWM/translation/whisper_venv/bin/python -u /home/raspi/BWM/translation/whisper_runtime.py
+
+ExecStopPost=/bin/bash -c 'echo STOPPED > /run/whisper_runtime.state'
+
+TimeoutStopSec=10
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

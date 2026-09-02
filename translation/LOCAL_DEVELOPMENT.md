@@ -36,6 +36,12 @@ by `apt`, and the virtual environment exposes those system packages.  It is
 the only environment that can validate actual GPIO, I2C/PCA9685, ALSA, and the
 ReSpeaker microphone.
 
-The optional Whisper stack is separate because its pinned Torch versions need
-to be available for the Pi's ARM64 platform; install it only on the Pi after
-confirming compatible wheels.
+The script creates the base Translation environment at `translation_venv`.
+Create `whisper_venv` separately from `requirements/requirements_whisper.txt`;
+the optional Whisper stack has pinned Torch versions which must be available
+for the Pi's ARM64 platform.  Install it only on the Pi after confirming
+compatible wheels.
+
+For the Pi autoplay installation of `whisper-runtime.service` (rpi02) and
+`play-events.service` (rpi03), including journald commands and legacy-service
+conflict notes, see [AUTOPLAY_SERVICES.md](AUTOPLAY_SERVICES.md).

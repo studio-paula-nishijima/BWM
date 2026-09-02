@@ -1,22 +1,23 @@
 [Unit]
-Description=BWM Play Events
+Description=BWM Play Events Runtime
 After=local-fs.target
 
 [Service]
 Type=simple
 
-WorkingDirectory=/home/raspi/BWMTest/translation_release
+WorkingDirectory=/home/raspi/BWM/translation
 
 ExecStartPre=/bin/bash -c 'echo RUNNING > /run/play_events.state'
 
-ExecStart=/home/raspi/BWMTest/translation_release/translation_demo/bin/python /home/raspi/BWMTest/translation_release/play_events.py
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/raspi/BWM/translation/translation_venv/bin/python -u /home/raspi/BWM/translation/play_events.py
 
 ExecStopPost=/bin/bash -c 'echo STOPPED > /run/play_events.state'
 
 TimeoutStopSec=10
 
-# IMPORTANT: no auto-restart
-Restart=no
+Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
