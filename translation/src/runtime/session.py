@@ -21,9 +21,15 @@ class PlaybackSessionRuntime:
         self._voice_interaction = dict(voice_interaction_config or {})
         self._lighting = lighting_controller
         if reaction_policy_config is not None and self._voice_interaction.get("enabled", False):
+            selection_policy_names = tuple(
+                band["reaction_policy"]
+                for band in self._voice_interaction.get("silero_selection_bands", ())
+                if "reaction_policy" in band
+            )
             strategies, policies = prepare_voice_reactions(
                 reaction_policy_config.get("strategies", {}), reaction_policy_config.get("policies", {}),
-                self._voice_interaction.get("reaction_policy", "voice_default"), reaction_targets)
+                self._voice_interaction.get("reaction_policy", "voice_default"), reaction_targets,
+                additional_policy_names=selection_policy_names)
             reaction_policy_config = {"strategies": strategies, "policies": policies}
         self._reaction_policy = None if reaction_policy_config is None else ReactionPolicy(
             reaction_policy_config.get("strategies", {}), reaction_policy_config.get("policies", {}), rng)

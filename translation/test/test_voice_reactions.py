@@ -33,6 +33,19 @@ class VoiceReactionTests(unittest.TestCase):
             prepare_voice_reactions({"reaction": {"type": "override_sequence", "phases": [
                 {"type": "sequence", "targets": ["missing"], "spacing_seconds": 0}]}},
                 policies, "voice_default", ["a"])
+
+    def test_voice_preparation_ignores_base_modulation_policies(self):
+        strategies = {
+            "cascade": {"type": "cascade"},
+            "reaction": {"type": "repeat_transform", "duration_seconds": 1,
+                         "repeat_count": 2, "tap_spacing_seconds": .1},
+        }
+        policies = {"default": {"mode": "fixed", "strategy": "cascade"},
+                    "voice_default": {"mode": "fixed", "strategy": "reaction"},
+                    "voice_band_1": {"mode": "fixed", "strategy": "reaction"}}
+        prepared, _ = prepare_voice_reactions(strategies, policies, "voice_default", ["a"],
+                                               additional_policy_names=("voice_band_1",))
+        self.assertEqual(prepared["cascade"]["type"], "cascade")
     def make_runtime(self, strategy, events):
         self.clock, self.dispatcher = SimulatedClock(), Dispatcher()
         config = {"strategies": {"reaction": strategy},

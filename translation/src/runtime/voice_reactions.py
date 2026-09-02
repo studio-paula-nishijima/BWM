@@ -2,15 +2,19 @@
 from copy import deepcopy
 
 
-def prepare_voice_reactions(strategies, policies, policy_name, targets):
-    """Validate selected Voice reactions and resolve their configured targets."""
+def prepare_voice_reactions(strategies, policies, policy_name, targets, *, additional_policy_names=()):
+    """Validate Voice-only reactions, never base modulation strategies."""
     strategies, policies, targets = deepcopy(strategies), deepcopy(policies), list(targets or ())
     policy = policies.get(policy_name)
     if policy is None:
         raise ValueError("voice_interaction.reaction_policy references missing policy: %s" % policy_name)
-    # All configured policies are validated/prepared because detector bands
-    # select one at semantic ingress, not just the legacy lifecycle policy.
-    names = {name for policy_name, policy in policies.items() for name in _policy_names(policy, policy_name)}
+    selected = (policy_name, *additional_policy_names)
+    names = set()
+    for selected_name in selected:
+        selected_policy = policies.get(selected_name)
+        if selected_policy is None:
+            raise ValueError("voice_interaction references missing policy: %s" % selected_name)
+        names.update(_policy_names(selected_policy, selected_name))
     for name in names:
         if name not in strategies:
             raise ValueError("%s references missing reaction: %s" % (policy_name, name))
