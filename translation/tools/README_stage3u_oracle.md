@@ -5,7 +5,7 @@ requirements plus the River Culture retrieval requirements and building a
 selected retrieval index:
 
 ```sh
-GPIOZERO_PIN_FACTORY=native python voice_rack_test_v0_7.py --oracle-width 800 --oracle-height 480 --no-actuation --voice-mqtt
+GPIOZERO_PIN_FACTORY=native python whisper_runtime.py --oracle-width 800 --oracle-height 480 --no-actuation --voice-mqtt
 ```
 
 The Oracle display/integration is enabled by default. Start windowed first; add

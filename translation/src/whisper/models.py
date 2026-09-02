@@ -146,6 +146,8 @@ class WhisperDetectionResult:
     assisted_confirmation_requirement: int = None
     fallback_confirmation_requirement: int = None
     context_confirmation_requirement: int = None
+    silero_selection_value: float = None
+    silero_probability: float = None
 
     feature_scores: Dict[str, float] = field(
         default_factory=dict

@@ -3,7 +3,7 @@
 On the Raspberry Pi, run from `translation/` with Faster-Whisper installed:
 
 ```sh
-GPIOZERO_PIN_FACTORY=native python voice_rack_test_v0_7.py --no-actuation
+GPIOZERO_PIN_FACTORY=native python whisper_runtime.py --no-actuation
 ```
 
 The default is Faster-Whisper `base`, CPU `int8`, two threads, automatic
@@ -14,7 +14,7 @@ detector-derived endpoint; maximum duration is the reliable completion path.
 For a low-cost model check, change only the model:
 
 ```sh
-GPIOZERO_PIN_FACTORY=native python voice_rack_test_v0_7.py --asr-model tiny --no-actuation
+GPIOZERO_PIN_FACTORY=native python whisper_runtime.py --asr-model tiny --no-actuation
 ```
 
 Useful test variants are `--no-live-asr` (capture without model work) and

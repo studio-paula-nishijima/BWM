@@ -95,3 +95,28 @@ voice_interaction:
   enabled: true
   trigger_state: capture_processing
   reaction_policy: voice_default
+  # Fixed artistic selector bands.  This is neither confidence nor loudness.
+  silero_selection_bands:
+    - {upper_exclusive: 0.002, reaction_policy: voice_band_1}
+    - {upper_exclusive: 0.006, reaction_policy: voice_band_2}
+    - {upper_exclusive: 0.020, reaction_policy: voice_band_3}
+    - {upper_exclusive: 0.060, reaction_policy: voice_band_4}
+    - {upper_exclusive: .inf, reaction_policy: voice_band_5}
+
+lighting:
+  enabled: true
+  serial_port: /dev/ttyUSB0
+  start_address: 1
+  frame_interval_seconds: 0.1
+  retry_seconds: 5.0
+  active_brightness_percent: 60
+  active_cct_kelvin: 2700
+  activation_fade_seconds: 4.0
+  deactivation_fade_seconds: 4.0
+  whisper_gesture:
+    enabled: true
+    pulse_count: 3
+    duration_seconds: 7.0
+    target_brightness_percent: 50
+    target_cct_kelvin: 6500
+  gesture_cooldown_seconds: 7.0

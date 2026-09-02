@@ -38,7 +38,7 @@ class ServoActuationController:
         self._servo = servo_factory(channel=self.config["channel"], frequency=self.config["frequency"], home_pulse=self.config["home_pulse"])
         self._servo.go_home()
 
-    def actuate(self):
+    def actuate(self, sequence=None):
         with self._lock:
             if self._closed:
                 return {"requested": True, "started": False, "suppression_reason": "shutdown"}
@@ -48,7 +48,9 @@ class ServoActuationController:
                 return {"requested": True, "started": False, "suppression_reason": "cooldown"}
             self._busy = True
             self._last_started = self._clock()
-            sequence = self._random_choice((1, 2, 3, 4, 5))
+            sequence = self._random_choice((1, 2, 3, 4, 5)) if sequence is None else int(sequence)
+            if sequence not in (1, 2, 3, 4, 5):
+                raise ValueError("servo sequence must be 1 through 5")
             self._worker = threading.Thread(target=self._run_sequence, args=(sequence,), daemon=True)
             self._worker.start()
             return {"requested": True, "started": True, "sequence": sequence, "suppression_reason": None}

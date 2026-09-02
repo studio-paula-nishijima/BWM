@@ -9,6 +9,7 @@ from uuid import uuid4
 SCHEMA_VERSION = 1
 INSTALLATION_ACTIVATION = "installation.activation"
 VOICE_STATE = "voice.state"
+VOICE_INTERACTION = "voice.interaction"
 VOICE_STATES = frozenset({"idle", "initializing", "listening", "whisper_detected", "capture_processing", "response_displayed"})
 
 
@@ -94,3 +95,18 @@ def voice_state(origin: str, state: str, **kwargs: Any) -> SemanticEvent:
     if state not in VOICE_STATES:
         raise EventValidationError("Unsupported Voice state: %r" % (state,))
     return SemanticEvent(VOICE_STATE, origin, {"state": state}, **kwargs)
+
+
+def voice_interaction(origin: str, source: str, *, silero_selection_value: float | None = None,
+                      **kwargs: Any) -> SemanticEvent:
+    """Create one real emitted interaction; the value is an artistic selector."""
+    if source not in {"detector", "button"}:
+        raise EventValidationError("Voice interaction source must be 'detector' or 'button'")
+    if source == "button" and silero_selection_value is not None:
+        raise EventValidationError("Button interactions must not carry a Silero selection value")
+    payload = {"source": source}
+    if source == "detector":
+        if not isinstance(silero_selection_value, (int, float)):
+            raise EventValidationError("Detector interactions require a numeric Silero selection value")
+        payload["silero_selection_value"] = float(silero_selection_value)
+    return SemanticEvent(VOICE_INTERACTION, origin, payload, **kwargs)

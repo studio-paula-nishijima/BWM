@@ -1,6 +1,8 @@
 """Detector-profile composition and temporal trigger confirmation policy."""
 
 from dataclasses import dataclass
+from collections import deque
+from statistics import median
 
 
 PROFILE_NAMES = ("webrtc_assisted_temporal", "temporal_only", "analysis_full", "temporal_v2_context", "temporal_v2_recall")
@@ -17,6 +19,7 @@ class ProfileDecision:
     assisted_confirmation_requirement: int = None
     fallback_confirmation_requirement: int = None
     context_confirmation_requirement: int = None
+    silero_selection_value: float = None
 
 
 class TemporalProfilePolicy:
@@ -34,11 +37,17 @@ class TemporalProfilePolicy:
         self._webrtc_enter_count = 0
         self._webrtc_exit_count = 0
         self._triggered_this_run = False
+        self._selection_values = deque(maxlen=10)
 
     def update(self, temporal_result, webrtc_result=None):
         candidate = bool(temporal_result.temporal_v2_raw_is_whisper if temporal_result.temporal_v2_raw_is_whisper is not None else temporal_result.temporal_v1_raw_is_whisper)
         if not candidate:
             self._triggered_this_run = False
+            self._selection_values.clear()
+        elif temporal_result.silero_probability is not None:
+            # Reuse the one authoritative per-frame Silero inference.  The
+            # window intentionally begins at this contiguous qualifying run.
+            self._selection_values.append(float(temporal_result.silero_probability))
 
         # ``analysis_full`` does not make the WebRTC result the primary speech
         # decision, but it intentionally reconstructs this same mode-0 gate so
@@ -83,4 +92,6 @@ class TemporalProfilePolicy:
             decision.trigger, decision.trigger_route = True, route
         if decision.trigger:
             self._triggered_this_run = True
+            if len(self._selection_values) == 10:
+                decision.silero_selection_value = float(median(self._selection_values))
         return decision

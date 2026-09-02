@@ -145,6 +145,16 @@ whisper_frames_required: 10
 cooldown_seconds: 7
 run_duration_seconds: 6000
 
+# Artistic physical-response selection, latched from the detector's existing
+# final ten-frame Silero window at its first emitted crossing. Not loudness.
+silero_response_selection:
+  bands:
+    - {upper_exclusive: 0.002, servo_sequence: 1}
+    - {upper_exclusive: 0.006, servo_sequence: 2}
+    - {upper_exclusive: 0.020, servo_sequence: 3}
+    - {upper_exclusive: 0.060, servo_sequence: 4}
+    - {upper_exclusive: .inf, servo_sequence: 5}
+
 # Legacy feature detector thresholds (retained unchanged).
 rms_min: 0.005
 rms_max: 0.1

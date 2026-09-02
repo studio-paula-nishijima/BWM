@@ -40,3 +40,10 @@ policy:
     voice_cascade: 1
     voice_triple_tap: 1
     voice_double_tap: 1
+
+policies:
+  voice_band_1: {mode: fixed, strategy: voice_simultaneous_then_sequence}
+  voice_band_2: {mode: fixed, strategy: voice_cascade}
+  voice_band_3: {mode: fixed, strategy: voice_triple_tap}
+  voice_band_4: {mode: fixed, strategy: voice_double_tap}
+  voice_band_5: {mode: fixed, strategy: voice_simultaneous_then_sequence}

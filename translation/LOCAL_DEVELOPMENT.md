@@ -17,7 +17,7 @@ The local runner sets `GPIOZERO_PIN_FACTORY=mock`; GPIO calls have no physical
 effect.  `-Target play-events` can be used after a suitable `events.npy` has
 been generated.
 
-`main.py` currently reads LamaH CSV files from paths under
+`translate_lamah.py` currently reads LamaH CSV files from paths under
 `/home/raspi/BWMTest/lamah_data`.  Those source files are not included in this
 workspace, so generating events locally requires either that dataset or a
 local configuration pointing at a copy of it.

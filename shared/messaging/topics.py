@@ -2,6 +2,7 @@
 
 INSTALLATION_ACTIVATION = "installation/activation"
 VOICE_STATE = "voice/state"
+VOICE_INTERACTION = "voice/interaction"
 
 
 class TopicNamespace:
@@ -24,6 +25,10 @@ class TopicNamespace:
     @property
     def voice_state(self) -> str:
         return self.topic(VOICE_STATE)
+
+    @property
+    def voice_interaction(self) -> str:
+        return self.topic(VOICE_INTERACTION)
 
     def availability(self, origin: str) -> str:
         if not origin.strip():

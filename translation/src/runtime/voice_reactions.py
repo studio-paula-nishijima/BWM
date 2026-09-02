@@ -8,7 +8,9 @@ def prepare_voice_reactions(strategies, policies, policy_name, targets):
     policy = policies.get(policy_name)
     if policy is None:
         raise ValueError("voice_interaction.reaction_policy references missing policy: %s" % policy_name)
-    names = _policy_names(policy, policy_name)
+    # All configured policies are validated/prepared because detector bands
+    # select one at semantic ingress, not just the legacy lifecycle policy.
+    names = {name for policy_name, policy in policies.items() for name in _policy_names(policy, policy_name)}
     for name in names:
         if name not in strategies:
             raise ValueError("%s references missing reaction: %s" % (policy_name, name))

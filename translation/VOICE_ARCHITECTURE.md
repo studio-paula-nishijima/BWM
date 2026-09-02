@@ -9,11 +9,21 @@ and analysis procedures.
 
 ## Runtime path and ownership
 
-`voice_rack_test_v0_7.py` is the current live composition root.  It keeps the
+`whisper_runtime.py` is the stable production live composition root.  It keeps the
 existing audio/detector pipeline running, feeds the `AudioRingBuffer`, and
 passes only a real emitted (post-cooldown) whisper trigger to Voice.  Servo
 actuation remains a parallel existing consumer of that emitted trigger; Voice
 does not change detector or actuation policy.
+
+## Interaction occurrence and artistic selector
+
+At the existing detector-confirmation and cooldown seam, Voice emits one
+`voice.interaction` event. Detector payloads carry `source: detector` and a
+`silero_selection_value`: the median of the final ten qualifying Silero frames,
+including the crossing frame, latched once. It is an artistic selector, not
+loudness, calibrated confidence, or speaker identity. It chooses a configured
+servo sequence 1–5. The backup button carries `source: button`, has no
+fabricated value, and retains random servo selection.
 
 For an admitted interaction the legacy Oracle demonstrator path is:
 

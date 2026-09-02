@@ -43,6 +43,16 @@ local operation.
 
 The initial common namespace also reserves `bwm/system/status/<origin>` for a
 future availability/LWT convention. It does not yet impose a health protocol.
+
+## Voice interaction occurrence
+
+`voice.interaction` is published on `bwm/voice/interaction` only for a real
+post-confirmation, post-cooldown occurrence. Detector payloads are `{ "source":
+"detector", "silero_selection_value": <float> }`; button payloads are
+`{ "source": "button" }`. The value is an artistic selector from the
+authoritative final ten-frame Silero window, not calibrated confidence,
+loudness, speaker identity, or a physical command. One `SemanticEvent` object
+is reused unchanged across MQTT and UART fan-out.
 Availability information is not an instruction to activate, deactivate, or
 quiesce another subsystem.
 

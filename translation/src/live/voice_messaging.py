@@ -1,7 +1,7 @@
 """Voice-side use of the shared semantic messaging convention."""
 from __future__ import annotations
 
-from shared.messaging.events import voice_state
+from shared.messaging.events import voice_interaction, voice_state
 from shared.messaging.topics import TopicNamespace
 
 
@@ -28,3 +28,21 @@ class VoiceStatePublisher:
                 self.emit(f"[VoiceMessaging] voice.state {state.value} failed via UART; local lifecycle continues")
         if not delivered:
             self.emit("[VoiceMessaging] all state transports unavailable; local lifecycle continues")
+
+
+class VoiceInteractionPublisher:
+    """Fan out one post-cooldown interaction envelope without changing its ID."""
+    def __init__(self, mqtt_client=None, *, uart_transport=None, topic_base="bwm", origin="voice_pi", emit=print):
+        self.mqtt_client, self.uart_transport = mqtt_client, uart_transport
+        self.topic, self.origin, self.emit = TopicNamespace(topic_base).voice_interaction, origin, emit
+
+    def publish(self, source, silero_selection_value=None):
+        event = voice_interaction(self.origin, source, silero_selection_value=silero_selection_value)
+        delivered = False
+        if self.mqtt_client is not None:
+            delivered = bool(self.mqtt_client.publish(self.topic, event))
+        if self.uart_transport is not None:
+            delivered = bool(self.uart_transport.send(event)) or delivered
+        if not delivered:
+            self.emit("[VoiceMessaging] interaction transports unavailable; local feedback continues")
+        return event

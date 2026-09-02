@@ -21,15 +21,15 @@ class DelayedInteractionServo:
     def __init__(self, controller, delay_seconds, *, emit=print, timer_factory=threading.Timer):
         self.controller, self.delay_seconds, self.emit, self._timer_factory = controller, delay_seconds, emit, timer_factory
         self._timers = set()
-    def schedule(self):
+    def schedule(self, sequence=None):
         if self.controller is None: return
         self.emit(f"[Servo] scheduled +{self.delay_seconds:.2f} s")
-        timer = self._timer_factory(self.delay_seconds, self._actuate)
+        timer = self._timer_factory(self.delay_seconds, lambda: self._actuate(sequence))
         self._timers.add(timer)
         timer.daemon = True
         timer.start()
-    def _actuate(self):
-        result = self.controller.actuate()
+    def _actuate(self, sequence=None):
+        result = self.controller.actuate(sequence=sequence)
         if result.get("started"):
             self.emit("[Servo] actuated")
         else:

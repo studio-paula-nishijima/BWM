@@ -36,6 +36,7 @@ from configs.whisper import (
     DETECTOR_PROFILE,
     DETECTOR_PROFILES,
     LIVE_DIAGNOSTIC_LOGGING,
+    SILERO_RESPONSE_SELECTION,
 
     RMS_MIN,
     RMS_MAX,
@@ -102,7 +103,7 @@ from live.interaction import OracleInteractionController
 from live.oracle_display import DisplayConfig, OracleDisplayController, PygameOracleDisplayController
 from live.retrieval_adapter import RiverCultureRetrievalAdapter
 from live.retrieval_worker import PersistentRetrievalWorker
-from live.voice_messaging import VoiceStatePublisher
+from live.voice_messaging import VoiceInteractionPublisher, VoiceStatePublisher
 from live.semantic_ingress import VoiceSemanticIngress
 from live.voice_session import VoiceSessionController
 from live.interaction_button import InteractionButton
@@ -153,6 +154,7 @@ voice_uart = None
 interaction_servo = None
 voice_session = None
 interaction_button = None
+interaction_publisher = None
 button_presses = queue.SimpleQueue()
 shutdown_started = False
 
@@ -239,7 +241,7 @@ def shutdown(*_):
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button
+    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button, interaction_publisher
 
     if not _begin_shutdown():
         return
@@ -355,7 +357,7 @@ def main():
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button
+    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button, interaction_publisher
 
     args = parse_arguments()
     asr_config = load_asr_config().get("asr", {})
@@ -661,6 +663,7 @@ def main():
             )
             voice_uart.start()
         lifecycle.add_transition_observer(VoiceStatePublisher(voice_mqtt, uart_transport=voice_uart, topic_base=topic_base).publish_transition)
+        interaction_publisher = VoiceInteractionPublisher(voice_mqtt, uart_transport=voice_uart, topic_base=topic_base)
     button_config = voice_config.get("interaction_button", {})
     if button_config.get("enabled", False):
         interaction_button = InteractionButton(
@@ -792,6 +795,7 @@ def main():
             result = (
                 pipeline_result.whisper
             )
+            result.silero_probability = float(speech_result.speech_probability)
 
 
             is_whisper = result.is_whisper
@@ -826,10 +830,18 @@ def main():
                 detector.record_trigger()
                 last_trigger_time = now
                 result.trigger_route = profile_decision.trigger_route
+                # The profile policy has latched the exact median of the final
+                # ten consecutive qualifying frames, including this crossing.
+                selection_value = profile_decision.silero_selection_value
+                result.silero_selection_value = selection_value
+                if interaction_publisher is not None:
+                    interaction_publisher.publish("detector", selection_value)
                 # Physical feedback and capture share Voice's active admission
                 # gate; detector inference itself remains unchanged.
                 if voice_session.admitting_interactions:
-                    interaction_servo.schedule()
+                    sequence = next((band["servo_sequence"] for band in SILERO_RESPONSE_SELECTION.get("bands", [])
+                                     if selection_value < float(band["upper_exclusive"])), None)
+                    interaction_servo.schedule(sequence=sequence)
             elif profile_decision.trigger:
                 # A threshold crossing is still logged, but it is not an
                 # emitted trigger while the actuator cooldown is active.
@@ -842,6 +854,8 @@ def main():
                 if voice_session.admitting_interactions:
                     print("[InteractionButton] source=button")
                     interaction_servo.schedule()
+                    if interaction_publisher is not None:
+                        interaction_publisher.publish("button")
                     if not triggered:
                         triggered, trigger_source = True, "button"
                     else:

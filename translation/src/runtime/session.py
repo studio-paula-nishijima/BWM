@@ -14,11 +14,12 @@ class PlaybackSessionRuntime:
 
     def __init__(self, events_factory, clock, dispatcher, session_timeout, initially_active=False,
                  event_logger=None, safety_config=None, reaction_policy_config=None, rng=None,
-                 voice_interaction_config=None, reaction_targets=None):
+                 voice_interaction_config=None, reaction_targets=None, lighting_controller=None):
         self._events_factory, self._clock, self._dispatcher = events_factory, clock, dispatcher
         self._session_timeout, self._event_logger = float(session_timeout), event_logger
         self._safety = RuntimeSafety(clock, dispatcher, safety_config)
         self._voice_interaction = dict(voice_interaction_config or {})
+        self._lighting = lighting_controller
         if reaction_policy_config is not None and self._voice_interaction.get("enabled", False):
             strategies, policies = prepare_voice_reactions(
                 reaction_policy_config.get("strategies", {}), reaction_policy_config.get("policies", {}),
@@ -73,6 +74,8 @@ class PlaybackSessionRuntime:
             engine.start()
             self._engine, self._modulation = engine, modulation
             self._started_at, self._active = self._clock.now(), True
+            if self._lighting:
+                self._lighting.activate()
             print("[Session] ACTIVE: fresh playback session started")
             self._changed.notify_all()
             return True
@@ -139,6 +142,38 @@ class PlaybackSessionRuntime:
             print(f"[Voice] trigger matched; selected reaction: {name}")
             return "triggered"
 
+    def observe_voice_interaction(self, payload):
+        """Admit a real Voice occurrence; selection remains Translation-owned."""
+        source = payload.get("source")
+        value = payload.get("silero_selection_value")
+        with self._changed:
+            if not self._active:
+                return "ignored_inactive"
+            if self._lighting:
+                self._lighting.trigger_interaction()
+            self._refresh_external_reaction()
+            if self._external_reaction_busy:
+                return "ignored_busy"
+            if self._reaction_policy is None:
+                return "ignored_unconfigured"
+            category = self._voice_interaction.get("reaction_policy", "voice_default")
+            if source == "detector":
+                category = self._silero_category(float(value))
+            name, config = self._reaction_policy.select(category)
+            seed = dict(config.pop("event", {"type": "solenoid", "duration": .15, "playback_time": 0}))
+            self._modulation.trigger_external(config.pop("type", name), seed, **config)
+            self._external_reaction_busy = self._modulation.external_busy
+            return "triggered"
+
+    def _silero_category(self, value):
+        bands = self._voice_interaction.get("silero_selection_bands", [])
+        for band in bands:
+            if value < float(band["upper_exclusive"]):
+                return band["reaction_policy"]
+        if not bands:
+            return self._voice_interaction.get("reaction_policy", "voice_default")
+        return bands[-1]["reaction_policy"]
+
     def step(self):
         """Advance both clocks' work without allowing logical pause to affect timeout."""
         with self._changed:
@@ -150,6 +185,8 @@ class PlaybackSessionRuntime:
                 return 0
             dispatched = self._engine.step()
             dispatched += self._modulation.step()
+            if self._lighting:
+                self._lighting.step()
             self._refresh_external_reaction()
             backend_idle = getattr(self._dispatcher, "is_idle", lambda: True)
             if self._engine.is_complete and self._modulation.pending_count == 0 and backend_idle():
@@ -173,6 +210,9 @@ class PlaybackSessionRuntime:
         self._external_reaction_busy = False
         self._modulation.cancel()
         self._engine.stop()
+        if self._lighting:
+            self._lighting.deactivate_async()
+            self._lighting.step()
         quiesce = getattr(self._dispatcher, "quiesce", None)
         if quiesce is not None:
             quiesce()

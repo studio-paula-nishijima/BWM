@@ -23,6 +23,7 @@ ANALYSIS_FILENAME_TAG = cfg.get("analysis_filename_tag", "")
 DETECTOR_PROFILE = cfg.get("detector_profile", "webrtc_assisted_temporal")
 DETECTOR_PROFILES = cfg.get("detector_profiles", {})
 LIVE_DIAGNOSTIC_LOGGING = cfg.get("live_diagnostic_logging", {})
+SILERO_RESPONSE_SELECTION = cfg.get("silero_response_selection", {})
 
 
 

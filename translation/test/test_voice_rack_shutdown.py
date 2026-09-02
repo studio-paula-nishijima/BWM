@@ -4,7 +4,7 @@ import unittest
 
 class VoiceRackShutdownTests(unittest.TestCase):
     def test_shutdown_guard_allows_only_one_cleanup(self):
-        app = importlib.import_module("voice_rack_test_v0_7")
+        app = importlib.import_module("whisper_runtime")
         previous = app.shutdown_started
         try:
             app.shutdown_started = False

@@ -21,7 +21,7 @@ $env:GPIOZERO_PIN_FACTORY = "mock"
 Push-Location $projectRoot
 try {
     if ($Target -eq "main") {
-        & $python main.py
+        & $python translate_lamah.py
     }
     else {
         & $python play_events.py

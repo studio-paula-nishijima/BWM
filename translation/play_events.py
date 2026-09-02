@@ -93,6 +93,7 @@ def main():
     from runtime.mqtt_adapter import TranslationMQTTAdapter
     from runtime.router import EventRouter
     from runtime.session import PlaybackSessionRuntime
+    from lighting.halo_runtime import HaloLightingController
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -112,7 +113,9 @@ def main():
         reaction_strategies = {**RUNTIME_CONFIG.get("modulation", {}).get("strategies", {}),
                                **voice_reactions.get("strategies", {})}
         reaction_policies = {**RUNTIME_CONFIG.get("reaction_policy", {}),
-                             "voice_default": voice_reactions.get("policy", {})}
+                             "voice_default": voice_reactions.get("policy", {}),
+                             **voice_reactions.get("policies", {})}
+        lighting = HaloLightingController(RUNTIME_CONFIG.get("lighting", {}))
         runtime = PlaybackSessionRuntime(
             fresh_session_events, RealtimeClock(), EventRouter({"solenoid": solenoid_backend}),
             playback_cfg["session_timeout_seconds"], playback_cfg.get("initially_active", True),
@@ -121,21 +124,32 @@ def main():
             reaction_policy_config={"strategies": reaction_strategies, "policies": reaction_policies},
             voice_interaction_config=RUNTIME_CONFIG.get("voice_interaction", {}),
             reaction_targets=list(solenoid_pin_map),
+            lighting_controller=lighting,
         )
+        register_shutdown_hook(lighting.shutdown)
         local_input = LocalActivationInput(get_backup_button_pin(), runtime)
         register_shutdown_hook(local_input.close)
+        # Semantic ingress exists even if a particular optional transport is
+        # unavailable; UART/BLE must not depend on MQTT startup succeeding.
+        from shared.messaging.topics import TopicNamespace
+        try:
+            from shared.messaging.config import load_mqtt_settings
+            _, topic_base = load_mqtt_settings(REPOSITORY_ROOT)
+        except Exception:
+            topic_base = "bwm"
+        topics = TopicNamespace(topic_base)
+        ingress = TranslationMQTTAdapter(runtime, topics.installation_activation,
+                                         topics.voice_state, topics.voice_interaction)
         # MQTT is an optional semantic input. Failure to import/connect leaves
         # this persistent GPIO17-capable runtime untouched.
         try:
             from shared.messaging.config import load_mqtt_settings
             from shared.messaging.mqtt_client import SemanticMQTTClient
-            from shared.messaging.topics import TopicNamespace
             mqtt_settings, topic_base = load_mqtt_settings(REPOSITORY_ROOT)
-            activation_topic = TopicNamespace(topic_base).installation_activation
-            voice_state_topic = TopicNamespace(topic_base).voice_state
-            ingress = TranslationMQTTAdapter(runtime, activation_topic, voice_state_topic)
+            topics = TopicNamespace(topic_base)
+            activation_topic, voice_state_topic, voice_interaction_topic = topics.installation_activation, topics.voice_state, topics.voice_interaction
             mqtt_client = SemanticMQTTClient(mqtt_settings, ingress.handle)
-            mqtt_client.start([activation_topic, voice_state_topic])
+            mqtt_client.start([activation_topic, voice_state_topic, voice_interaction_topic])
             register_shutdown_hook(mqtt_client.close)
         except Exception as exc:
             print(f"[MQTT] Unavailable; continuing with local activation: {exc}")
