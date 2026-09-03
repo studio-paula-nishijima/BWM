@@ -56,7 +56,7 @@ Faster-Whisper child process and a bounded request queue.  `OracleInteractionCon
 in `src/live/interaction.py` owns a separate, single-worker retrieval executor
 and display scheduling.  It must not change Voice admission or ASR ownership.
 
-## Independent autostart and future quiescence
+## Independent autostart and persistent active periods
 
 Voice autostarts and operates according to its own configuration. It does not
 wait for Translation to become active, an `installation.activation` event,
@@ -65,13 +65,20 @@ path, capture admission, ASR, and local runtime can operate. Translation and
 Voice/Whisper are independent runtimes; peer absence or transport loss is
 isolated degradation, never an implicit local `inactive` or quiescence state.
 
-No Voice quiescence policy is implemented today. If one is added, it must
-follow an explicit semantic instruction or explicit deployment policy, never
-the absence of a message. It may block new interactions and deliberately
-stop/restart heavy ASR or retrieval resources, while normally allowing an
-already-admitted interaction to finish and preserving appropriate lightweight
-local/hardware state. Explicit reactivation must restart cleanly. Translation
-session timing does not create a separate Voice-side timer.
+`whisper_runtime.py` is a persistent process. Its service lifetime is separate
+from the renewable Voice active period: expiry requests graceful session
+quiescence, rather than leaving the runner loop or deinitialising servo
+hardware. The process, semantic ingress, audio/detector loop, UART, and
+lightweight control paths stay available for a later explicit `active` event.
+Only SIGTERM/SIGINT, an expected finite WAV replay completion, or an
+unrecoverable runner error performs final process cleanup.
+
+Voice quiescence follows an explicit semantic instruction or the local active
+period timer, never absence of a message. It blocks new interactions and,
+after an already-admitted interaction finishes, stops the restartable ASR
+worker according to configuration. Explicit reactivation restarts that worker
+cleanly. Translation session timing does not create a separate Voice-side
+timer.
 
 ## Lifecycle and admission
 
@@ -194,6 +201,11 @@ timer expiry use the same graceful path: new interaction admission closes,
 an already admitted interaction completes normally, then the ASR child is
 stopped.  Semantic ingress, process, and lightweight GPIO/control paths stay
 alive so only an explicit `active` envelope can wake Voice.
+
+`voice_session.active_period_seconds` is the production Voice active-period
+duration. The retained `configs/whisper.yaml` `run_duration_seconds` setting
+belongs to older finite-run tooling and is not read by `whisper_runtime.py`; it
+does not control the production service lifetime or Voice session timer.
 
 rpi02's legacy voice-rack button wiring is GPIO17 to GND, internal pull-up,
 falling-edge, 0.4-second debounce.  It is an interaction backup, never an

@@ -51,7 +51,6 @@ from configs.whisper import (
 
     WHISPER_FRAMES_REQUIRED,
     COOLDOWN_SECONDS,
-    RUN_DURATION_SECONDS,
 
     PROCESSING_MODE,
 
@@ -135,8 +134,6 @@ FRAME_SIZE = int(
 # -----------------------------
 
 source = None
-
-start_time = None
 
 last_trigger_time = 0
 
@@ -232,7 +229,8 @@ def _begin_shutdown():
     return True
 
 
-def shutdown(*_):
+def shutdown():
+    """Perform final process cleanup only after an actual runner exit."""
 
     global source
     global csv_logger
@@ -325,19 +323,15 @@ def shutdown(*_):
             )
 
 
-    raise SystemExit
+def signal_handler(signum, _frame):
+    """Stop the persistent runner deliberately; session expiry never reaches here."""
+    print(f"[SIGNAL] Received {signum}, shutting down...")
+    shutdown()
+    raise SystemExit(0)
 
 
-
-signal.signal(
-    signal.SIGINT,
-    shutdown
-)
-
-signal.signal(
-    signal.SIGTERM,
-    shutdown
-)
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 # -----------------------------
 # MAIN LOOP
@@ -347,8 +341,6 @@ def main():
 
     global source
     global csv_logger
-
-    global start_time
 
     global last_trigger_time
     global whisper_count
@@ -679,9 +671,6 @@ def main():
     # START
     # -----------------------------
 
-    start_time = time.time()
-
-
     print(
         "Whisper detection running..."
     )
@@ -716,26 +705,6 @@ def main():
 
 
             # -----------------------------
-            # TIME LIMIT
-            # -----------------------------
-
-            if (
-                time.time()
-                -
-                start_time
-                >
-                RUN_DURATION_SECONDS
-            ):
-
-                print(
-                    "Run time complete"
-                )
-
-                break
-
-
-
-            # -----------------------------
             # AUDIO READ
             # -----------------------------
 
@@ -749,11 +718,10 @@ def main():
                 if oracle_interaction:
                     oracle_interaction.on_asr_results(completed_asr)
                     oracle_interaction.poll()
-                print(
-                    "Audio source complete"
-                )
-
-                break
+                if args.wav:
+                    print("Audio source complete")
+                    break
+                raise RuntimeError("Live audio source ended unexpectedly")
 
 
 
@@ -945,6 +913,7 @@ def main():
         import traceback
 
         traceback.print_exc()
+        raise
 
 
 
