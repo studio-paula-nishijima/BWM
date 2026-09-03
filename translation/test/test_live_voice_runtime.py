@@ -127,7 +127,7 @@ class VoiceRuntimeTests(unittest.TestCase):
             self.assertEqual(runtime.lifecycle.state, VoiceState.CAPTURE_PROCESSING)
             self.feed(runtime, start=8, count=2, trigger_at=8)
             self.assertEqual(len(runtime.capture.completed), 1)
-            self.assertTrue(any("[Interaction] capture ignored: busy (capture_processing)" in item for item in events))
+            self.assertTrue(any("[WhisperInteraction] capture ignored: busy (capture_processing)" in item for item in events))
             self.assertTrue(runtime.complete_interaction("test release"))
             self.feed(runtime, start=10, count=8, trigger_at=10)
             self.assertEqual(len(runtime.capture.completed), 2)

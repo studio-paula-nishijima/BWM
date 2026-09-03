@@ -52,7 +52,7 @@ class VoiceSessionTests(unittest.TestCase):
         self.assertEqual(coordinator.started, 1)
         self.assertTrue(session.admitting_interactions)
         self.assertEqual(len(timers), 1)
-        self.assertIn("[VoiceSession] active; timer 600 s", events)
+        self.assertIn("[WhisperSession] active; timer 600 s", events)
 
     def test_timeout_blocks_new_admission_and_quiesces(self):
         session, coordinator, timers, _ = self.make(); session.start()
@@ -77,7 +77,7 @@ class VoiceSessionTests(unittest.TestCase):
         self.assertFalse(session.quiescent)
         coordinator.lifecycle.set(VoiceState.LISTENING)
         self.assertTrue(session.quiescent)
-        self.assertIn("[VoiceSession] waiting_for_interaction_completion", events)
+        self.assertIn("[WhisperSession] waiting_for_interaction_completion", events)
 
     def test_active_wakes_quiescent_voice(self):
         session, coordinator, timers, _ = self.make(); session.start(); timers[-1].callback()

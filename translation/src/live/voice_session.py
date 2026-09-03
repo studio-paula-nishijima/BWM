@@ -31,17 +31,17 @@ class VoiceSessionController:
             self.coordinator.start()
             self._arm_timer("active")
         else:
-            self.emit("[VoiceSession] quiescent at startup")
+            self.emit("[WhisperSession] quiescent at startup")
 
     def activation_received(self, state, _event=None):
         if state == "active":
             if self.quiescent:
-                self.emit("[VoiceSession] quiescent -> active reason=translation_active; reinitializing")
+                self.emit("[WhisperSession] quiescent -> active reason=translation_active; reinitializing")
                 self.quiescent = self.quiescence_requested = False
                 self.coordinator.reactivate()
             else:
                 self.quiescence_requested = False
-                self.emit("[VoiceSession] active -> active reason=translation_active; timer_reset")
+                self.emit("[WhisperSession] active -> active reason=translation_active; timer_reset")
             self._arm_timer("active")
         elif state == "inactive":
             self.request_quiescence("translation_inactive")
@@ -51,9 +51,9 @@ class VoiceSessionController:
             return
         self.quiescence_requested = True
         self._cancel_timer()
-        self.emit(f"[VoiceSession] active -> quiescence_requested reason={reason}")
+        self.emit(f"[WhisperSession] active -> quiescence_requested reason={reason}")
         if self.coordinator.interaction_admitted:
-            self.emit("[VoiceSession] waiting_for_interaction_completion")
+            self.emit("[WhisperSession] waiting_for_interaction_completion")
             return
         self._enter_quiescent()
 
@@ -67,14 +67,14 @@ class VoiceSessionController:
         self.quiescent = True
         if self.stop_asr_when_quiescent:
             self.coordinator.quiesce()
-        self.emit("[VoiceSession] quiescence_requested -> quiescent")
+        self.emit("[WhisperSession] quiescence_requested -> quiescent")
 
     def _arm_timer(self, _reason):
         self._cancel_timer()
         self._timer = self._timer_factory(self.active_period_seconds, self._expired)
         self._timer.daemon = True
         self._timer.start()
-        self.emit(f"[VoiceSession] active; timer {self.active_period_seconds:g} s")
+        self.emit(f"[WhisperSession] active; timer {self.active_period_seconds:g} s")
 
     def _expired(self):
         self.request_quiescence("timer_expired")

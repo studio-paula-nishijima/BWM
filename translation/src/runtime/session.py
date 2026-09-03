@@ -137,7 +137,7 @@ class PlaybackSessionRuntime:
         """Track one semantic Voice transition and admit at most one reaction."""
         with self._changed:
             previous, self._voice_state = self._voice_state, state
-            print(f"[Voice] state: {previous!r} -> {state!r}")
+            print(f"[WhisperLifecycle] {previous!r} -> {state!r}")
             if not self._voice_interaction.get("enabled", False):
                 return "observed_disabled"
             if previous == state:
@@ -145,11 +145,11 @@ class PlaybackSessionRuntime:
             if state != self._voice_interaction.get("trigger_state"):
                 return "observed"
             if not self._active:
-                print("[Voice] trigger ignored: Translation session inactive")
+                print("[WhisperInteraction] trigger ignored: Translation session inactive")
                 return "ignored_inactive"
             self._refresh_external_reaction()
             if self._external_reaction_busy:
-                print("[Voice] trigger ignored: external reaction busy")
+                print("[WhisperInteraction] trigger ignored: external reaction busy")
                 return "ignored_busy"
             if self._reaction_policy is None:
                 return "ignored_unconfigured"
@@ -161,7 +161,7 @@ class PlaybackSessionRuntime:
             executable = config.pop("type", name)
             self._modulation.trigger_external(executable, seed, **config)
             self._external_reaction_busy = self._modulation.external_busy
-            print(f"[Voice] trigger matched; selected reaction: {name}")
+            print(f"[WhisperInteraction] trigger matched; selected reaction: {name}")
             return "triggered"
 
     def observe_voice_interaction(self, payload):
@@ -249,4 +249,4 @@ class PlaybackSessionRuntime:
     def _refresh_external_reaction(self):
         if self._external_reaction_busy and not self._modulation.external_busy:
             self._external_reaction_busy = False
-            print("[Voice] external reaction complete; busy cleared")
+            print("[WhisperInteraction] external reaction complete; busy cleared")

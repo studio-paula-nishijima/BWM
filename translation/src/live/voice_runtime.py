@@ -39,13 +39,13 @@ class VoiceLifecycle:
         if state == self.state:
             return False
         previous, self.state = self.state, state
-        self._emit(f"[Voice] state: {previous.value} -> {state.value}")
+        self._emit(f"[WhisperLifecycle] {previous.value} -> {state.value}")
         if self._on_transition:
             try:
                 self._on_transition(previous, state)
             except Exception as exc:
                 # External observability must never invalidate local admission.
-                self._emit(f"[Voice] transition observer failed: {exc}")
+                self._emit(f"[WhisperLifecycle] transition observer failed: {exc}")
         return True
 
 
@@ -92,7 +92,7 @@ class LiveASRCoordinator:
             self._asr_status = "loading"
             self.worker.start()
         else:
-            self.emit("[Voice] ASR disabled; initialization complete")
+            self.emit("[WhisperRuntime] ASR disabled; initialization complete")
             self.lifecycle.set(VoiceState.LISTENING)
 
     def quiesce(self):
@@ -123,12 +123,12 @@ class LiveASRCoordinator:
             self.emit(message)
         dependencies_ready, dependency_error = self.startup_ready()
         if status == "ready" and dependencies_ready and self.lifecycle.state is VoiceState.INITIALIZING:
-            self.emit("[Voice] required startup resources ready")
+            self.emit("[WhisperRuntime] required startup resources ready")
             self.lifecycle.set(VoiceState.LISTENING)
         elif status == "unavailable" and self.lifecycle.state is VoiceState.INITIALIZING:
             if not self._startup_failure_reported:
                 self._startup_failure_reported = True
-                self.emit(f"[Voice] initialization failed: {self.worker.startup_error}; Voice remains unavailable")
+                self.emit(f"[WhisperRuntime] initialization failed: {self.worker.startup_error}; Whisper remains unavailable")
         elif dependency_error:
             self.emit(f"[RetrievalWorker] error: {dependency_error}")
         return status
@@ -146,7 +146,7 @@ class LiveASRCoordinator:
                 self.lifecycle.set(VoiceState.WHISPER_DETECTED)
             else:
                 reason = "quiescent" if not self._interaction_admission() else f"busy ({self.lifecycle.state.value})"
-                self.emit(f"[Interaction] capture ignored: {reason}")
+                self.emit(f"[WhisperInteraction] capture ignored: {reason}")
         completed = self.capture.process_frame(frame, frame_number, admitted_trigger, temporal_candidate)
         if self.capture.is_capturing and admitted_trigger:
             self.emit("[Capture] started")
@@ -164,7 +164,7 @@ class LiveASRCoordinator:
         """
         if self.capture.is_capturing or self.lifecycle.state not in (VoiceState.CAPTURE_PROCESSING, VoiceState.RESPONSE_DISPLAYED):
             return False
-        self.emit(f"[Interaction] complete: {reason}")
+        self.emit(f"[WhisperInteraction] complete reason={reason}")
         return self.lifecycle.set(VoiceState.LISTENING)
 
     def finish_capture(self):
@@ -267,7 +267,7 @@ class LiveASRCoordinator:
             except Exception as exc:
                 self.emit(f"[ASR] result observer failed: {exc}")
         if self.release_after_asr or self.release_on_asr_result:
-            reason = "debug ASR completion" if self.release_after_asr else "ASR completion (exhibition)"
+            reason = "debug_asr_completion" if self.release_after_asr else "asr_completion"
             self.complete_interaction(reason)
 
     def shutdown(self):
