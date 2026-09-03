@@ -12,7 +12,7 @@ if [[ "$translation_dir" != "/home/raspi/BWM/translation" ]]; then
     exit 1
 fi
 
-sudo install -m 0644 "$repo_dir/services/voice rack services/whisper-runtime.service" \
+sudo install -m 0644 "$repo_dir/services/voice_rack_services/whisper-runtime.service" \
     /etc/systemd/system/whisper-runtime.service
 sudo install -m 0644 "$repo_dir/services/translation services/play-events.service" \
     /etc/systemd/system/play-events.service

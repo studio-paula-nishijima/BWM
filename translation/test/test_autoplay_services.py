@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-VOICE_UNIT = REPOSITORY_ROOT / "services" / "voice rack services" / "whisper-runtime.service"
+VOICE_UNIT = REPOSITORY_ROOT / "services" / "voice_rack_services" / "whisper-runtime.service"
 PLAYBACK_UNIT = REPOSITORY_ROOT / "services" / "translation services" / "play-events.service"
 INSTALL_SCRIPT = REPOSITORY_ROOT / "translation" / "scripts" / "install-autoplay-services.sh"
 
@@ -39,6 +39,7 @@ class AutoplayServiceTests(unittest.TestCase):
 
     def test_install_script_installs_and_enables_only_the_new_units(self):
         text = INSTALL_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("services/voice_rack_services/whisper-runtime.service", text)
         self.assertIn("/etc/systemd/system/whisper-runtime.service", text)
         self.assertIn("/etc/systemd/system/play-events.service", text)
         self.assertIn("sudo systemctl daemon-reload", text)

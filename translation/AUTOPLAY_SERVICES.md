@@ -61,7 +61,7 @@ enables both services, restarts them, and displays their status.  The equivalent
 manual commands are:
 
 ```bash
-sudo install -m 0644 '/home/raspi/BWM/services/voice rack services/whisper-runtime.service' /etc/systemd/system/whisper-runtime.service
+sudo install -m 0644 /home/raspi/BWM/services/voice_rack_services/whisper-runtime.service /etc/systemd/system/whisper-runtime.service
 sudo install -m 0644 '/home/raspi/BWM/services/translation services/play-events.service' /etc/systemd/system/play-events.service
 sudo systemctl daemon-reload
 sudo systemctl enable whisper-runtime.service play-events.service

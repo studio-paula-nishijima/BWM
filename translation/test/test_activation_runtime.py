@@ -28,8 +28,9 @@ class FakeDispatcher:
 class FakeInput:
     instances = []
 
-    def __init__(self, pin, pull_up):
-        self.pin, self.pull_up, self.when_deactivated, self.closed = pin, pull_up, None, False
+    def __init__(self, pin, pull_up, bounce_time):
+        self.pin, self.pull_up, self.bounce_time = pin, pull_up, bounce_time
+        self.when_deactivated, self.closed = None, False
         self.instances.append(self)
 
     def close(self):
@@ -96,6 +97,7 @@ class ActivationRuntimeTests(unittest.TestCase):
         local_input = LocalActivationInput(17, self.controller, FakeInput)
         device = FakeInput.instances[-1]
         self.assertEqual(device.pin, 17)
+        self.assertEqual(device.bounce_time, 0.4)
         device.when_deactivated()
         self.assertFalse(self.controller.is_active)
         device.when_deactivated()
