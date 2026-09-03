@@ -19,15 +19,19 @@ class TranslationActivationPublisher:
         event = installation_activation(self.ORIGIN, state)
         transport = self._uart_transport
         if transport is None:
-            self._emit(f"[ActivationPublication] UART unavailable; {state} remains local")
+            self._emit(f"[SemanticTx] transport=uart type=installation.activation origin={self.ORIGIN} "
+                       f"state={state} result=unavailable; local_state_retained")
             return False
         try:
             sent = bool(transport.send(event))
         except Exception as exc:
-            self._emit(f"[ActivationPublication] UART publish failed for {state}; local state retained: {exc}")
+            self._emit(f"[SemanticTx] transport=uart type=installation.activation origin={self.ORIGIN} "
+                       f"state={state} result=failed; local_state_retained error={exc}")
             return False
         if sent:
-            self._emit(f"[ActivationPublication] UART sent {state} id={event.id}")
+            self._emit(f"[SemanticTx] transport=uart type={event.event_type} origin={event.origin} "
+                       f"state={state} id={event.id} result=sent")
         else:
-            self._emit(f"[ActivationPublication] UART publish failed for {state}; local state retained")
+            self._emit(f"[SemanticTx] transport=uart type={event.event_type} origin={event.origin} "
+                       f"state={state} id={event.id} result=failed; local_state_retained")
         return sent

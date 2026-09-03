@@ -36,24 +36,24 @@ class VoiceSessionController:
     def activation_received(self, state, _event=None):
         if state == "active":
             if self.quiescent:
-                self.emit("[VoiceSession] activation received; reinitializing")
+                self.emit("[VoiceSession] quiescent -> active reason=translation_active; reinitializing")
                 self.quiescent = self.quiescence_requested = False
                 self.coordinator.reactivate()
             else:
                 self.quiescence_requested = False
-                self.emit("[VoiceSession] activation received; timer reset")
+                self.emit("[VoiceSession] active -> active reason=translation_active; timer_reset")
             self._arm_timer("active")
         elif state == "inactive":
-            self.request_quiescence("inactive")
+            self.request_quiescence("translation_inactive")
 
     def request_quiescence(self, reason):
         if self.quiescence_requested or self.quiescent:
             return
         self.quiescence_requested = True
         self._cancel_timer()
-        self.emit(f"[VoiceSession] quiescence requested: {reason}")
+        self.emit(f"[VoiceSession] active -> quiescence_requested reason={reason}")
         if self.coordinator.interaction_admitted:
-            self.emit("[VoiceSession] waiting for admitted interaction to finish")
+            self.emit("[VoiceSession] waiting_for_interaction_completion")
             return
         self._enter_quiescent()
 
@@ -67,7 +67,7 @@ class VoiceSessionController:
         self.quiescent = True
         if self.stop_asr_when_quiescent:
             self.coordinator.quiesce()
-        self.emit("[VoiceSession] quiescent")
+        self.emit("[VoiceSession] quiescence_requested -> quiescent")
 
     def _arm_timer(self, _reason):
         self._cancel_timer()
@@ -77,7 +77,7 @@ class VoiceSessionController:
         self.emit(f"[VoiceSession] active; timer {self.active_period_seconds:g} s")
 
     def _expired(self):
-        self.request_quiescence("timeout")
+        self.request_quiescence("timer_expired")
 
     def _cancel_timer(self):
         if self._timer:

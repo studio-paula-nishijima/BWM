@@ -77,7 +77,7 @@ class VoiceSessionTests(unittest.TestCase):
         self.assertFalse(session.quiescent)
         coordinator.lifecycle.set(VoiceState.LISTENING)
         self.assertTrue(session.quiescent)
-        self.assertIn("[VoiceSession] waiting for admitted interaction to finish", events)
+        self.assertIn("[VoiceSession] waiting_for_interaction_completion", events)
 
     def test_active_wakes_quiescent_voice(self):
         session, coordinator, timers, _ = self.make(); session.start(); timers[-1].callback()
@@ -87,7 +87,7 @@ class VoiceSessionTests(unittest.TestCase):
 
     def test_semantic_ingress_remains_available_while_quiescent(self):
         session, coordinator, timers, _ = self.make(); session.start(); timers[-1].callback()
-        ingress = VoiceSemanticIngress(session.activation_received)
+        ingress = VoiceSemanticIngress(session.activation_received, emit=lambda _: None)
         self.assertTrue(ingress.handle_event(installation_activation("test", "active", id="wake")))
         self.assertEqual(coordinator.reactivated, 1)
 

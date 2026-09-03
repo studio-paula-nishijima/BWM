@@ -151,7 +151,8 @@ def main():
             mqtt_settings, topic_base = load_mqtt_settings(REPOSITORY_ROOT)
             topics = TopicNamespace(topic_base)
             activation_topic, voice_state_topic, voice_interaction_topic = topics.installation_activation, topics.voice_state, topics.voice_interaction
-            mqtt_client = SemanticMQTTClient(mqtt_settings, ingress.handle)
+            mqtt_client = SemanticMQTTClient(
+                mqtt_settings, lambda topic, event: ingress.handle(topic, event, transport="mqtt"))
             mqtt_client.start([activation_topic, voice_state_topic, voice_interaction_topic])
             register_shutdown_hook(mqtt_client.close)
         except Exception as exc:
@@ -164,7 +165,7 @@ def main():
             # reaches the runtime's one authoritative publication seam.
             uart_client = SemanticUARTTransport(
                 load_uart_settings(REPOSITORY_ROOT),
-                lambda event: ingress.handle_event(event, publish_authoritative=False),
+                lambda event: ingress.handle_event(event, publish_authoritative=False, transport="uart"),
             )
             if uart_client.start():
                 activation_publisher.set_uart_transport(uart_client)
@@ -175,7 +176,10 @@ def main():
         try:
             from shared.messaging.ble import SemanticBLETransport
             from shared.messaging.config import load_ble_settings
-            ble_client = SemanticBLETransport(load_ble_settings(REPOSITORY_ROOT), ingress.handle_event)
+            ble_client = SemanticBLETransport(
+                load_ble_settings(REPOSITORY_ROOT),
+                lambda event: ingress.handle_event(event, transport="ble"),
+            )
             if ble_client.start():
                 register_shutdown_hook(ble_client.close)
         except Exception as exc:

@@ -642,7 +642,7 @@ def main():
         if args.voice_mqtt:
             voice_mqtt = SemanticMQTTClient(
                 settings,
-                lambda topic, event: ingress.handle_event(event) if topic == topics.installation_activation else False,
+                lambda topic, event: ingress.handle_event(event, transport="mqtt") if topic == topics.installation_activation else False,
             )
             voice_mqtt.start([topics.installation_activation])
         if args.voice_uart:
@@ -651,7 +651,7 @@ def main():
             # shared UART ingress independently.
             voice_uart = SemanticUARTTransport(
                 replace(load_uart_settings(Path(BASE_DIR).parent), enabled=True),
-                ingress.handle_event,
+                lambda event: ingress.handle_event(event, transport="uart"),
             )
             voice_uart.start()
         lifecycle.add_transition_observer(VoiceLifecyclePublisher(voice_mqtt, uart_transport=voice_uart, topic_base=topic_base).publish_transition)
