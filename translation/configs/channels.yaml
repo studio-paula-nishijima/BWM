@@ -21,7 +21,7 @@ channels:
     freq_min: 0.1
     freq_max: 2.0
     
-    time_scale: 345600
+    time_scale: 182800
     
     peak_preservation:
       enabled: true
@@ -46,7 +46,7 @@ channels:
     freq_min: 0.25
     freq_max: 3.5
     
-    time_scale: 345600
+    time_scale: 182800
     
     peak_preservation:
       enabled: true
@@ -71,7 +71,7 @@ channels:
     freq_min: 0.2
     freq_max: 3.3
     
-    time_scale: 345600
+    time_scale: 182800
     
     peak_preservation:
       enabled: true
@@ -96,7 +96,7 @@ channels:
     freq_min: 0.2
     freq_max: 3.3
     
-    time_scale: 345600
+    time_scale: 182800
     
     peak_preservation:
       enabled: true
@@ -121,7 +121,7 @@ channels:
     freq_min: 0.2
     freq_max: 3.3
     
-    time_scale: 345600
+    time_scale: 182800
     
     peak_preservation:
       enabled: true
@@ -146,7 +146,7 @@ channels:
     freq_min: 0.2
     freq_max: 3.3
     
-    time_scale: 345600
+    time_scale: 182800
     
     peak_preservation:
       enabled: true
