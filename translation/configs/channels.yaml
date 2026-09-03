@@ -12,7 +12,7 @@ channels:
 
     start_date: "2000-01-01"
     end_date: "2017-12-31"
-    threshold: 1.0
+    threshold: 0.0
     scaling: "linear"
     frequency_shaping: "power"
     frequency_gamma: 2.0
@@ -38,7 +38,7 @@ channels:
 
     start_date: "2000-01-01"
     end_date: "2017-12-31"
-    threshold: 1.0
+    threshold: 0.0
     scaling: "linear"
     frequency_shaping: "power"
     frequency_gamma: 1.3
@@ -63,7 +63,7 @@ channels:
 
     start_date: "2000-01-01"
     end_date: "2017-12-31"
-    threshold: 1.0
+    threshold: 0.0
     scaling: "linear"
     frequency_shaping: "power"
     frequency_gamma: 1.3
@@ -88,7 +88,7 @@ channels:
 
     start_date: "2000-01-01"
     end_date: "2017-12-31"
-    threshold: 1.0
+    threshold: 0.0
     scaling: "linear"
     frequency_shaping: "power"
     frequency_gamma: 1.3
@@ -113,7 +113,7 @@ channels:
 
     start_date: "2000-01-01"
     end_date: "2017-12-31"
-    threshold: 1.0
+    threshold: 0.0
     scaling: "linear"
     frequency_shaping: "power"
     frequency_gamma: 1.3
@@ -138,7 +138,7 @@ channels:
 
     start_date: "2000-01-01"
     end_date: "2017-12-31"
-    threshold: 1.0
+    threshold: 0.0
     scaling: "linear"
     frequency_shaping: "power"
     frequency_gamma: 1.3
