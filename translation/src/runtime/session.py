@@ -14,7 +14,8 @@ class PlaybackSessionRuntime:
 
     def __init__(self, events_factory, clock, dispatcher, session_timeout, initially_active=False,
                  event_logger=None, safety_config=None, reaction_policy_config=None, rng=None,
-                 voice_interaction_config=None, reaction_targets=None, lighting_controller=None):
+                 voice_interaction_config=None, reaction_targets=None, lighting_controller=None,
+                 activation_publisher=None):
         self._events_factory, self._clock, self._dispatcher = events_factory, clock, dispatcher
         self._session_timeout, self._event_logger = float(session_timeout), event_logger
         self._safety = RuntimeSafety(clock, dispatcher, safety_config)
@@ -37,9 +38,12 @@ class PlaybackSessionRuntime:
         self._external_reaction_busy = False
         self._changed = threading.Condition()
         self._active = False
+        self._activation_publisher = activation_publisher
         self._engine = self._modulation = self._started_at = None
         if initially_active:
-            self.activate()
+            # Startup is locally authoritative.  Its optional later UART
+            # notification is synchronization, never startup authorization.
+            self.activate(publish=False)
 
     @property
     def is_active(self):
@@ -65,7 +69,17 @@ class PlaybackSessionRuntime:
         with self._changed:
             return self._external_reaction_busy
 
-    def activate(self):
+    def set_activation_publisher(self, publisher):
+        """Attach the single outbound state-transition publication seam."""
+        with self._changed:
+            self._activation_publisher = publisher
+
+    def publish_current_activation(self):
+        """Best-effort startup synchronization after UART becomes available."""
+        with self._changed:
+            self._publish_activation("active" if self._active else "inactive")
+
+    def activate(self, *, publish=True):
         with self._changed:
             if self._active:
                 return False
@@ -83,15 +97,17 @@ class PlaybackSessionRuntime:
             if self._lighting:
                 self._lighting.activate()
             print("[Session] ACTIVE: fresh playback session started")
+            if publish:
+                self._publish_activation("active")
             self._changed.notify_all()
             return True
 
-    def deactivate(self):
+    def deactivate(self, *, publish=True):
         """Explicit cancellation, not a logical-score pause."""
         with self._changed:
             if not self._active:
                 return False
-            self._finish_session("cancelled")
+            self._finish_session("cancelled", publish=publish)
             self._changed.notify_all()
             return True
 
@@ -209,7 +225,7 @@ class PlaybackSessionRuntime:
         with self._changed:
             self._changed.wait(timeout)
 
-    def _finish_session(self, reason):
+    def _finish_session(self, reason, *, publish=True):
         """Single teardown path: close admission, clear session work, quiesce, idle."""
         print(f"[Session] TEARDOWN: {reason}; closing session admission")
         self._active = False
@@ -223,6 +239,12 @@ class PlaybackSessionRuntime:
         if quiesce is not None:
             quiesce()
         print("[Session] IDLE: session state cleared; hardware quiescent")
+        if publish:
+            self._publish_activation("inactive")
+
+    def _publish_activation(self, state):
+        if self._activation_publisher is not None:
+            self._activation_publisher.publish(state)
 
     def _refresh_external_reaction(self):
         if self._external_reaction_busy and not self._modulation.external_busy:

@@ -91,6 +91,14 @@ transport-independent controller surface that a future MQTT adapter may use:
 
 `GPIO17 -> LocalActivationInput -> same PlaybackSessionRuntime -> PlaybackEngine -> RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> hardware`
 
+Translation is the authoritative installation state.  Its one runtime
+state-transition seam best-effort publishes a newly constructed
+`installation.activation` event with origin `translation_pi` over UART after
+each actual local state change, including GPIO17 and accepted MQTT/BLE changes.
+The startup `active` notification is synchronization only: both Translation
+and Voice start independently if UART is absent.  Inbound UART activation is
+applied locally without re-publication, preventing an echo loop.
+
 Stage 6 implements the repo-wide `shared.messaging` envelope and MQTT wrapper;
 it is not owned by Translation. MQTT `installation.activation` is explicit
 `active`/`inactive` state on a semantic topic. A bounded shared ID cache

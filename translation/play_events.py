@@ -91,6 +91,7 @@ def main():
     from runtime.gpio_backend import GPIOBackend
     from runtime.local_activation_input import LocalActivationInput
     from runtime.mqtt_adapter import TranslationMQTTAdapter
+    from runtime.activation_publication import TranslationActivationPublisher
     from runtime.router import EventRouter
     from runtime.session import PlaybackSessionRuntime
     from lighting.halo_runtime import HaloLightingController
@@ -126,6 +127,8 @@ def main():
             reaction_targets=list(solenoid_pin_map),
             lighting_controller=lighting,
         )
+        activation_publisher = TranslationActivationPublisher()
+        runtime.set_activation_publisher(activation_publisher)
         register_shutdown_hook(lighting.shutdown)
         local_input = LocalActivationInput(get_backup_button_pin(), runtime)
         register_shutdown_hook(local_input.close)
@@ -156,8 +159,16 @@ def main():
         try:
             from shared.messaging.config import load_uart_settings
             from shared.messaging.uart import SemanticUARTTransport
-            uart_client = SemanticUARTTransport(load_uart_settings(REPOSITORY_ROOT), ingress.handle_event)
-            uart_client.start()
+            # UART ingress is local-only: an inbound UART activation must not
+            # be echoed back to its sender.  Every other accepted state change
+            # reaches the runtime's one authoritative publication seam.
+            uart_client = SemanticUARTTransport(
+                load_uart_settings(REPOSITORY_ROOT),
+                lambda event: ingress.handle_event(event, publish_authoritative=False),
+            )
+            if uart_client.start():
+                activation_publisher.set_uart_transport(uart_client)
+                runtime.publish_current_activation()
             register_shutdown_hook(uart_client.close)
         except Exception as exc:
             print(f"[UART] Unavailable; continuing without UART: {exc}")
