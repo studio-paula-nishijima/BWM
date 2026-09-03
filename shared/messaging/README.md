@@ -19,9 +19,11 @@ Each message is compact JSON with `version`, `id`, `type`, `origin`,
 `timestamp`, and object `payload`. IDs are UUIDs; origins name the emitting
 component (for example `person_detector`). The Stage 6 event is
 `installation.activation`, with payload `{ "state": "active" }` or
-`{ "state": "inactive" }` on `bwm/installation/activation`.
+`{ "state": "inactive" }` on `bwm/installation/activation`. In the
+inter-Pi deployment, this is **Translation activation** when its origin is
+`translation_pi`: Translation's authoritative installation state.
 
-Voice/oracle components publish `voice.state` on `bwm/voice/state`, with
+Voice/oracle components publish **Voice lifecycle** as `voice.state` on `bwm/voice/state`, with
 payload `{ "state": "idle|initializing|listening|whisper_detected|capture_processing|response_displayed" }`.
 Each publication uses a fresh envelope ID and a meaningful origin such as
 `voice_pi`. These are coarse semantic milestones, not detector scores, ASR,
@@ -46,7 +48,7 @@ future availability/LWT convention. It does not yet impose a health protocol.
 
 ## Voice interaction occurrence
 
-`voice.interaction` is published on `bwm/voice/interaction` only for a real
+**Voice interaction** is published as `voice.interaction` on `bwm/voice/interaction` only for a real
 post-confirmation, post-cooldown occurrence. Detector payloads are `{ "source":
 "detector", "silero_selection_value": <float> }`; button payloads are
 `{ "source": "button" }`. The value is an artistic selector from the
@@ -64,7 +66,7 @@ and topic, with a new ID on each explicit state publication and origin
 `person_detector`; it must not issue Translation commands or rely on repeated
 detections extending a session.
 
-The Voice runtime publishes the five `voice.state` milestones above using this
+The Voice runtime publishes the five `voice.state` lifecycle milestones above using this
 package. Translation's initial behavior reacts to a transition into
 `capture_processing`; Voice does not select or need to know the solenoid
 reaction, nor whether Translation is currently busy. Future UART redundancy

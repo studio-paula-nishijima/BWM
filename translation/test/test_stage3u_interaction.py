@@ -9,7 +9,7 @@ sys.path[:0] = [str(ROOT), str(ROOT / "translation" / "src")]
 from live.interaction import OracleInteractionController, compact_preview, retrieval_debug_line
 from live.oracle_display import DisplayConfig, OracleDisplayController, sanitize_display_text
 from live.voice_runtime import VoiceLifecycle, VoiceState
-from live.voice_messaging import VoiceStatePublisher
+from live.voice_messaging import VoiceLifecyclePublisher
 
 
 class Coordinator:
@@ -92,7 +92,7 @@ class VoiceMessagingTests(unittest.TestCase):
             def __init__(self): self.events = []
             def publish(self, topic, event): self.events.append((topic, event)); return True
         mqtt, lifecycle = MQTT(), VoiceLifecycle()
-        lifecycle.add_transition_observer(VoiceStatePublisher(mqtt, emit=lambda _: None).publish_transition)
+        lifecycle.add_transition_observer(VoiceLifecyclePublisher(mqtt, emit=lambda _: None).publish_transition)
         lifecycle.set("initializing"); lifecycle.set("initializing"); lifecycle.set("listening")
         self.assertEqual(len(mqtt.events), 2)
         self.assertEqual(mqtt.events[0][0], "bwm/voice/state")
@@ -106,7 +106,7 @@ class VoiceMessagingTests(unittest.TestCase):
             def __init__(self): self.events = []
             def send(self, event): self.events.append(event); return True
         mqtt, uart = MQTT(), UART()
-        VoiceStatePublisher(mqtt, uart_transport=uart, emit=lambda _: None).publish_transition(None, VoiceState.LISTENING)
+        VoiceLifecyclePublisher(mqtt, uart_transport=uart, emit=lambda _: None).publish_transition(None, VoiceState.LISTENING)
         self.assertEqual(uart.events[0], mqtt.events[0][1])
 
     def test_fanout_keeps_one_envelope_when_one_transport_fails(self):
@@ -117,7 +117,7 @@ class VoiceMessagingTests(unittest.TestCase):
             def __init__(self): self.events = []
             def send(self, event): self.events.append(event); return True
         emitted, mqtt, uart = [], MQTT(), UART()
-        VoiceStatePublisher(mqtt, uart_transport=uart, emit=emitted.append).publish_transition(None, VoiceState.CAPTURE_PROCESSING)
+        VoiceLifecyclePublisher(mqtt, uart_transport=uart, emit=emitted.append).publish_transition(None, VoiceState.CAPTURE_PROCESSING)
         mqtt_event, uart_event = mqtt.events[0][1], uart.events[0]
         self.assertEqual(mqtt_event.to_dict(), uart_event.to_dict())
         self.assertTrue(any("failed via MQTT" in line for line in emitted))
@@ -128,7 +128,7 @@ class VoiceMessagingTests(unittest.TestCase):
             def publish(self, *_): return False
             def send(self, *_): return False
         emitted = []
-        VoiceStatePublisher(Unavailable(), uart_transport=Unavailable(), emit=emitted.append).publish_transition(
+        VoiceLifecyclePublisher(Unavailable(), uart_transport=Unavailable(), emit=emitted.append).publish_transition(
             None, VoiceState.CAPTURE_PROCESSING)
         self.assertTrue(any("all state transports unavailable" in line for line in emitted))
 

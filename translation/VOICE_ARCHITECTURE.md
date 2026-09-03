@@ -184,6 +184,31 @@ is what calls `complete_interaction()`.
 
 ## Shared Voice-state messaging
 
+## Inter-Pi semantic terminology
+
+`SemanticTx` and `SemanticRx` name transport direction only: a shared semantic
+event leaving or arriving at a Pi. They do not replace a wire event's type or
+origin.
+
+The event concepts are named by their meaning and owner:
+
+```text
+Translation activation = installation.activation from translation_pi
+Voice lifecycle        = voice.state from voice_pi
+Voice interaction      = voice.interaction from voice_pi
+```
+
+Voice interaction reports a visitor interaction occurrence admitted at the
+semantic interaction boundary. It includes valid button-triggered interactions
+and does not describe raw detector crossings.
+
+```text
+Voice session quiescent != Voice process stopped != Voice lifecycle idle
+```
+
+These terms do not alter wire types, origins, behavior, services,
+configuration, or logging semantics.
+
 ## Voice active period and rpi02 interaction backup
 
 Voice boots independently into normal operation and owns a local monotonic
@@ -222,7 +247,7 @@ deployment because it separately claims GPIO17 to start/stop the old service.
 Voice uses the repo-wide `shared/messaging/` implementation; it does not own a
 second MQTT stack. UART Voice semantic publication is enabled by default in
 the live runner. `--voice-mqtt` additionally enables MQTT publication;
-`VoiceStatePublisher` observes genuine lifecycle transitions and builds one
+`VoiceLifecyclePublisher` observes genuine lifecycle transitions and builds one
 shared envelope per transition:
 
 ```text

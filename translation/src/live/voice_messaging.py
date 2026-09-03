@@ -5,7 +5,8 @@ from shared.messaging.events import voice_interaction, voice_state
 from shared.messaging.topics import TopicNamespace
 
 
-class VoiceStatePublisher:
+class VoiceLifecyclePublisher:
+    """Publish Voice interaction-lifecycle transitions without changing their wire contract."""
     """Build one authoritative event then fan it out without changing its identity."""
     def __init__(self, mqtt_client=None, *, uart_transport=None, topic_base="bwm", origin="voice_pi", emit=print):
         self.mqtt_client, self.uart_transport = mqtt_client, uart_transport

@@ -102,7 +102,7 @@ from live.interaction import OracleInteractionController
 from live.oracle_display import DisplayConfig, OracleDisplayController, PygameOracleDisplayController
 from live.retrieval_adapter import RiverCultureRetrievalAdapter
 from live.retrieval_worker import PersistentRetrievalWorker
-from live.voice_messaging import VoiceInteractionPublisher, VoiceStatePublisher
+from live.voice_messaging import VoiceInteractionPublisher, VoiceLifecyclePublisher
 from live.semantic_ingress import VoiceSemanticIngress
 from live.voice_session import VoiceSessionController
 from live.interaction_button import InteractionButton
@@ -654,7 +654,7 @@ def main():
                 ingress.handle_event,
             )
             voice_uart.start()
-        lifecycle.add_transition_observer(VoiceStatePublisher(voice_mqtt, uart_transport=voice_uart, topic_base=topic_base).publish_transition)
+        lifecycle.add_transition_observer(VoiceLifecyclePublisher(voice_mqtt, uart_transport=voice_uart, topic_base=topic_base).publish_transition)
         interaction_publisher = VoiceInteractionPublisher(voice_mqtt, uart_transport=voice_uart, topic_base=topic_base)
     button_config = voice_config.get("interaction_button", {})
     if button_config.get("enabled", False):
