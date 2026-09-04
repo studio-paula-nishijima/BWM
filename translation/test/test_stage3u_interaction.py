@@ -87,7 +87,7 @@ class Stage3UInteractionTests(unittest.TestCase):
 
 
 class VoiceMessagingTests(unittest.TestCase):
-    def test_shared_voice_state_is_published_only_for_genuine_transition(self):
+    def test_shared_whisper_state_is_published_only_for_genuine_transition(self):
         class MQTT:
             def __init__(self): self.events = []
             def publish(self, topic, event): self.events.append((topic, event)); return True
@@ -95,10 +95,10 @@ class VoiceMessagingTests(unittest.TestCase):
         lifecycle.add_transition_observer(VoiceLifecyclePublisher(mqtt, emit=lambda _: None).publish_transition)
         lifecycle.set("initializing"); lifecycle.set("initializing"); lifecycle.set("listening")
         self.assertEqual(len(mqtt.events), 2)
-        self.assertEqual(mqtt.events[0][0], "bwm/voice/state")
+        self.assertEqual(mqtt.events[0][0], "bwm/whisper/state")
         self.assertEqual(mqtt.events[0][1].payload, {"state": "initializing"})
 
-    def test_voice_state_fanout_preserves_one_event_identity(self):
+    def test_whisper_state_fanout_preserves_one_event_identity(self):
         class MQTT:
             def __init__(self): self.events = []
             def publish(self, topic, event): self.events.append((topic, event)); return True

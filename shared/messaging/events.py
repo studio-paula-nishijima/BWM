@@ -8,9 +8,9 @@ from uuid import uuid4
 
 SCHEMA_VERSION = 1
 INSTALLATION_ACTIVATION = "installation.activation"
-VOICE_STATE = "voice.state"
-VOICE_INTERACTION = "voice.interaction"
-VOICE_STATES = frozenset({"idle", "initializing", "listening", "whisper_detected", "capture_processing", "response_displayed"})
+WHISPER_STATE = "whisper.state"
+WHISPER_INTERACTION = "whisper.interaction"
+WHISPER_STATES = frozenset({"idle", "initializing", "listening", "whisper_detected", "capture_processing", "response_displayed"})
 
 
 class EventValidationError(ValueError):
@@ -90,14 +90,14 @@ def installation_activation(origin: str, state: str, **kwargs: Any) -> SemanticE
     return SemanticEvent(INSTALLATION_ACTIVATION, origin, {"state": state}, **kwargs)
 
 
-def voice_state(origin: str, state: str, **kwargs: Any) -> SemanticEvent:
+def whisper_state(origin: str, state: str, **kwargs: Any) -> SemanticEvent:
     """Create the coarse, subsystem-independent Voice state event."""
-    if state not in VOICE_STATES:
+    if state not in WHISPER_STATES:
         raise EventValidationError("Unsupported Voice state: %r" % (state,))
-    return SemanticEvent(VOICE_STATE, origin, {"state": state}, **kwargs)
+    return SemanticEvent(WHISPER_STATE, origin, {"state": state}, **kwargs)
 
 
-def voice_interaction(origin: str, source: str, *, silero_selection_value: float | None = None,
+def whisper_interaction(origin: str, source: str, *, silero_selection_value: float | None = None,
                       **kwargs: Any) -> SemanticEvent:
     """Create one real emitted interaction; the value is an artistic selector."""
     if source not in {"detector", "button"}:
@@ -109,4 +109,4 @@ def voice_interaction(origin: str, source: str, *, silero_selection_value: float
         if not isinstance(silero_selection_value, (int, float)):
             raise EventValidationError("Detector interactions require a numeric Silero selection value")
         payload["silero_selection_value"] = float(silero_selection_value)
-    return SemanticEvent(VOICE_INTERACTION, origin, payload, **kwargs)
+    return SemanticEvent(WHISPER_INTERACTION, origin, payload, **kwargs)

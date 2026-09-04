@@ -89,7 +89,7 @@ class AuthoritativeActivationPublicationTests(unittest.TestCase):
         ingress = TranslationSemanticIngress(app, TopicNamespace().installation_activation)
         self.assertTrue(ingress.handle_event(installation_activation("person_detector", "active", id="ble")))
         self.assertEqual([event.payload["state"] for event in uart.events], ["active"])
-        self.assertTrue(ingress.handle_event(installation_activation("voice_pi", "inactive", id="uart"),
+        self.assertTrue(ingress.handle_event(installation_activation("whisper_pi", "inactive", id="uart"),
                                              publish_authoritative=False))
         self.assertFalse(app.is_active)
         self.assertEqual([event.payload["state"] for event in uart.events], ["active"])

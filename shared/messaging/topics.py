@@ -1,8 +1,8 @@
 """Small semantic MQTT topic hierarchy; topics never reveal transport or hardware."""
 
 INSTALLATION_ACTIVATION = "installation/activation"
-VOICE_STATE = "voice/state"
-VOICE_INTERACTION = "voice/interaction"
+WHISPER_STATE = "whisper/state"
+WHISPER_INTERACTION = "whisper/interaction"
 
 
 class TopicNamespace:
@@ -23,12 +23,12 @@ class TopicNamespace:
         return self.topic(INSTALLATION_ACTIVATION)
 
     @property
-    def voice_state(self) -> str:
-        return self.topic(VOICE_STATE)
+    def whisper_state(self) -> str:
+        return self.topic(WHISPER_STATE)
 
     @property
-    def voice_interaction(self) -> str:
-        return self.topic(VOICE_INTERACTION)
+    def whisper_interaction(self) -> str:
+        return self.topic(WHISPER_INTERACTION)
 
     def availability(self, origin: str) -> str:
         if not origin.strip():

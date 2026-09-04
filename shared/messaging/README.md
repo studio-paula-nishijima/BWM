@@ -23,10 +23,10 @@ component (for example `person_detector`). The Stage 6 event is
 inter-Pi deployment, this is **Translation activation** when its origin is
 `translation_pi`: Translation's authoritative installation state.
 
-Voice/oracle components publish **Voice lifecycle** as `voice.state` on `bwm/voice/state`, with
+Voice/oracle components publish **Voice lifecycle** as `whisper.state` on `bwm/whisper/state`, with
 payload `{ "state": "idle|initializing|listening|whisper_detected|capture_processing|response_displayed" }`.
 Each publication uses a fresh envelope ID and a meaningful origin such as
-`voice_pi`. These are coarse semantic milestones, not detector scores, ASR,
+`whisper_pi`. These are coarse semantic milestones, not detector scores, ASR,
 retrieval, display, servo, GPIO, or Translation strategy commands. Receivers
 must validate the state and suppress duplicate IDs before interpreting a
 state transition.
@@ -48,7 +48,7 @@ future availability/LWT convention. It does not yet impose a health protocol.
 
 ## Voice interaction occurrence
 
-**Voice interaction** is published as `voice.interaction` on `bwm/voice/interaction` only for a real
+**Voice interaction** is published as `whisper.interaction` on `bwm/whisper/interaction` only for a real
 post-confirmation, post-cooldown occurrence. Detector payloads are `{ "source":
 "detector", "silero_selection_value": <float> }`; button payloads are
 `{ "source": "button" }`. The value is an artistic selector from the
@@ -66,7 +66,7 @@ and topic, with a new ID on each explicit state publication and origin
 `person_detector`; it must not issue Translation commands or rely on repeated
 detections extending a session.
 
-The Voice runtime publishes the five `voice.state` lifecycle milestones above using this
+The Voice runtime publishes the five `whisper.state` lifecycle milestones above using this
 package. Translation's initial behavior reacts to a transition into
 `capture_processing`; Voice does not select or need to know the solenoid
 reaction, nor whether Translation is currently busy. Future UART redundancy

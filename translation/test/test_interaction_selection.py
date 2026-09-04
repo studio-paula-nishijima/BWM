@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from actuation.servo_controller import ServoActuationController
 from live.voice_messaging import VoiceInteractionPublisher
-from shared.messaging.events import EventValidationError, voice_interaction
+from shared.messaging.events import EventValidationError, whisper_interaction
 from whisper.models import WhisperDetectionResult
 from whisper.profiles import TemporalProfilePolicy
 
@@ -17,9 +17,9 @@ class FakeServo:
 
 
 def test_detector_payload_requires_value_but_button_is_value_free():
-    assert voice_interaction("voice", "detector", silero_selection_value=.006).payload == {"source": "detector", "silero_selection_value": .006}
-    assert voice_interaction("voice", "button").payload == {"source": "button"}
-    with pytest.raises(EventValidationError): voice_interaction("voice", "button", silero_selection_value=0)
+    assert whisper_interaction("voice", "detector", silero_selection_value=.006).payload == {"source": "detector", "silero_selection_value": .006}
+    assert whisper_interaction("voice", "button").payload == {"source": "button"}
+    with pytest.raises(EventValidationError): whisper_interaction("voice", "button", silero_selection_value=0)
 
 
 def test_servo_explicit_sequence_preserves_random_button_path():

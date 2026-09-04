@@ -10,7 +10,7 @@ sys.path.insert(0, str(TRANSLATION / "src"))
 from runtime.clock import SimulatedClock
 from runtime.mqtt_adapter import TranslationMQTTAdapter
 from runtime.session import PlaybackSessionRuntime
-from shared.messaging.events import SemanticEvent, voice_state
+from shared.messaging.events import SemanticEvent, whisper_state
 from shared.messaging.topics import TopicNamespace
 
 
@@ -38,21 +38,21 @@ class VoiceStateIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.clock, self.dispatcher = SimulatedClock(), Dispatcher()
         self.runtime = PlaybackSessionRuntime(lambda: [event(0, "voice"), event(10, "base")], self.clock, self.dispatcher, 20,
-            reaction_policy_config=policy(), voice_interaction_config={"enabled": True,
+            reaction_policy_config=policy(), whisper_interaction_config={"enabled": True,
                 "trigger_state": "capture_processing", "reaction_policy": "voice_default"},
             reaction_targets=["voice", "one", "two", "base"])
         topics = TopicNamespace()
-        self.adapter = TranslationMQTTAdapter(self.runtime, topics.installation_activation, topics.voice_state)
-        self.topic = topics.voice_state
+        self.adapter = TranslationMQTTAdapter(self.runtime, topics.installation_activation, topics.whisper_state)
+        self.topic = topics.whisper_state
 
     def send(self, state, identifier=None):
-        return self.adapter.handle(self.topic, voice_state("voice_pi", state, id=identifier) if identifier
-                                   else voice_state("voice_pi", state))
+        return self.adapter.handle(self.topic, whisper_state("whisper_pi", state, id=identifier) if identifier
+                                   else whisper_state("whisper_pi", state))
 
-    def test_shared_voice_state_validation_and_topic(self):
-        self.assertEqual(self.topic, "bwm/voice/state")
-        self.assertEqual(voice_state("voice_pi", "listening").event_type, "voice.state")
-        self.assertEqual(self.adapter.handle(self.topic, SemanticEvent("voice.state", "voice_pi",
+    def test_shared_whisper_state_validation_and_topic(self):
+        self.assertEqual(self.topic, "bwm/whisper/state")
+        self.assertEqual(whisper_state("whisper_pi", "listening").event_type, "whisper.state")
+        self.assertEqual(self.adapter.handle(self.topic, SemanticEvent("whisper.state", "whisper_pi",
                          {"state": "low_level_detector"})), "rejected_invalid")
 
     def test_transition_is_configurable_and_idle_does_not_activate(self):
@@ -62,12 +62,12 @@ class VoiceStateIntegrationTests(unittest.TestCase):
         self.assertEqual(self.send("listening"), "observed")
         self.assertEqual(self.send("capture_processing"), "triggered")
         self.runtime.step()
-        self.assertEqual(self.runtime.voice_state, "capture_processing")
+        self.assertEqual(self.runtime.whisper_state, "capture_processing")
         self.assertEqual(len(self.dispatcher.events), 1)
         self.assertEqual(self.send("capture_processing"), "observed_no_transition")
 
     def test_configured_other_trigger_state_needs_no_code_change(self):
-        self.runtime._voice_interaction["trigger_state"] = "whisper_detected"
+        self.runtime._whisper_interaction["trigger_state"] = "whisper_detected"
         self.runtime.activate()
         self.assertEqual(self.send("listening"), "observed")
         self.assertEqual(self.send("capture_processing"), "observed")
@@ -82,13 +82,13 @@ class VoiceStateIntegrationTests(unittest.TestCase):
         configured["policies"]["voice_default"] = {"mode": "weighted",
                                                       "choices": {"voice_tap": 1, "voice_cascade": 3}}
         runtime = PlaybackSessionRuntime(lambda: [event()], self.clock, self.dispatcher, 20,
-            reaction_policy_config=configured, rng=LastChoice(), voice_interaction_config={"enabled": True,
+            reaction_policy_config=configured, rng=LastChoice(), whisper_interaction_config={"enabled": True,
                 "trigger_state": "capture_processing", "reaction_policy": "voice_default"},
             reaction_targets=["voice", "one", "two", "base"])
         adapter = TranslationMQTTAdapter(runtime, TopicNamespace().installation_activation, self.topic)
         runtime.activate()
-        adapter.handle(self.topic, voice_state("voice_pi", "listening"))
-        self.assertEqual(adapter.handle(self.topic, voice_state("voice_pi", "capture_processing")), "triggered")
+        adapter.handle(self.topic, whisper_state("whisper_pi", "listening"))
+        self.assertEqual(adapter.handle(self.topic, whisper_state("whisper_pi", "capture_processing")), "triggered")
         self.assertEqual(self.dispatcher.events[0]["target"], "one")
 
     def test_duplicate_id_is_filtered_before_transition(self):
@@ -102,7 +102,7 @@ class VoiceStateIntegrationTests(unittest.TestCase):
     def test_same_voice_event_from_mqtt_and_uart_triggers_one_reaction(self):
         self.runtime.activate()
         self.assertEqual(self.send("listening", "before"), "observed")
-        capture_processing = voice_state("voice_pi", "capture_processing", id="shared-transport-id")
+        capture_processing = whisper_state("whisper_pi", "capture_processing", id="shared-transport-id")
         self.assertEqual(self.adapter.handle(self.topic, capture_processing), "triggered")
         self.assertEqual(self.adapter.handle_event(capture_processing), "ignored_duplicate")
         self.runtime.step()

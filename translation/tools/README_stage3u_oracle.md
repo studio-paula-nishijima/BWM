@@ -42,7 +42,7 @@ Use either transport independently, or both:
 --voice-mqtt --no-voice-uart      # MQTT only
 ```
 
-For each genuine lifecycle transition, Voice creates one `voice.state` event
+For each genuine lifecycle transition, Voice creates one `whisper.state` event
 and sends that unchanged envelope to every selected transport.  In particular,
 the default `capture_processing` transition reaches Translation's semantic
 ingress, where ID deduplication precedes the existing configured Voice
@@ -61,8 +61,8 @@ retrieval query/result, and that the exact result text reaches the Oracle
 response view. A static response remains for `--oracle-response-seconds`;
 longer text scrolls. Detector triggers during the response must report busy.
 After `[Display] response complete`, Voice returns to listening and accepts the
-next interaction. With MQTT enabled, inspect `bwm/voice/state` for one shared
-`voice.state` envelope per actual lifecycle transition. Observe CPU, RAM,
+next interaction. With MQTT enabled, inspect `bwm/whisper/state` for one shared
+`whisper.state` envelope per actual lifecycle transition. Observe CPU, RAM,
 temperature and throttling with the normal Pi tools during a live interaction.
 For an empty transcript or a recoverable retrieval failure, confirm concise
 `[ASR]`/`[Retrieval] ERROR` diagnostics identify the reason while the visitor

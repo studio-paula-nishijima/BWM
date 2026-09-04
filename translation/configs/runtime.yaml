@@ -91,7 +91,7 @@ reaction_policy:
     strategy: cascade
 # Semantic Voice interaction never activates a session.  A matching transition
 # during an open session chooses one configured, non-pausing reaction.
-voice_interaction:
+whisper_interaction:
   enabled: true
   trigger_state: capture_processing
   reaction_policy: voice_default

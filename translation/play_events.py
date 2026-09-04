@@ -123,7 +123,7 @@ def main():
             event_logger=log_dispatched_event,
             safety_config=RUNTIME_CONFIG.get("runtime_safety", {}),
             reaction_policy_config={"strategies": reaction_strategies, "policies": reaction_policies},
-            voice_interaction_config=RUNTIME_CONFIG.get("voice_interaction", {}),
+            whisper_interaction_config=RUNTIME_CONFIG.get("whisper_interaction", {}),
             reaction_targets=list(solenoid_pin_map),
             lighting_controller=lighting,
         )
@@ -142,7 +142,7 @@ def main():
             topic_base = "bwm"
         topics = TopicNamespace(topic_base)
         ingress = TranslationMQTTAdapter(runtime, topics.installation_activation,
-                                         topics.voice_state, topics.voice_interaction)
+                                         topics.whisper_state, topics.whisper_interaction)
         # MQTT is an optional semantic input. Failure to import/connect leaves
         # this persistent GPIO17-capable runtime untouched.
         try:
@@ -150,10 +150,10 @@ def main():
             from shared.messaging.mqtt_client import SemanticMQTTClient
             mqtt_settings, topic_base = load_mqtt_settings(REPOSITORY_ROOT)
             topics = TopicNamespace(topic_base)
-            activation_topic, voice_state_topic, voice_interaction_topic = topics.installation_activation, topics.voice_state, topics.voice_interaction
+            activation_topic, whisper_state_topic, whisper_interaction_topic = topics.installation_activation, topics.whisper_state, topics.whisper_interaction
             mqtt_client = SemanticMQTTClient(
                 mqtt_settings, lambda topic, event: ingress.handle(topic, event, transport="mqtt"))
-            mqtt_client.start([activation_topic, voice_state_topic, voice_interaction_topic])
+            mqtt_client.start([activation_topic, whisper_state_topic, whisper_interaction_topic])
             register_shutdown_hook(mqtt_client.close)
         except Exception as exc:
             print(f"[MQTT] Unavailable; continuing with local activation: {exc}")

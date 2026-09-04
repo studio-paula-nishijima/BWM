@@ -200,10 +200,10 @@ def parse_arguments():
     parser.add_argument("--oracle-response-seconds", type=float, default=8.0, help="Minimum static response duration")
     parser.add_argument("--oracle-max-response-seconds", type=float, default=8.0,
                         help="Demo cap for total response presentation (0 disables cap)")
-    parser.add_argument("--voice-mqtt", action="store_true", help="Publish shared voice.state transitions through configured MQTT")
+    parser.add_argument("--voice-mqtt", action="store_true", help="Publish shared whisper.state transitions through configured MQTT")
     uart_group = parser.add_mutually_exclusive_group()
     uart_group.add_argument("--voice-uart", dest="voice_uart", action="store_true", default=True,
-                            help="Publish shared voice.state transitions through configured UART (default)")
+                            help="Publish shared whisper.state transitions through configured UART (default)")
     uart_group.add_argument("--no-voice-uart", dest="voice_uart", action="store_false",
                             help="Disable UART publication for an MQTT-only or standalone run")
     parser.add_argument("--detector-profile", choices=PROFILE_NAMES, default=None)

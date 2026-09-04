@@ -167,7 +167,7 @@ reactions or bypasses safety.
 
 ## Stage L1 interaction and Halo lighting
 
-`voice.interaction -> semantic ingress -> Translation ReactionPolicy ->
+`whisper.interaction -> semantic ingress -> Translation ReactionPolicy ->
 RuntimeModulationEngine -> RuntimeSafety -> GPIOBackend`. Detector occurrences
 map their supplied selection value through Translation-owned configurable bands;
 button occurrences preserve random `voice_default` selection. Voice sends no
@@ -190,13 +190,13 @@ implemented.
 
 ## Stage 7 Voice-state interaction
 
-`Voice subsystem -> voice.state MQTT -> TranslationMQTTAdapter -> transition
+`Voice subsystem -> whisper.state MQTT -> TranslationMQTTAdapter -> transition
 matcher -> external-reaction busy guard -> ReactionPolicy ->
 RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> GPIOBackend`
 
-The shared `voice.state` contract accepts `idle`, `initializing`, `listening`,
+The shared `whisper.state` contract accepts `idle`, `initializing`, `listening`,
 `whisper_detected`, `capture_processing`, and `response_displayed`. Translation
-retains only the latest state for diagnostics. `voice_interaction.trigger_state`
+retains only the latest state for diagnostics. `whisper_interaction.trigger_state`
 is configurable and defaults to `capture_processing`; only a transition *into*
 that state may trigger. Voice state never activates Translation or changes its
 600-second wall-clock session.
@@ -245,8 +245,8 @@ cannot admit work. MQTT duplicate-ID filtering occurs before transition logic;
 new IDs reporting the same state update observation but do not retrigger.
 
 For a Pi smoke test, activate Translation then run:
-`python translation/tools/simulate_voice_state.py listening`,
-`python translation/tools/simulate_voice_state.py capture_processing`, wait for
+`python translation/tools/simulate_whisper_state.py listening`,
+`python translation/tools/simulate_whisper_state.py capture_processing`, wait for
 completion, publish a state away from the trigger, then publish
 `capture_processing` again. A second trigger while busy is intentionally
 ignored. Stage 8 transports must preserve envelope IDs/origins and route every
@@ -264,7 +264,7 @@ Future compatibility includes shared semantic MQTT events, an MQTT-to-UART trans
 
 `MQTT --\` and `UART --+-> semantic ingress -> validation/dedup -> existing
 Translation handler`. UART is process-wide, not session-scoped: it remains
-open across teardown while GPIO17 remains local-first. UART `voice.state` and
+open across teardown while GPIO17 remains local-first. UART `whisper.state` and
 `installation.activation` use the same semantic paths as MQTT. One Voice
 lifecycle transition creates one envelope, then configured MQTT/UART transports
 fan it out with the same ID. The shared transport resolves DT `uart0`, rejects
@@ -293,7 +293,7 @@ The implemented Voice runtime is documented canonically in
 River Culture retrieval runtime and presents its opaque top response text in
 the Oracle display. Voice remains responsible for its own admission and
 lifecycle, including waiting for display completion before releasing an
-interaction. Its optional shared `voice.state` publication is semantic only;
+interaction. Its optional shared `whisper.state` publication is semantic only;
 Translation's existing reaction path above remains Translation-owned.
 
 Voice and Translation do not gate one another's startup or normal local

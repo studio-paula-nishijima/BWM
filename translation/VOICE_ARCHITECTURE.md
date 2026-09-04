@@ -18,7 +18,7 @@ does not change detector or actuation policy.
 ## Interaction occurrence and artistic selector
 
 At the existing detector-confirmation and cooldown seam, Voice emits one
-`voice.interaction` event. Detector payloads carry `source: detector` and a
+`whisper.interaction` event. Detector payloads carry `source: detector` and a
 `silero_selection_value`: the median of the final ten qualifying Silero frames,
 including the crossing frame, latched once. It is an artistic selector, not
 loudness, calibrated confidence, or speaker identity. It chooses a configured
@@ -194,8 +194,8 @@ The event concepts are named by their meaning and owner:
 
 ```text
 Translation activation = installation.activation from translation_pi
-Voice lifecycle        = voice.state from voice_pi
-Voice interaction      = voice.interaction from voice_pi
+Voice lifecycle        = whisper.state from whisper_pi
+Voice interaction      = whisper.interaction from whisper_pi
 ```
 
 Voice interaction reports a visitor interaction occurrence admitted at the
@@ -251,8 +251,8 @@ the live runner. `--voice-mqtt` additionally enables MQTT publication;
 shared envelope per transition:
 
 ```text
-topic: bwm/voice/state
-type:  voice.state
+topic: bwm/whisper/state
+type:  whisper.state
 payload: {"state": "<VoiceState>"}
 ```
 
@@ -264,7 +264,7 @@ nor sends solenoid, GPIO, or modulation instructions. Transport selection
 controls semantic publication only; it does not control Voice lifecycle.
 
 When either or both transports are selected, this existing authoritative
-lifecycle observer fans the same `voice.state` envelope, including its ID,
+lifecycle observer fans the same `whisper.state` envelope, including its ID,
 origin, timestamp, type, and payload, to each selected transport. UART and
 MQTT failure are isolated degradation and cannot change lifecycle timing or
 busy admission; display completion remains release.

@@ -7,14 +7,14 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from shared.messaging.config import load_mqtt_settings
-from shared.messaging.events import VOICE_STATES, voice_state
+from shared.messaging.events import WHISPER_STATES, whisper_state
 from shared.messaging.mqtt_client import SemanticMQTTClient
 from shared.messaging.topics import TopicNamespace
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("state", choices=sorted(VOICE_STATES))
+    parser.add_argument("state", choices=sorted(WHISPER_STATES))
     parser.add_argument("--origin", default="voice-simulator")
     args = parser.parse_args()
     settings, topic_base = load_mqtt_settings(ROOT)
@@ -26,8 +26,8 @@ def main():
     if not client.wait_until_connected():
         client.close()
         raise SystemExit("MQTT broker did not connect within five seconds")
-    published = client.publish(TopicNamespace(topic_base).voice_state,
-                               voice_state(args.origin, args.state))
+    published = client.publish(TopicNamespace(topic_base).whisper_state,
+                               whisper_state(args.origin, args.state))
     client.close()
     if not published:
         raise SystemExit("MQTT publish failed")

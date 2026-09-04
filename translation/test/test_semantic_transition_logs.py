@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "translation" / "src"))
 from live.semantic_ingress import VoiceSemanticIngress
 from runtime.activation_publication import TranslationActivationPublisher
 from runtime.mqtt_adapter import TranslationSemanticIngress
-from shared.messaging.events import installation_activation, voice_state
+from shared.messaging.events import installation_activation, whisper_state
 from shared.messaging.topics import TopicNamespace
 
 
@@ -34,16 +34,16 @@ class SemanticTransitionLogTests(unittest.TestCase):
 
     def test_translation_records_received_voice_lifecycle_with_semantic_rx_label(self):
         class Runtime:
-            def observe_voice_state(self, state):
+            def observe_whisper_state(self, state):
                 return state
 
         emitted = []
         ingress = TranslationSemanticIngress(Runtime(), TopicNamespace().installation_activation,
-                                             TopicNamespace().voice_state)
+                                             TopicNamespace().whisper_state)
         with unittest.mock.patch("builtins.print", emitted.append):
-            self.assertEqual(ingress.handle_event(voice_state("voice_pi", "listening", id="voice-1"),
+            self.assertEqual(ingress.handle_event(whisper_state("whisper_pi", "listening", id="voice-1"),
                                                   transport="uart"), "listening")
-        self.assertEqual(emitted, ["[SemanticRx] transport=uart type=voice.state origin=voice_pi state=listening id=voice-1"])
+        self.assertEqual(emitted, ["[SemanticRx] transport=uart type=whisper.state origin=whisper_pi state=listening id=voice-1"])
 
 
 if __name__ == "__main__":

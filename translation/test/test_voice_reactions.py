@@ -8,7 +8,7 @@ sys.path.insert(0, str(ROOT / "translation" / "src"))
 
 from runtime.clock import SimulatedClock
 from runtime.session import PlaybackSessionRuntime
-from shared.messaging.events import voice_state
+from shared.messaging.events import whisper_state
 from shared.messaging.topics import TopicNamespace
 from runtime.mqtt_adapter import TranslationMQTTAdapter
 from runtime.voice_reactions import prepare_voice_reactions
@@ -51,15 +51,15 @@ class VoiceReactionTests(unittest.TestCase):
         config = {"strategies": {"reaction": strategy},
                   "policies": {"voice_default": {"mode": "fixed", "strategy": "reaction"}}}
         runtime = PlaybackSessionRuntime(lambda: events, self.clock, self.dispatcher, 30,
-            reaction_policy_config=config, voice_interaction_config={"enabled": True,
+            reaction_policy_config=config, whisper_interaction_config={"enabled": True,
                 "trigger_state": "capture_processing", "reaction_policy": "voice_default"},
             reaction_targets=["n", "s", "e", "west", "north", "east", "south", "a", "b", "base"])
         topics = TopicNamespace()
-        adapter = TranslationMQTTAdapter(runtime, topics.installation_activation, topics.voice_state)
+        adapter = TranslationMQTTAdapter(runtime, topics.installation_activation, topics.whisper_state)
         runtime.activate()
-        adapter.handle(topics.voice_state, voice_state("voice_pi", "listening"))
-        self.assertEqual(adapter.handle(topics.voice_state, voice_state("voice_pi", "capture_processing")), "triggered")
-        return runtime, adapter, topics.voice_state
+        adapter.handle(topics.whisper_state, whisper_state("whisper_pi", "listening"))
+        self.assertEqual(adapter.handle(topics.whisper_state, whisper_state("whisper_pi", "capture_processing")), "triggered")
+        return runtime, adapter, topics.whisper_state
 
     def test_a_simultaneous_then_sequence_override_uses_quiet_gap_and_resumes(self):
         strategy = {"type": "override_sequence", "initial_quiet_gap_seconds": .5,
@@ -71,11 +71,11 @@ class VoiceReactionTests(unittest.TestCase):
         self.clock, self.dispatcher = SimulatedClock(), Dispatcher()
         config = {"strategies": {"reaction": strategy}, "policies": {"voice_default": {"mode": "fixed", "strategy": "reaction"}}}
         runtime = PlaybackSessionRuntime(lambda: [event(.25), event(1), event(2.5)], self.clock, self.dispatcher, 30,
-            reaction_policy_config=config, voice_interaction_config={"enabled": True, "trigger_state": "capture_processing", "reaction_policy": "voice_default"},
+            reaction_policy_config=config, whisper_interaction_config={"enabled": True, "trigger_state": "capture_processing", "reaction_policy": "voice_default"},
             reaction_targets=["n", "s", "e"])
         runtime.activate(); runtime.safety.dispatch(event(-1, "prior"))
-        topics = TopicNamespace(); adapter = TranslationMQTTAdapter(runtime, topics.installation_activation, topics.voice_state)
-        adapter.handle(topics.voice_state, voice_state("voice_pi", "listening")); adapter.handle(topics.voice_state, voice_state("voice_pi", "capture_processing"))
+        topics = TopicNamespace(); adapter = TranslationMQTTAdapter(runtime, topics.installation_activation, topics.whisper_state)
+        adapter.handle(topics.whisper_state, whisper_state("whisper_pi", "listening")); adapter.handle(topics.whisper_state, whisper_state("whisper_pi", "capture_processing"))
         self.clock.advance(.25); runtime.step(); self.assertEqual([x["target"] for x in self.dispatcher.events], ["prior"])
         self.clock.advance(.25); runtime.step(); self.assertEqual([x["target"] for x in self.dispatcher.events], ["prior", "n", "s", "e"])
         self.clock.advance(.5); runtime.step(); self.assertEqual(self.dispatcher.events[-1]["target"], "n")
@@ -91,8 +91,8 @@ class VoiceReactionTests(unittest.TestCase):
                     "phases": [{"type": "sequence", "targets": ["west", "north", "east", "south"], "spacing_seconds": .3},
                                {"type": "wait", "duration_seconds": 1.0}]}
         runtime, adapter, topic = self.make_runtime(strategy, [event(.25), event(3)])
-        adapter.handle(topic, voice_state("voice_pi", "response_displayed"))
-        self.assertEqual(adapter.handle(topic, voice_state("voice_pi", "capture_processing")), "ignored_busy")
+        adapter.handle(topic, whisper_state("whisper_pi", "response_displayed"))
+        self.assertEqual(adapter.handle(topic, whisper_state("whisper_pi", "capture_processing")), "ignored_busy")
         self.clock.advance(.5); runtime.step()
         self.assertEqual([x["target"] for x in self.dispatcher.events], ["west"])
         for expected in ("north", "east", "south"):
@@ -113,7 +113,7 @@ class VoiceReactionTests(unittest.TestCase):
     def test_c_triple_tap_transforms_only_its_window(self):
         strategy = {"type": "repeat_transform", "repeat_count": 3, "tap_spacing_seconds": .2, "duration_seconds": 3.0}
         runtime, adapter, topic = self.make_runtime(strategy, [event(0, "a"), event(1, "b"), event(3.1, "c")])
-        adapter.handle(topic, voice_state("voice_pi", "response_displayed")); self.assertEqual(adapter.handle(topic, voice_state("voice_pi", "capture_processing")), "ignored_busy")
+        adapter.handle(topic, whisper_state("whisper_pi", "response_displayed")); self.assertEqual(adapter.handle(topic, whisper_state("whisper_pi", "capture_processing")), "ignored_busy")
         runtime.step(); self.clock.advance(.2); runtime.step(); self.clock.advance(.2); runtime.step()
         self.clock.advance(.6); runtime.step(); self.clock.advance(.2); runtime.step(); self.clock.advance(.2); runtime.step()
         self.assertEqual([x["target"] for x in self.dispatcher.events], ["a", "a", "a", "b", "b", "b"])
@@ -124,7 +124,7 @@ class VoiceReactionTests(unittest.TestCase):
     def test_d_double_tap_transforms_only_its_window_and_teardown_cancels(self):
         strategy = {"type": "repeat_transform", "repeat_count": 2, "tap_spacing_seconds": .2, "duration_seconds": 4.0}
         runtime, adapter, topic = self.make_runtime(strategy, [event(0, "a"), event(4.1, "b")])
-        adapter.handle(topic, voice_state("voice_pi", "response_displayed")); self.assertEqual(adapter.handle(topic, voice_state("voice_pi", "capture_processing")), "ignored_busy")
+        adapter.handle(topic, whisper_state("whisper_pi", "response_displayed")); self.assertEqual(adapter.handle(topic, whisper_state("whisper_pi", "capture_processing")), "ignored_busy")
         runtime.step(); self.clock.advance(.2); runtime.step()
         self.assertEqual([x["target"] for x in self.dispatcher.events], ["a", "a"])
         self.assertTrue(all(decision.accepted for decision in runtime.safety.decisions))

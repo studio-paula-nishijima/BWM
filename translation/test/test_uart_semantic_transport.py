@@ -8,14 +8,14 @@ sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "translation" / "sr
 
 from live.semantic_ingress import VoiceSemanticIngress
 from runtime.mqtt_adapter import TranslationSemanticIngress
-from shared.messaging.events import SemanticEvent, installation_activation, voice_state
+from shared.messaging.events import SemanticEvent, installation_activation, whisper_state
 from shared.messaging.uart import (NewlineEventDecoder, UARTConfigurationError,
                                    assert_uart_unclaimed, encode_frame, resolve_uart0_device)
 
 
 class UARTFramingTests(unittest.TestCase):
     def test_frames_partial_multiple_bad_and_recovery(self):
-        first, second = voice_state("voice_pi", "listening", id="one"), installation_activation("pi", "active", id="two")
+        first, second = whisper_state("whisper_pi", "listening", id="one"), installation_activation("pi", "active", id="two")
         decoder = NewlineEventDecoder(256)
         self.assertEqual(decoder.feed(encode_frame(first)[:11]), [])
         self.assertEqual(decoder.feed(encode_frame(first)[11:] + encode_frame(second)), [first, second])
@@ -25,7 +25,7 @@ class UARTFramingTests(unittest.TestCase):
 
     def test_invalid_envelope_is_rejected(self):
         decoder = NewlineEventDecoder(256)
-        self.assertEqual(decoder.feed(b'{"type":"voice.state"}\n'), [])
+        self.assertEqual(decoder.feed(b'{"type":"whisper.state"}\n'), [])
 
 
 class ResolverTests(unittest.TestCase):
@@ -64,6 +64,6 @@ class IngressTests(unittest.TestCase):
             def activate(self): self.calls += 1; return True
             def deactivate(self): return False
         runtime = Runtime(); ingress = TranslationSemanticIngress(runtime, "activation", "voice")
-        event = installation_activation("voice_pi", "active", id="same")
+        event = installation_activation("whisper_pi", "active", id="same")
         self.assertTrue(ingress.handle("activation", event)); self.assertFalse(ingress.handle_event(event))
         self.assertEqual(runtime.calls, 1)

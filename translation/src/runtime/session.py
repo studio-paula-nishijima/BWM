@@ -14,27 +14,27 @@ class PlaybackSessionRuntime:
 
     def __init__(self, events_factory, clock, dispatcher, session_timeout, initially_active=False,
                  event_logger=None, safety_config=None, reaction_policy_config=None, rng=None,
-                 voice_interaction_config=None, reaction_targets=None, lighting_controller=None,
+                 whisper_interaction_config=None, reaction_targets=None, lighting_controller=None,
                  activation_publisher=None):
         self._events_factory, self._clock, self._dispatcher = events_factory, clock, dispatcher
         self._session_timeout, self._event_logger = float(session_timeout), event_logger
         self._safety = RuntimeSafety(clock, dispatcher, safety_config)
-        self._voice_interaction = dict(voice_interaction_config or {})
+        self._whisper_interaction = dict(whisper_interaction_config or {})
         self._lighting = lighting_controller
-        if reaction_policy_config is not None and self._voice_interaction.get("enabled", False):
+        if reaction_policy_config is not None and self._whisper_interaction.get("enabled", False):
             selection_policy_names = tuple(
                 band["reaction_policy"]
-                for band in self._voice_interaction.get("silero_selection_bands", ())
+                for band in self._whisper_interaction.get("silero_selection_bands", ())
                 if "reaction_policy" in band
             )
             strategies, policies = prepare_voice_reactions(
                 reaction_policy_config.get("strategies", {}), reaction_policy_config.get("policies", {}),
-                self._voice_interaction.get("reaction_policy", "voice_default"), reaction_targets,
+                self._whisper_interaction.get("reaction_policy", "voice_default"), reaction_targets,
                 additional_policy_names=selection_policy_names)
             reaction_policy_config = {"strategies": strategies, "policies": policies}
         self._reaction_policy = None if reaction_policy_config is None else ReactionPolicy(
             reaction_policy_config.get("strategies", {}), reaction_policy_config.get("policies", {}), rng)
-        self._voice_state = None
+        self._whisper_state = None
         self._external_reaction_busy = False
         self._changed = threading.Condition()
         self._active = False
@@ -60,9 +60,9 @@ class PlaybackSessionRuntime:
     def safety(self): return self._safety
 
     @property
-    def voice_state(self):
+    def whisper_state(self):
         with self._changed:
-            return self._voice_state
+            return self._whisper_state
 
     @property
     def external_reaction_busy(self):
@@ -133,16 +133,16 @@ class PlaybackSessionRuntime:
             # Stage 4 modulation strategy.
             return self._modulation.trigger(config.pop("type", name), **config)
 
-    def observe_voice_state(self, state):
+    def observe_whisper_state(self, state):
         """Track one semantic Voice transition and admit at most one reaction."""
         with self._changed:
-            previous, self._voice_state = self._voice_state, state
+            previous, self._whisper_state = self._whisper_state, state
             print(f"[WhisperLifecycle] {previous!r} -> {state!r}")
-            if not self._voice_interaction.get("enabled", False):
+            if not self._whisper_interaction.get("enabled", False):
                 return "observed_disabled"
             if previous == state:
                 return "observed_no_transition"
-            if state != self._voice_interaction.get("trigger_state"):
+            if state != self._whisper_interaction.get("trigger_state"):
                 return "observed"
             if not self._active:
                 print("[WhisperInteraction] trigger ignored: Translation session inactive")
@@ -153,7 +153,7 @@ class PlaybackSessionRuntime:
                 return "ignored_busy"
             if self._reaction_policy is None:
                 return "ignored_unconfigured"
-            category = self._voice_interaction.get("reaction_policy", "voice_default")
+            category = self._whisper_interaction.get("reaction_policy", "voice_default")
             name, config = self._reaction_policy.select(category)
             seed = dict(config.pop("event", {"type": "solenoid", "duration": .15, "playback_time": 0}))
             if not seed.get("type"):
@@ -164,7 +164,7 @@ class PlaybackSessionRuntime:
             print(f"[WhisperInteraction] trigger matched; selected reaction: {name}")
             return "triggered"
 
-    def observe_voice_interaction(self, payload):
+    def observe_whisper_interaction(self, payload):
         """Admit a real Voice occurrence; selection remains Translation-owned."""
         source = payload.get("source")
         value = payload.get("silero_selection_value")
@@ -178,7 +178,7 @@ class PlaybackSessionRuntime:
                 return "ignored_busy"
             if self._reaction_policy is None:
                 return "ignored_unconfigured"
-            category = self._voice_interaction.get("reaction_policy", "voice_default")
+            category = self._whisper_interaction.get("reaction_policy", "voice_default")
             if source == "detector":
                 category = self._silero_category(float(value))
             name, config = self._reaction_policy.select(category)
@@ -188,12 +188,12 @@ class PlaybackSessionRuntime:
             return "triggered"
 
     def _silero_category(self, value):
-        bands = self._voice_interaction.get("silero_selection_bands", [])
+        bands = self._whisper_interaction.get("silero_selection_bands", [])
         for band in bands:
             if value < float(band["upper_exclusive"]):
                 return band["reaction_policy"]
         if not bands:
-            return self._voice_interaction.get("reaction_policy", "voice_default")
+            return self._whisper_interaction.get("reaction_policy", "voice_default")
         return bands[-1]["reaction_policy"]
 
     def step(self):

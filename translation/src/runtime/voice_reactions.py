@@ -7,13 +7,13 @@ def prepare_voice_reactions(strategies, policies, policy_name, targets, *, addit
     strategies, policies, targets = deepcopy(strategies), deepcopy(policies), list(targets or ())
     policy = policies.get(policy_name)
     if policy is None:
-        raise ValueError("voice_interaction.reaction_policy references missing policy: %s" % policy_name)
+        raise ValueError("whisper_interaction.reaction_policy references missing policy: %s" % policy_name)
     selected = (policy_name, *additional_policy_names)
     names = set()
     for selected_name in selected:
         selected_policy = policies.get(selected_name)
         if selected_policy is None:
-            raise ValueError("voice_interaction references missing policy: %s" % selected_name)
+            raise ValueError("whisper_interaction references missing policy: %s" % selected_name)
         names.update(_policy_names(selected_policy, selected_name))
     for name in names:
         if name not in strategies:
