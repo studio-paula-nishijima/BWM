@@ -71,9 +71,9 @@ def run_live(port: str, start_address: int, interval: float, *, fade_seconds: fl
 
 
 def run_static(port: str, start_address: int, interval: float, *, brightness: float,
-               cct: float, duration: float) -> None:
-    """Hold one explicit DMX state, then safely return the fixture to blackout."""
-    if interval <= 0 or duration <= 0:
+               cct: float, duration: float | None) -> None:
+    """Transmit one explicit DMX state without sending blackout on exit."""
+    if interval <= 0 or (duration is not None and duration <= 0):
         raise ValueError("interval and duration must be positive")
     state = Halo60xState(brightness, cct)
     try:
@@ -84,11 +84,17 @@ def run_static(port: str, start_address: int, interval: float, *, brightness: fl
     with serial.Serial(port=port, baudrate=250000, bytesize=8, parity=serial.PARITY_NONE,
                        stopbits=2, timeout=1) as serial_port:
         try:
-            print(f"[Halo 60x] static {brightness:g}% {cct:g} K for {duration:g} s", flush=True)
-            cue = Halo60xCue("static", state, state, 0, duration)
-            play_cue(serial_port, cue, start_address, interval)
-        finally:
-            send_open_dmx_frame(serial_port, (0, 0, 0), start_address)
+            if duration is None:
+                print(f"[Halo 60x] static {brightness:g}% {cct:g} K until Ctrl+C", flush=True)
+                while True:
+                    cue = Halo60xCue("static", state, state, 0, 1.0)
+                    play_cue(serial_port, cue, start_address, interval)
+            else:
+                print(f"[Halo 60x] static {brightness:g}% {cct:g} K for {duration:g} s", flush=True)
+                cue = Halo60xCue("static", state, state, 0, duration)
+                play_cue(serial_port, cue, start_address, interval)
+        except KeyboardInterrupt:
+            print("\n[Halo 60x] static transmission stopped; no blackout sent", flush=True)
 
 
 def main() -> None:
@@ -110,8 +116,8 @@ def main() -> None:
                         help="static intensity from 0 to 100 (required with --static)")
     parser.add_argument("--cct", type=float, metavar="KELVIN",
                         help="static CCT from 2700 to 6500 K (required with --static)")
-    parser.add_argument("--duration", type=float, default=10.0, metavar="SECONDS",
-                        help="static-state duration before blackout (default: 10)")
+    parser.add_argument("--duration", type=float, metavar="SECONDS",
+                        help="optional static transmission duration; default: until Ctrl+C; no blackout")
     parser.add_argument("--live", action="store_true", help="send frames to the connected Halo 60x")
     args = parser.parse_args()
     if args.live:

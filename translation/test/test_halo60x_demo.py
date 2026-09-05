@@ -1,7 +1,9 @@
 import sys
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -80,12 +82,22 @@ class Halo60xDemoTests(unittest.TestCase):
         self.assertLess(len(sent), 20)
         self.assertEqual(sent[-1], state_to_dmx_channels(cue.end))
 
-    def test_static_cue_holds_one_state_then_blackout_is_available_to_caller(self):
-        state = Halo60xState(100, 6500)
-        cue = halo_tool.Halo60xCue("static", state, state, 0, 10)
-        self.assertEqual(cue.state_at(0), state)
-        self.assertEqual(cue.state_at(10), state)
-        self.assertEqual(state_to_dmx_channels(BLACKOUT), (0, 101, 0))
+    def test_static_cue_holds_one_state_without_a_blackout_frame(self):
+        serial_port = mock.MagicMock()
+        serial_port.__enter__.return_value = serial_port
+        fake_serial = SimpleNamespace(
+            PARITY_NONE="N",
+            Serial=mock.Mock(return_value=serial_port),
+        )
+        with mock.patch.dict(sys.modules, {"serial": fake_serial}), \
+                mock.patch.object(halo_tool, "play_cue") as play_cue, \
+                mock.patch.object(halo_tool, "send_open_dmx_frame") as send_frame:
+            halo_tool.run_static("/dev/ttyUSB0", 1, 0.1, brightness=100, cct=6500, duration=10)
+
+        cue = play_cue.call_args.args[1]
+        self.assertEqual(cue.start, Halo60xState(100, 6500))
+        self.assertEqual(cue.end, Halo60xState(100, 6500))
+        send_frame.assert_not_called()
 
 
 if __name__ == "__main__":
