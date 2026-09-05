@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from lighting.halo_runtime import HaloLightingController
+from lighting.halo_runtime import HaloLightingController, send_open_dmx_frame
+from lighting.open_dmx import BREAK_SECONDS, MARK_AFTER_BREAK_SECONDS
 
 
 class Clock:
@@ -12,11 +13,28 @@ class Clock:
 
 
 class Port:
-    def __init__(self): self.frames = []; self.closed = False
-    def send_break(self, **kwargs): pass
-    def write(self, frame): self.frames.append(frame)
-    def flush(self): pass
+    def __init__(self): self.frames = []; self.closed = False; self.events = []
+    @property
+    def break_condition(self): return False
+    @break_condition.setter
+    def break_condition(self, value): self.events.append(("break", value))
+    def write(self, frame): self.frames.append(frame); self.events.append(("write", frame))
+    def flush(self): self.events.append(("flush",))
     def close(self): self.closed = True
+
+
+def test_open_dmx_uses_explicit_break_and_mark_timing():
+    port = Port()
+    send_open_dmx_frame(port, (255, 0, 0), 1,
+                        sleep=lambda duration: port.events.append(("sleep", duration)))
+    assert port.events[:4] == [
+        ("break", True),
+        ("sleep", BREAK_SECONDS),
+        ("break", False),
+        ("sleep", MARK_AFTER_BREAK_SECONDS),
+    ]
+    assert port.frames[0][:4] == bytes((0, 255, 0, 0))
+    assert port.events[-1] == ("flush",)
 
 
 def config(**overrides):

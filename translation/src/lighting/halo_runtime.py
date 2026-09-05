@@ -6,18 +6,9 @@ import threading
 import time
 
 from .halo60x_demo import BLACKOUT, Halo60xState, state_to_dmx_channels
+from .open_dmx import send_open_dmx_frame
 
 LOG = logging.getLogger(__name__)
-
-
-def send_open_dmx_frame(serial_port, channels, start_address):
-    """The validated Open-DMX frame convention; strobe is always channel 3 = 0."""
-    frame = bytearray(512)
-    frame[start_address - 1:start_address + 2] = bytes(channels)
-    serial_port.send_break(duration=.0001)
-    serial_port.write(bytes([0]) + frame)
-    serial_port.flush()  # never accumulate obsolete fade frames
-
 
 class HaloLightingController:
     """Base state plus a non-overlapping temporary gesture, independent of GPIO."""

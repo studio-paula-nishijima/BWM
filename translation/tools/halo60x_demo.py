@@ -9,18 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lighting.halo60x_demo import Halo60xCue, Halo60xState, build_halo60x_demo, state_to_dmx_channels
-
-
-def send_open_dmx_frame(serial_port, channels: tuple[int, int, int], start_address: int) -> None:
-    """Send one frame using the Enttec Open DMX serial convention."""
-    if not 1 <= start_address <= 510:
-        raise ValueError("start_address must leave room for the three Halo channels")
-    frame = bytearray(512)
-    frame[start_address - 1:start_address + 2] = bytes(channels)
-    serial_port.send_break(duration=0.0001)
-    serial_port.write(bytes([0]) + frame)
-    # Do not queue obsolete fade frames behind a slow FTDI/Open-DMX adapter.
-    serial_port.flush()
+from lighting.open_dmx import send_open_dmx_frame
 
 
 def play_cue(serial_port, cue, start_address: int, interval: float, *, clock=time.monotonic,
