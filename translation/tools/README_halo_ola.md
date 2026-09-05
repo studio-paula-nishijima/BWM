@@ -21,7 +21,10 @@ ola_patch --help
 ```
 
 The script disables the conflicting Open DMX, StageProfi, and USB-serial OLA
-plugins and enables FTDI at 30 Hz. Confirm the detected FTDI device reports
+plugins and enables FTDI at 30 Hz. It uses the OLA configuration directory
+already installed by the package—normally `/var/lib/ola/conf` on Debian, then
+`/etc/ola` only if that is the actual existing directory—rather than creating a
+dead configuration path. Confirm the detected FTDI device reports
 serial `BG03CXL2` (VID/PID `0403:6001`) and patch its output port to universe 1
 using the current device/port IDs shown by `ola_dev_info`; those IDs are dynamic
 and are intentionally not stored in application config. Repeat the patch only
