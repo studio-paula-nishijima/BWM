@@ -80,6 +80,13 @@ class Halo60xDemoTests(unittest.TestCase):
         self.assertLess(len(sent), 20)
         self.assertEqual(sent[-1], state_to_dmx_channels(cue.end))
 
+    def test_static_cue_holds_one_state_then_blackout_is_available_to_caller(self):
+        state = Halo60xState(100, 6500)
+        cue = halo_tool.Halo60xCue("static", state, state, 0, 10)
+        self.assertEqual(cue.state_at(0), state)
+        self.assertEqual(cue.state_at(10), state)
+        self.assertEqual(state_to_dmx_channels(BLACKOUT), (0, 101, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

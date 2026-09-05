@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from lighting.halo60x_demo import build_halo60x_demo, state_to_dmx_channels
+from lighting.halo60x_demo import Halo60xCue, Halo60xState, build_halo60x_demo, state_to_dmx_channels
 
 
 def send_open_dmx_frame(serial_port, channels: tuple[int, int, int], start_address: int) -> None:
@@ -70,6 +70,27 @@ def run_live(port: str, start_address: int, interval: float, *, fade_seconds: fl
             send_open_dmx_frame(serial_port, (0, 0, 0), start_address)
 
 
+def run_static(port: str, start_address: int, interval: float, *, brightness: float,
+               cct: float, duration: float) -> None:
+    """Hold one explicit DMX state, then safely return the fixture to blackout."""
+    if interval <= 0 or duration <= 0:
+        raise ValueError("interval and duration must be positive")
+    state = Halo60xState(brightness, cct)
+    try:
+        import serial
+    except ImportError as exc:
+        raise SystemExit("pyserial is required for --live; use translation_venv") from exc
+
+    with serial.Serial(port=port, baudrate=250000, bytesize=8, parity=serial.PARITY_NONE,
+                       stopbits=2, timeout=1) as serial_port:
+        try:
+            print(f"[Halo 60x] static {brightness:g}% {cct:g} K for {duration:g} s", flush=True)
+            cue = Halo60xCue("static", state, state, 0, duration)
+            play_cue(serial_port, cue, start_address, interval)
+        finally:
+            send_open_dmx_frame(serial_port, (0, 0, 0), start_address)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--interval", type=float, default=0.1, help="frame interval in seconds")
@@ -83,11 +104,25 @@ def main() -> None:
                         help="fade duration for independent-control checks (default: 12)")
     parser.add_argument("--blackout-hold", type=float, default=3.0, metavar="SECONDS",
                         help="blackout hold duration at beginning/end (default: 3)")
+    parser.add_argument("--static", action="store_true",
+                        help="hold one explicit intensity/CCT state instead of running the demonstration")
+    parser.add_argument("--brightness", type=float, metavar="PERCENT",
+                        help="static intensity from 0 to 100 (required with --static)")
+    parser.add_argument("--cct", type=float, metavar="KELVIN",
+                        help="static CCT from 2700 to 6500 K (required with --static)")
+    parser.add_argument("--duration", type=float, default=10.0, metavar="SECONDS",
+                        help="static-state duration before blackout (default: 10)")
     parser.add_argument("--live", action="store_true", help="send frames to the connected Halo 60x")
     args = parser.parse_args()
     if args.live:
         if not args.port:
             parser.error("--live requires --port, for example --port /dev/ttyUSB0")
+        if args.static:
+            if args.brightness is None or args.cct is None:
+                parser.error("--static requires --brightness and --cct")
+            run_static(args.port, args.address, args.interval, brightness=args.brightness,
+                       cct=args.cct, duration=args.duration)
+            return
         run_live(args.port, args.address, args.interval, fade_seconds=args.fade,
                  hold_seconds=args.hold, check_fade_seconds=args.check_fade,
                  blackout_hold_seconds=args.blackout_hold)
