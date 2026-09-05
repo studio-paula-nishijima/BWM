@@ -107,6 +107,8 @@ lighting:
   enabled: true
   # olad exclusively owns the FTDI adapter; application sends universe frames.
   universe: 1
+  # Provisioning patches this exact adapter to the universe; OLA device IDs are dynamic.
+  adapter_serial: BG03CXL2
   ola_refresh_hz: 30
   start_address: 1
   frame_interval_seconds: 0.1

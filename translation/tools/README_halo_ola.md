@@ -1,14 +1,16 @@
 # Halo 60x through OLA
 
-The production path is `play-events -> OLA Python client -> olad -> FTDI DMX
+The production path is `play-events -> persistent ola_streaming_client -> olad -> FTDI DMX
 plugin -> amaran Halo 60x`. No BWM application opens `/dev/ttyUSB*`.
 
-On the Pi install the distribution OLA package and Python bindings, then run
-`sudo systemctl enable --now olad.service`:
+The authoritative rpi05 test installed only the Raspberry Pi OS/Debian OLA
+package. It used the packaged system service and command-line client; the
+separate Python bindings were not part of the successful hardware test:
 
 ```bash
 sudo apt update
-sudo apt install ola ola-python
+sudo apt install ola
+sudo systemctl enable --now olad.service
 ```
 
 Apply the repository provisioning script as root:
@@ -20,16 +22,13 @@ ola_dev_info
 ola_patch --help
 ```
 
-The script disables the conflicting Open DMX, StageProfi, and USB-serial OLA
-plugins and enables FTDI at 30 Hz. It uses the OLA configuration directory
-already installed by the package—normally `/var/lib/ola/conf` on Debian, then
-`/etc/ola` only if that is the actual existing directory—rather than creating a
-dead configuration path. Confirm the detected FTDI device reports
-serial `BG03CXL2` (VID/PID `0403:6001`) and patch its output port to universe 1
-using the current device/port IDs shown by `ola_dev_info`; those IDs are dynamic
-and are intentionally not stored in application config. Repeat the patch only
-if OLA's device database changes. `ola_dev_info` and `ola_patch` make this
-inspectable after reboots.
+The script reproduces the working `/etc/ola` configuration: FTDI DMX enabled at
+30 Hz; StageProfi, Open DMX, and the complete Serial USB plugin disabled. It
+then restarts the system `olad`, finds serial `BG03CXL2` (VID/PID `0403:6001`)
+in `ola_dev_info`, and patches its current output port to universe 1. OLA device
+numbers are dynamic and never hard-coded. Override the deployment identity with
+`OLA_FTDI_SERIAL` and `OLA_UNIVERSE` when needed; `OLA_CONFIG_DIR` is available
+only for an explicitly verified alternative daemon configuration directory.
 
 Test independently, then run the runtime:
 
@@ -38,5 +37,11 @@ python tools/halo60x_demo.py --live --universe 1 --static --brightness 100 --cct
 python tools/halo60x_demo.py --live --universe 1 --static --brightness 100 --cct 6500
 ```
 
-The demo blacks out and withdraws its OLA source on exit. Do not leave the demo
-running while `play-events` is authoritative for universe 1.
+The demo and runtime each maintain one long-lived `ola_streaming_client` process
+and feed it complete 512-channel frames through stdin. This avoids the observed
+state reversion caused by isolated short-lived sources. Each blacks out before
+withdrawing its source. Do not leave the demo running while `play-events` is
+authoritative for universe 1.
+
+The rpi05 proof did not record its exact Pi model or OS release. Query those on
+the target rather than treating an assumed release as part of the contract.

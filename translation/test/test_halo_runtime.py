@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -32,13 +33,53 @@ def test_failure_and_disabled_lighting_are_non_fatal_without_serial():
     assert controller._retry_at > 0
     disabled=HaloLightingController(config(enabled=False), clock=clock, ola_client=broken); disabled.activate(); disabled.step()
 
-def test_ola_client_sends_a_full_universe_frame_without_serial_device_access():
-    sent=[]
-    class Wrapper:
-        def Client(self): return self
-        def SendDmx(self, universe, frame, callback): sent.append((universe, bytes(frame))); callback(type("Result", (), {"Succeeded": lambda _: True})())
-        def AddEvent(self, *_): pass
-    output=OLAUniverseClient(1, wrapper_factory=Wrapper, emit=lambda _:None)
-    output._wrapper=Wrapper(); output._started=True; output.send(bytes([1,2,0]) + bytes(509)); output._tick()
-    assert sent == [(1, bytes([1,2,0]) + bytes(509))]
-    assert "serial" not in Path(__file__).resolve().parents[1].joinpath("src/lighting/halo_runtime.py").read_text().lower()
+def test_ola_client_keeps_one_packaged_cli_source_and_blackouts_on_close():
+    class Stdin:
+        def __init__(self): self.writes=[]; self.closed=False
+        def write(self, value): self.writes.append(value); return len(value)
+        def flush(self): pass
+        def close(self): self.closed=True
+    class Process:
+        def __init__(self): self.stdin=Stdin(); self.returncode=None
+        def poll(self): return self.returncode
+        def terminate(self): self.returncode=0
+        def wait(self, timeout=None): return self.returncode
+        def kill(self): self.returncode=-9
+    processes=[]
+    def popen(args, **kwargs):
+        processes.append((args, kwargs, Process()))
+        return processes[-1][2]
+
+    output=OLAUniverseClient(1, refresh_hz=200, popen_factory=popen, emit=lambda _:None)
+    output.send(bytes([1,2,0]) + bytes(509))
+    deadline=time.monotonic()+.5
+    while not processes or not processes[0][2].stdin.writes:
+        assert time.monotonic() < deadline
+        time.sleep(.005)
+    output.send(bytes([3,4,0]) + bytes(509))
+    deadline=time.monotonic()+.5
+    while not any(line.startswith(b"3,4,0,") for line in processes[0][2].stdin.writes):
+        assert time.monotonic() < deadline
+        time.sleep(.005)
+    output.close()
+
+    assert len(processes) == 1
+    assert processes[0][0] == ["ola_streaming_client", "-u", "1"]
+    assert len(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == 512
+    assert set(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == {"0"}
+    source=Path(__file__).resolve().parents[1].joinpath("src/lighting/halo_runtime.py").read_text().lower()
+    assert "pyserial" not in source and "/dev/ttyusb" not in source
+
+
+def test_provisioning_matches_rpi05_and_resolves_dynamic_ola_id_by_serial():
+    root=Path(__file__).resolve().parents[1]
+    script=root.joinpath("scripts/configure-ola-halo.sh").read_text()
+    runtime=root.joinpath("configs/runtime.yaml").read_text()
+    docs=root.joinpath("tools/README_halo_ola.md").read_text()
+    assert "config_dir=${OLA_CONFIG_DIR:-/etc/ola}" in script
+    assert "/var/lib/ola" not in script
+    assert 'ola-usbserial.conf" enabled false' in script
+    assert 'awk -v serial="$adapter_serial"' in script
+    assert 'ola_patch -d "$1" -p "$2" -u "$universe"' in script
+    assert "adapter_serial: BG03CXL2" in runtime
+    assert "ola-python" not in docs

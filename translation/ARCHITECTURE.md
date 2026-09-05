@@ -182,10 +182,13 @@ activation/startup and deactivation/timeout/shutdown. Eligible detector or
 button occurrences start three smooth 7 s pulses toward 50%/6500 K, then return
 to the current base. Lighting cooldown affects lighting only.
 
-Halo is an OLA client: `HaloLightingController -> OLA Python client -> olad ->
-FTDI DMX plugin -> fixture`. `olad` exclusively owns the FTDI adapter; the
-application never opens `/dev/ttyUSB*`. The persistent client is the runtime's
-single source on its configured universe and sends a blackout before withdrawal.
+Halo is an OLA client: `HaloLightingController -> persistent packaged
+ola_streaming_client -> system olad -> FTDI DMX plugin -> fixture`. `olad`
+exclusively owns the FTDI adapter; the application never opens `/dev/ttyUSB*`.
+The client receives successive complete frames on stdin and remains the
+runtime's single source on its configured universe, sending a blackout before
+withdrawal. Deployment patches the expected FTDI serial to the universe without
+relying on OLA's dynamic device number.
 OLA failure is isolated with bounded retry; it cannot block semantic ingress, GPIO quiescence,
 or shutdown. No persistent selector diagnostics are enabled by default. Future
 actual-actuation-frequency selection/base-light modulation is deliberately not
