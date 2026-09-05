@@ -62,8 +62,14 @@ def generate_events(
     # -------------------------------------------------
     # Persistent pulse oscillator phase
     # -------------------------------------------------
+    #
+    # This is deliberately phase, not an absolute time calculated from the
+    # frequency at a previous pulse.  A new control value therefore affects
+    # the oscillator immediately, including during a short high-flow peak.
+    # A channel begins at phase zero: its first pulse follows one accumulated
+    # cycle rather than being an implicit t=0 pulse.
 
-    next_pulse_time = 0.0
+    phase = 0.0
 
     # -------------------------------------------------
     # Main timeline traversal
@@ -86,7 +92,9 @@ def generate_events(
         # -------------------------------------------------
 
         if not active:
-
+            # Silence is a genuine oscillator boundary.  Do not let a partial
+            # cycle from before it advance the next later active region.
+            phase = 0.0
             current_time = interval_end
 
             continue
@@ -100,25 +108,25 @@ def generate_events(
             mode
         )
 
-        period = 1.0 / freq
-
         # -------------------------------------------------
-        # Ensure oscillator never falls behind
+        # Phase-responsive pulse generation
         # -------------------------------------------------
+        #
+        # Calculate each boundary crossing at its exact position in this
+        # control interval.  This retains precise event times while allowing
+        # an interval to cross more than one cycle.
+        accumulated_phase = phase + (freq * scaled_dt)
+        completed_cycles = int(np.floor(accumulated_phase + 1e-12))
 
-        if next_pulse_time < interval_start:
+        if completed_cycles:
+            first_crossing = (1.0 - phase) / freq
+            period = 1.0 / freq
 
-            next_pulse_time = interval_start
-
-        # -------------------------------------------------
-        # Continuous pulse generation
-        # -------------------------------------------------
-
-        while next_pulse_time <= interval_end:
+        for cycle in range(completed_cycles):
 
             events.append({
 
-                "playback_time": next_pulse_time,
+                "playback_time": interval_start + first_crossing + (cycle * period),
 
                 "timestamp": timestamps[i],
 
@@ -138,11 +146,12 @@ def generate_events(
                 }
             })
 
-            # ---------------------------------------------
-            # Advance persistent oscillator
-            # ---------------------------------------------
-
-            next_pulse_time += period
+        # Retain only the incomplete cycle.  Avoid a floating-point value
+        # infinitesimally below one becoming a spurious immediate pulse in
+        # the next interval.
+        phase = accumulated_phase - completed_cycles
+        if phase >= 1.0 - 1e-12:
+            phase = 0.0
 
         # -------------------------------------------------
         # Advance global playback clock
