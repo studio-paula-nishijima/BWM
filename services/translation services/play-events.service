@@ -1,6 +1,8 @@
 [Unit]
 Description=BWM Play Events Runtime
 After=local-fs.target
+Wants=olad.service
+After=olad.service
 
 [Service]
 Type=simple

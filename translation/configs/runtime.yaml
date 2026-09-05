@@ -105,7 +105,9 @@ whisper_interaction:
 
 lighting:
   enabled: true
-  serial_port: /dev/ttyUSB0
+  # olad exclusively owns the FTDI adapter; application sends universe frames.
+  universe: 1
+  ola_refresh_hz: 30
   start_address: 1
   frame_interval_seconds: 0.1
   retry_seconds: 5.0

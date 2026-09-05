@@ -5,21 +5,22 @@ import logging
 import threading
 import time
 
-from .halo60x_demo import BLACKOUT, Halo60xState, state_to_dmx_channels
-from .open_dmx import send_open_dmx_frame
+from .halo60x_demo import Halo60xState, state_to_dmx_channels
+from .ola_client import OLAUniverseClient
 
 LOG = logging.getLogger(__name__)
 
 class HaloLightingController:
     """Base state plus a non-overlapping temporary gesture, independent of GPIO."""
-    def __init__(self, config, *, clock=time.monotonic, sleep=time.sleep, serial_factory=None, emit=print):
-        self.config, self.clock, self.sleep, self.serial_factory, self.emit = dict(config or {}), clock, sleep, serial_factory, emit
+    def __init__(self, config, *, clock=time.monotonic, sleep=time.sleep, ola_client=None, emit=print):
+        self.config, self.clock, self.sleep, self.emit = dict(config or {}), clock, sleep, emit
         self.enabled = bool(self.config.get("enabled", False))
         self.base = Halo60xState(float(self.config.get("active_brightness_percent", 60)), float(self.config.get("active_cct_kelvin", 2700)))
         self.blackout = Halo60xState(0, self.base.cct_kelvin)
         self.address = int(self.config.get("start_address", 1))
+        self.universe = int(self.config.get("universe", 1))
         self.interval = float(self.config.get("frame_interval_seconds", .1))
-        self._port = None
+        self._ola = ola_client
         self._next_frame = 0.0
         self._retry_at = 0.0
         self._base_fade = None
@@ -110,22 +111,18 @@ class HaloLightingController:
         if self.clock() < self._retry_at:
             return
         try:
-            if self._port is None:
-                if self.serial_factory is None:
-                    import serial
-                    self._port = serial.Serial(port=self.config["serial_port"], baudrate=250000, bytesize=8,
-                                               parity=serial.PARITY_NONE, stopbits=2, timeout=1)
-                else:
-                    self._port = self.serial_factory()
-            send_open_dmx_frame(self._port, state_to_dmx_channels(state), self.address)
+            if self._ola is None:
+                self._ola = OLAUniverseClient(self.universe, refresh_hz=self.config.get("ola_refresh_hz", 30),
+                                              retry_seconds=self.config.get("retry_seconds", 5), emit=self.emit)
+            frame = bytearray(512)
+            frame[self.address - 1:self.address + 2] = bytes(state_to_dmx_channels(state))
+            self._ola.send(frame)
         except Exception as exc:
             LOG.warning("Halo DMX unavailable: %s", exc)
             self.emit(f"[Halo] unavailable; continuing Translation: {exc}")
-            self._close()
             self._retry_at = self.clock() + float(self.config.get("retry_seconds", 5.0))
 
     def _close(self):
-        if self._port is not None:
-            try: self._port.close()
+        if self._ola is not None:
+            try: self._ola.close()
             except Exception: pass
-        self._port = None

@@ -182,8 +182,11 @@ activation/startup and deactivation/timeout/shutdown. Eligible detector or
 button occurrences start three smooth 7 s pulses toward 50%/6500 K, then return
 to the current base. Lighting cooldown affects lighting only.
 
-The Open-DMX adapter opens lazily, drops stale frames, and isolates serial
-failure with bounded retry; it cannot block semantic ingress, GPIO quiescence,
+Halo is an OLA client: `HaloLightingController -> OLA Python client -> olad ->
+FTDI DMX plugin -> fixture`. `olad` exclusively owns the FTDI adapter; the
+application never opens `/dev/ttyUSB*`. The persistent client is the runtime's
+single source on its configured universe and sends a blackout before withdrawal.
+OLA failure is isolated with bounded retry; it cannot block semantic ingress, GPIO quiescence,
 or shutdown. No persistent selector diagnostics are enabled by default. Future
 actual-actuation-frequency selection/base-light modulation is deliberately not
 implemented.

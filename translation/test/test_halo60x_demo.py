@@ -68,36 +68,28 @@ class Halo60xDemoTests(unittest.TestCase):
         self.assertEqual(state_to_dmx_channels(Halo60xState(70, 4600)), (178, 128, 0))
         self.assertEqual(state_to_dmx_channels(Halo60xState(100, 6500)), (255, 255, 0))
 
-    def test_slow_open_dmx_output_does_not_extend_cue_duration(self):
+    def test_slow_ola_submission_does_not_extend_cue_duration(self):
         class Clock:
             now = 0.0
             def __call__(self): return self.now
             def sleep(self, seconds): self.now += seconds
         clock, sent = Clock(), []
-        def slow_send(_port, channels, _address):
-            sent.append(channels); clock.now += 0.25
+        class SlowOla:
+            def send(self, frame): sent.append(frame); clock.now += 0.25
         cue = build_halo60x_demo(fade_seconds=1, hold_seconds=2)[1]
-        halo_tool.play_cue(None, cue, 1, 0.033, clock=clock, sleep=clock.sleep, send_frame=slow_send)
+        halo_tool.play_cue(SlowOla(), cue, 1, 0.033, clock=clock, sleep=clock.sleep)
         self.assertLessEqual(clock.now, 3.3)
         self.assertLess(len(sent), 20)
-        self.assertEqual(sent[-1], state_to_dmx_channels(cue.end))
+        self.assertEqual(sent[-1][:3], bytes(state_to_dmx_channels(cue.end)))
 
-    def test_static_cue_holds_one_state_without_a_blackout_frame(self):
-        serial_port = mock.MagicMock()
-        serial_port.__enter__.return_value = serial_port
-        fake_serial = SimpleNamespace(
-            PARITY_NONE="N",
-            Serial=mock.Mock(return_value=serial_port),
-        )
-        with mock.patch.dict(sys.modules, {"serial": fake_serial}), \
-                mock.patch.object(halo_tool, "play_cue") as play_cue, \
-                mock.patch.object(halo_tool, "send_open_dmx_frame") as send_frame:
-            halo_tool.run_static("/dev/ttyUSB0", 1, 0.1, brightness=100, cct=6500, duration=10)
-
-        cue = play_cue.call_args.args[1]
-        self.assertEqual(cue.start, Halo60xState(100, 6500))
-        self.assertEqual(cue.end, Halo60xState(100, 6500))
-        send_frame.assert_not_called()
+    def test_static_cue_uses_ola_and_blackouts_on_exit(self):
+        client = mock.MagicMock()
+        with mock.patch.object(halo_tool, "OLAUniverseClient", return_value=client), \
+                mock.patch.object(halo_tool, "play_cue") as play_cue:
+            halo_tool.run_static(1, 1, .1, brightness=100, cct=6500, duration=10)
+        self.assertEqual(play_cue.call_args.args[1].end, Halo60xState(100, 6500))
+        self.assertTrue(client.send.called)
+        client.close.assert_called_once()
 
 
 if __name__ == "__main__":

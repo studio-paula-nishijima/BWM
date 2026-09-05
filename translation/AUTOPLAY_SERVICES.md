@@ -7,7 +7,9 @@ rpi02: whisper-runtime.service -> translation/whisper_runtime.py
 rpi03: play-events.service     -> translation/play_events.py
 ```
 
-Both units use `After=local-fs.target`.  They deliberately do not use or wait
+Both units use `After=local-fs.target`. `play-events.service` additionally uses
+best-effort `Wants=olad.service` and `After=olad.service`, never `Requires=`.
+They deliberately do not use or wait
 for `network-online.target`, Wi-Fi, Ethernet, MQTT, BLE, the person detector,
 Translation availability, or Voice availability.  Transport setup failures are
 handled by the runners as isolated degradation, so each process can start and
@@ -94,6 +96,11 @@ and Translation begins its initially-active session without network.  Confirm
 the expected initial playback, local GPIO17 backup operation, journal output,
 failure restart, and graceful stop with GPIO quiescence and Halo fade/blackout
 when lighting is configured.
+
+## Halo / OLA deployment
+
+See `tools/README_halo_ola.md`. OLA owns the FTDI device; Translation only sends
+DMX to configured universe 1. OLA being unavailable is non-fatal to playback.
 
 Do not automatically disable, remove, rename, or mask legacy services.  Before
 deployment, manually check for conflicts: on rpi02 the legacy
