@@ -8,7 +8,7 @@ On the Pi install the distribution OLA package and Python bindings, then run
 
 ```bash
 sudo apt update
-sudo apt install ola python3-ola
+sudo apt install ola ola-python
 ```
 
 Apply the repository provisioning script as root:
