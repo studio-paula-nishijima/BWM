@@ -68,6 +68,9 @@ class Halo60xDemoTests(unittest.TestCase):
         self.assertEqual(state_to_dmx_channels(Halo60xState(70, 4600)), (178, 128, 0))
         self.assertEqual(state_to_dmx_channels(Halo60xState(100, 6500)), (255, 255, 0))
 
+    def test_address_one_uses_proven_three_slot_ola_frame(self):
+        self.assertEqual(halo_tool.frame_for(Halo60xState(100, 2700), 1), bytes((255, 0, 0)))
+
     def test_slow_ola_submission_does_not_extend_cue_duration(self):
         class Clock:
             now = 0.0

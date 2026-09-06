@@ -6,7 +6,7 @@ from lighting.halo60x_demo import Halo60xCue, Halo60xState, build_halo60x_demo, 
 from lighting.ola_client import OLAUniverseClient
 
 def frame_for(state, address):
-    frame = bytearray(512); frame[address - 1:address + 2] = bytes(state_to_dmx_channels(state)); return frame
+    frame = bytearray(address + 2); frame[address - 1:address + 2] = bytes(state_to_dmx_channels(state)); return frame
 
 def play_cue(client, cue, address, interval, *, clock=time.monotonic, sleep=time.sleep):
     started, deadline, next_frame = clock(), None, None

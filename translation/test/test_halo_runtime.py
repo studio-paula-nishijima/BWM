@@ -25,7 +25,7 @@ def test_ola_frame_mapping_activation_gesture_and_cooldown():
     state=controller._state_at(clock()); assert state.brightness_percent == pytest.approx(50); assert state.cct_kelvin == pytest.approx(6500)
     assert not controller.trigger_interaction(); clock.value=11; controller.step()
     assert ola.frames[-1][:3] == bytes((153, 0, 0)) # current base: 60%, 2700K, strobe off
-    assert len(ola.frames[-1]) == 512
+    assert len(ola.frames[-1]) == 3
 
 def test_failure_and_disabled_lighting_are_non_fatal_without_serial():
     clock=Clock(); broken=type("Broken",(),{"send":lambda *_: (_ for _ in ()).throw(OSError("olad down")),"close":lambda *_:None})()
@@ -51,24 +51,30 @@ def test_ola_client_keeps_one_packaged_cli_source_and_blackouts_on_close():
         return processes[-1][2]
 
     output=OLAUniverseClient(1, refresh_hz=200, popen_factory=popen, emit=lambda _:None)
-    output.send(bytes([1,2,0]) + bytes(509))
+    output.send(bytes([1,2,0]))
     deadline=time.monotonic()+.5
     while not processes or not processes[0][2].stdin.writes:
         assert time.monotonic() < deadline
         time.sleep(.005)
-    output.send(bytes([3,4,0]) + bytes(509))
+    output.send(bytes([3,4,0]))
     deadline=time.monotonic()+.5
-    while not any(line.startswith(b"3,4,0,") for line in processes[0][2].stdin.writes):
+    while not any(line == b"3,4,0\n" for line in processes[0][2].stdin.writes):
         assert time.monotonic() < deadline
         time.sleep(.005)
     output.close()
 
     assert len(processes) == 1
     assert processes[0][0] == ["ola_streaming_client", "-u", "1"]
-    assert len(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == 512
+    assert len(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == 3
     assert set(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == {"0"}
     source=Path(__file__).resolve().parents[1].joinpath("src/lighting/halo_runtime.py").read_text().lower()
     assert "pyserial" not in source and "/dev/ttyusb" not in source
+
+
+def test_ola_client_rejects_empty_or_oversized_frames():
+    output=OLAUniverseClient(1, popen_factory=lambda *_args, **_kwargs: None)
+    with pytest.raises(ValueError): output.send(b"")
+    with pytest.raises(ValueError): output.send(bytes(513))
 
 
 def test_provisioning_matches_rpi05_and_resolves_dynamic_ola_id_by_serial():

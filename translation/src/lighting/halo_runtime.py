@@ -115,7 +115,10 @@ class HaloLightingController:
             if self._ola is None:
                 self._ola = OLAUniverseClient(self.universe, refresh_hz=self.config.get("ola_refresh_hz", 30),
                                               retry_seconds=self.config.get("retry_seconds", 5), emit=self.emit)
-            frame = bytearray(512)
+            # OLA/FTDI sends only through the fixture's final used slot.  The
+            # rpi05 hardware path was proven with this three-slot form at
+            # address 1; padding to all 512 slots prevented fixture output.
+            frame = bytearray(self.address + 2)
             frame[self.address - 1:self.address + 2] = bytes(state_to_dmx_channels(state))
             self._ola.send(frame)
         except Exception as exc:

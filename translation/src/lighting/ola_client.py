@@ -9,7 +9,7 @@ LOG = logging.getLogger(__name__)
 
 
 class OLAUniverseClient:
-    """Feed full frames to one long-lived ``ola_streaming_client`` process."""
+    """Feed successive DMX frames to one long-lived ``ola_streaming_client``."""
 
     def __init__(self, universe, *, refresh_hz=30, retry_seconds=5,
                  executable="ola_streaming_client", popen_factory=subprocess.Popen,
@@ -22,7 +22,7 @@ class OLAUniverseClient:
         self._executable = executable
         self._popen_factory = popen_factory
         self._emit = emit
-        self._frame = bytearray(512)
+        self._frame = bytearray()
         self._frame_lock = threading.Lock()
         self._thread_lock = threading.Lock()
         self._write_lock = threading.Lock()
@@ -32,8 +32,8 @@ class OLAUniverseClient:
         self._closed = False
 
     def send(self, frame):
-        if len(frame) != 512:
-            raise ValueError("OLA universe frames must contain 512 channels")
+        if not 1 <= len(frame) <= 512:
+            raise ValueError("OLA universe frames must contain 1 to 512 channels")
         if self._closed:
             return
         with self._frame_lock:
@@ -47,8 +47,8 @@ class OLAUniverseClient:
         if self._closed:
             return
         self._closed = True
-        blackout = bytes(512)
         with self._frame_lock:
+            blackout = bytes(len(self._frame))
             self._frame[:] = blackout
         # Stop the refresh loop before the final write so no older frame can be
         # emitted after blackout.

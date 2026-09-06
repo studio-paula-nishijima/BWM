@@ -38,10 +38,12 @@ python tools/halo60x_demo.py --live --universe 1 --static --brightness 100 --cct
 ```
 
 The demo and runtime each maintain one long-lived `ola_streaming_client` process
-and feed it complete 512-channel frames through stdin. This avoids the observed
-state reversion caused by isolated short-lived sources. Each blacks out before
-withdrawing its source. Do not leave the demo running while `play-events` is
-authoritative for universe 1.
+and feed it frames through stdin. Frames end at the fixture's final configured
+slot: address 1 therefore sends the hardware-proven three values such as
+`255,0,0`, rather than padding the universe to 512 slots. This avoids both the
+observed full-frame output failure and state reversion from isolated short-lived
+sources. Each client blacks out before withdrawing its source. Do not leave the
+demo running while `play-events` is authoritative for universe 1.
 
 The rpi05 proof did not record its exact Pi model or OS release. Query those on
 the target rather than treating an assumed release as part of the contract.
