@@ -50,11 +50,16 @@ def test_ola_client_keeps_one_packaged_cli_source_and_blackouts_on_close():
             return self.returncode
         def kill(self): self.returncode=-9
     processes=[]
+    one_shots=[]
     def popen(args, **kwargs):
         processes.append((args, kwargs, Process()))
         return processes[-1][2]
+    def run(args, **kwargs):
+        one_shots.append((args, kwargs))
+        return type("Result", (), {"returncode": 0})()
 
-    output=OLAUniverseClient(1, refresh_hz=200, popen_factory=popen, emit=lambda _:None)
+    output=OLAUniverseClient(1, refresh_hz=200, popen_factory=popen,
+                             run_factory=run, emit=lambda _:None)
     output.send(bytes([1,2,0]))
     deadline=time.monotonic()+.5
     while not processes or not processes[0][2].stdin.writes:
@@ -73,6 +78,8 @@ def test_ola_client_keeps_one_packaged_cli_source_and_blackouts_on_close():
     assert set(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == {"0"}
     assert processes[0][2].waited
     assert not processes[0][2].terminated
+    assert one_shots[0][0] == ["ola_streaming_client", "-u", "1", "-d", "0,0,0"]
+    assert one_shots[0][1]["timeout"] == 1.0
     source=Path(__file__).resolve().parents[1].joinpath("src/lighting/halo_runtime.py").read_text().lower()
     assert "pyserial" not in source and "/dev/ttyusb" not in source
 
@@ -97,6 +104,16 @@ def test_ola_client_forces_exit_only_after_graceful_drain_times_out():
     process=StuckProcess()
     OLAUniverseClient._close_process(process)
     assert process.terminated and process.returncode == 0
+
+
+def test_ola_one_shot_blackout_failure_is_non_fatal():
+    def fail(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired("ola_streaming_client", 1)
+    messages=[]
+    output=OLAUniverseClient(1, run_factory=fail, emit=messages.append)
+    output._frame[:]=bytes((1, 2, 0))
+    output.close()
+    assert messages and "continuing shutdown" in messages[0]
 
 
 def test_provisioning_matches_rpi05_and_resolves_dynamic_ola_id_by_serial():

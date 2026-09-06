@@ -13,6 +13,7 @@ class OLAUniverseClient:
 
     def __init__(self, universe, *, refresh_hz=30, retry_seconds=5,
                  executable="ola_streaming_client", popen_factory=subprocess.Popen,
+                 run_factory=subprocess.run, blackout_timeout_seconds=1.0,
                  emit=print):
         self.universe = int(universe)
         self.refresh_hz = float(refresh_hz)
@@ -21,6 +22,8 @@ class OLAUniverseClient:
         self._retry_seconds = float(retry_seconds)
         self._executable = executable
         self._popen_factory = popen_factory
+        self._run_factory = run_factory
+        self._blackout_timeout_seconds = float(blackout_timeout_seconds)
         self._emit = emit
         self._frame = bytearray()
         self._frame_lock = threading.Lock()
@@ -65,6 +68,8 @@ class OLAUniverseClient:
         self._close_process(process)
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout=0.5)
+        if blackout:
+            self._latch_blackout(blackout)
 
     def _run(self):
         while not self._stop.is_set():
@@ -102,9 +107,29 @@ class OLAUniverseClient:
             process.stdin.write(self._payload(frame))
             process.stdin.flush()
 
+    def _latch_blackout(self, blackout):
+        """Best-effort final state using the one-shot path proven on rpi05."""
+        try:
+            result = self._run_factory(
+                [self._executable, "-u", str(self.universe), "-d", self._dmx_arg(blackout)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                timeout=self._blackout_timeout_seconds,
+                check=False,
+            )
+            if getattr(result, "returncode", 0):
+                LOG.warning("OLA one-shot blackout exited with status %s", result.returncode)
+        except Exception as exc:
+            LOG.warning("OLA one-shot blackout failed: %s", exc)
+            self._emit(f"[Halo] OLA blackout failed; continuing shutdown: {exc}")
+
     @staticmethod
     def _payload(frame):
-        return (",".join(str(value) for value in frame) + "\n").encode("ascii")
+        return (OLAUniverseClient._dmx_arg(frame) + "\n").encode("ascii")
+
+    @staticmethod
+    def _dmx_arg(frame):
+        return ",".join(str(value) for value in frame)
 
     @staticmethod
     def _close_process(process):

@@ -45,9 +45,11 @@ observed full-frame output failure and state reversion from isolated short-lived
 sources. Each client blacks out before withdrawing its source. Do not leave the
 demo running while `play-events` is authoritative for universe 1.
 
-On controlled exit the application closes the client's stdin and gives the
-packaged client a bounded interval to consume and submit its final blackout.
-Forced termination is only the fallback if that graceful exit does not finish.
+On controlled exit the application closes the persistent client's stdin and
+gives it a bounded interval to exit. It then executes the hardware-proven
+one-shot `ola_streaming_client -u 1 -d 0,0,0` form to latch blackout in `olad`.
+Both operations have strict time bounds and failures remain non-fatal to GPIO
+quiescence and process shutdown.
 
 The rpi05 proof did not record its exact Pi model or OS release. Query those on
 the target rather than treating an assumed release as part of the contract.
