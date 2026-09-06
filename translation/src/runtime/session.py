@@ -39,7 +39,7 @@ class PlaybackSessionRuntime:
         self._changed = threading.Condition()
         self._active = False
         self._activation_publisher = activation_publisher
-        self._engine = self._modulation = self._started_at = None
+        self._engine = self._modulation = self._started_at = self._playback_starts_at = None
         if initially_active:
             # Startup is locally authoritative.  Its optional later UART
             # notification is synchronization, never startup authorization.
@@ -91,11 +91,15 @@ class PlaybackSessionRuntime:
                                     due_event_handler=modulation.process,
                                     event_logger=self._event_logger)
             modulation.bind_playback_control(engine)
-            engine.start()
             self._engine, self._modulation = engine, modulation
             self._started_at, self._active = self._clock.now(), True
+            self._playback_starts_at = self._started_at
             if self._lighting:
                 self._lighting.activate()
+                self._playback_starts_at += float(getattr(self._lighting, "activation_delay_seconds", 0.0))
+                self._lighting.step()
+            if self._playback_starts_at <= self._started_at:
+                engine.start()
             print("[Session] ACTIVE: fresh playback session started")
             if publish:
                 self._publish_activation("active")
@@ -205,10 +209,15 @@ class PlaybackSessionRuntime:
                 self._finish_session("timeout")
                 self._changed.notify_all()
                 return 0
-            dispatched = self._engine.step()
-            dispatched += self._modulation.step()
             if self._lighting:
                 self._lighting.step()
+            if self._engine.state == PlaybackEngine.READY:
+                if self._clock.now() < self._playback_starts_at:
+                    return 0
+                self._engine.start()
+                print("[Session] PLAYBACK: Halo activation fade complete; solenoid admission opened")
+            dispatched = self._engine.step()
+            dispatched += self._modulation.step()
             self._refresh_external_reaction()
             backend_idle = getattr(self._dispatcher, "is_idle", lambda: True)
             if self._engine.is_complete and self._modulation.pending_count == 0 and backend_idle():

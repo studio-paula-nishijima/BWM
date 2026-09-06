@@ -34,6 +34,11 @@ class HaloLightingController:
         self._base_fade = (self.clock(), self._current, self.base, float(self.config.get("activation_fade_seconds", 4.0)))
         self._gesture_started = None
 
+    @property
+    def activation_delay_seconds(self):
+        """Configured base-fade time before Translation admits playback."""
+        return float(self.config.get("activation_fade_seconds", 4.0)) if self.enabled else 0.0
+
     def deactivate(self):
         self._gesture_started = None
         self._base_fade = (self.clock(), self._current, self.blackout, float(self.config.get("deactivation_fade_seconds", 4.0)))

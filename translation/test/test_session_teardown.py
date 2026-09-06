@@ -8,6 +8,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from runtime.clock import SimulatedClock
 from runtime.gpio_backend import GPIOBackend
+from runtime.playback import PlaybackEngine
 from runtime.router import EventRouter
 from runtime.session import PlaybackSessionRuntime
 
@@ -32,6 +33,14 @@ class SessionDispatcher:
     def dispatch(self, item): self.events.append(item)
     def quiesce(self): self.quiesce_count += 1
     def begin_session(self): self.begin_count += 1
+
+
+class ActivationFadeLighting:
+    def __init__(self, delay):
+        self.activation_delay_seconds, self.activate_count, self.step_count = delay, 0, 0
+    def activate(self): self.activate_count += 1
+    def step(self): self.step_count += 1
+    def deactivate_async(self): pass
 
 
 class SessionTeardownTests(unittest.TestCase):
@@ -61,6 +70,20 @@ class SessionTeardownTests(unittest.TestCase):
         runtime.step(); runtime.deactivate()
         self.clock.advance(10); runtime.activate(); runtime.step()
         self.assertEqual([item["target"] for item in self.dispatcher.events], ["a", "fresh"])
+
+    def test_halo_activation_fade_opens_solenoid_admission_only_after_normal_brightness(self):
+        lighting = ActivationFadeLighting(delay=4)
+        runtime = PlaybackSessionRuntime(lambda: [event(0)], self.clock, self.dispatcher, 30,
+                                         lighting_controller=lighting)
+        runtime.activate()
+        self.assertEqual(runtime.engine.state, PlaybackEngine.READY)
+        self.assertEqual(lighting.activate_count, 1)
+        runtime.step()
+        self.assertEqual(self.dispatcher.events, [])
+        self.clock.advance(3.999); runtime.step()
+        self.assertEqual(self.dispatcher.events, [])
+        self.clock.advance(.001); runtime.step()
+        self.assertEqual([item["target"] for item in self.dispatcher.events], ["a"])
 
 
 class GPIOBackendTeardownTests(unittest.TestCase):
