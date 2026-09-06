@@ -120,6 +120,33 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertEqual(VoiceState.RESPONSE_DISPLAYED.value, "response_displayed")
         self.assertEqual(len(events), 1)
 
+    def test_lifecycle_return_to_listening_reports_completion_reason(self):
+        events = []
+        lifecycle = VoiceLifecycle(events.append)
+        lifecycle.set(VoiceState.CAPTURE_PROCESSING)
+        self.assertTrue(lifecycle.set(VoiceState.LISTENING, reason="asr_completion"))
+        self.assertEqual(events[-1], "[WhisperLifecycle] capture_processing -> listening reason=asr_completion")
+
+    def test_quiescent_worker_is_reported_as_suspended_not_loading(self):
+        runtime, events = self.make()
+        try:
+            initial_loading_count = events.count("[ASR] loading")
+            runtime.quiesce()
+            runtime.ready_status()
+            self.assertEqual(events.count("[ASRWorker] suspended reason=whisper_quiescent"), 1)
+            self.assertEqual(events.count("[ASR] loading"), initial_loading_count)
+        finally:
+            runtime.shutdown()
+
+    def test_reactivation_reports_loading_after_a_quiescent_worker(self):
+        runtime, events = self.make()
+        try:
+            runtime.quiesce()
+            runtime.reactivate()
+            self.assertEqual(events[-1], "[ASR] loading")
+        finally:
+            runtime.shutdown()
+
     def test_busy_interaction_does_not_admit_second_capture_until_released(self):
         runtime, events = self.make()
         try:

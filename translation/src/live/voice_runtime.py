@@ -34,12 +34,13 @@ class VoiceLifecycle:
         else:
             self._on_transition = lambda before, after: (previous(before, after), observer(before, after))
 
-    def set(self, state):
+    def set(self, state, *, reason=None):
         state = VoiceState(state)
         if state == self.state:
             return False
         previous, self.state = self.state, state
-        self._emit(f"[WhisperLifecycle] {previous.value} -> {state.value}")
+        suffix = f" reason={reason}" if reason else ""
+        self._emit(f"[WhisperLifecycle] {previous.value} -> {state.value}{suffix}")
         if self._on_transition:
             try:
                 self._on_transition(previous, state)
@@ -67,6 +68,7 @@ class LiveASRCoordinator:
         self.results = []
         self._asr_status = None
         self._startup_failure_reported = False
+        self._asr_quiescent = False
         self.release_after_asr = release_after_asr
         self.inference_timeout_seconds = inference_timeout_seconds
         self.on_capture_started = on_capture_started
@@ -86,6 +88,7 @@ class LiveASRCoordinator:
             VoiceState.WHISPER_DETECTED, VoiceState.CAPTURE_PROCESSING, VoiceState.RESPONSE_DISPLAYED)
 
     def start(self):
+        self._asr_quiescent = False
         self.lifecycle.set(VoiceState.INITIALIZING)
         if self.worker:
             self.emit("[ASR] loading")
@@ -99,8 +102,12 @@ class LiveASRCoordinator:
         """Suspend only the restartable heavy ASR child; ingress stays outside."""
         if self.worker:
             self.worker.shutdown()
+            self._asr_quiescent = True
+            self._asr_status = "suspended"
+            self.emit("[ASRWorker] suspended reason=whisper_quiescent")
 
     def reactivate(self):
+        self._asr_quiescent = False
         self.lifecycle.set(VoiceState.INITIALIZING)
         if self.worker:
             self.emit("[ASR] loading")
@@ -112,6 +119,11 @@ class LiveASRCoordinator:
     def ready_status(self):
         if not self.worker:
             status, message = "disabled", "[ASR] disabled"
+        elif self._asr_quiescent:
+            # The process remains alive after a normal session quiescence,
+            # but its intentionally stopped worker is neither loading nor
+            # unavailable.  Reactivation clears this state before startup.
+            status, message = "suspended", None
         elif self.worker.ready:
             status, message = "ready", "[ASR] ready"
         elif self.worker.startup_error:
@@ -120,7 +132,8 @@ class LiveASRCoordinator:
             status, message = "loading", "[ASR] loading"
         if status != self._asr_status:
             self._asr_status = status
-            self.emit(message)
+            if message:
+                self.emit(message)
         dependencies_ready, dependency_error = self.startup_ready()
         if status == "ready" and dependencies_ready and self.lifecycle.state is VoiceState.INITIALIZING:
             self.emit("[WhisperRuntime] required startup resources ready")
@@ -164,8 +177,9 @@ class LiveASRCoordinator:
         """
         if self.capture.is_capturing or self.lifecycle.state not in (VoiceState.CAPTURE_PROCESSING, VoiceState.RESPONSE_DISPLAYED):
             return False
+        reason = reason.replace(" ", "_")
         self.emit(f"[WhisperInteraction] complete reason={reason}")
-        return self.lifecycle.set(VoiceState.LISTENING)
+        return self.lifecycle.set(VoiceState.LISTENING, reason=reason)
 
     def finish_capture(self):
         completed = self.capture.finish()

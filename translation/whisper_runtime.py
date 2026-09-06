@@ -622,8 +622,8 @@ def main():
     )
     # The policy is Voice-local; it does not observe Translation or transport state.
     asr_coordinator._interaction_admission = lambda: voice_session.admitting_interactions
-    print("[Runtime] Oracle/Pygame/retrieval enabled" if args.oracle else
-          "[Runtime] exhibition mode: ASR enabled; Oracle/Pygame/retrieval disabled")
+    print("[WhisperRuntime] Oracle/Pygame/retrieval enabled" if args.oracle else
+          "[WhisperRuntime] ASR enabled; Oracle/Pygame/retrieval disabled")
     if args.oracle:
         display_config = DisplayConfig(width=args.oracle_width, height=args.oracle_height,
             fullscreen=args.oracle_fullscreen, enabled=not args.oracle_headless,
@@ -827,7 +827,7 @@ def main():
                     if not triggered:
                         triggered, trigger_source = True, "button"
                     else:
-                        print("[Interaction] capture ignored: busy (detector already admitted)")
+                        print("[WhisperInteraction] capture ignored reason=busy_detector_interaction_admitted")
                 else:
                     print("[InteractionButton] ignored: Voice quiescent")
             except queue.Empty:
