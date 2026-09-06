@@ -45,5 +45,9 @@ observed full-frame output failure and state reversion from isolated short-lived
 sources. Each client blacks out before withdrawing its source. Do not leave the
 demo running while `play-events` is authoritative for universe 1.
 
+On controlled exit the application closes the client's stdin and gives the
+packaged client a bounded interval to consume and submit its final blackout.
+Forced termination is only the fallback if that graceful exit does not finish.
+
 The rpi05 proof did not record its exact Pi model or OS release. Query those on
 the target rather than treating an assumed release as part of the contract.

@@ -117,6 +117,17 @@ class OLAUniverseClient:
             pass
         try:
             if process.poll() is None:
+                # EOF lets ola_streaming_client consume the final blackout,
+                # submit it to olad, and withdraw normally.  Terminating first
+                # can kill it before that last stdin frame is processed.
+                process.wait(timeout=0.5)
+                return
+        except subprocess.TimeoutExpired:
+            pass
+        except Exception:
+            pass
+        try:
+            if process.poll() is None:
                 process.terminate()
                 process.wait(timeout=0.25)
         except Exception:

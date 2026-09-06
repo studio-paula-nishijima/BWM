@@ -1,4 +1,5 @@
 import sys
+import subprocess
 import time
 from pathlib import Path
 import pytest
@@ -40,10 +41,13 @@ def test_ola_client_keeps_one_packaged_cli_source_and_blackouts_on_close():
         def flush(self): pass
         def close(self): self.closed=True
     class Process:
-        def __init__(self): self.stdin=Stdin(); self.returncode=None
+        def __init__(self): self.stdin=Stdin(); self.returncode=None; self.terminated=False; self.waited=False
         def poll(self): return self.returncode
-        def terminate(self): self.returncode=0
-        def wait(self, timeout=None): return self.returncode
+        def terminate(self): self.terminated=True; self.returncode=0
+        def wait(self, timeout=None):
+            self.waited=True
+            if self.stdin.closed: self.returncode=0
+            return self.returncode
         def kill(self): self.returncode=-9
     processes=[]
     def popen(args, **kwargs):
@@ -67,6 +71,8 @@ def test_ola_client_keeps_one_packaged_cli_source_and_blackouts_on_close():
     assert processes[0][0] == ["ola_streaming_client", "-u", "1"]
     assert len(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == 3
     assert set(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == {"0"}
+    assert processes[0][2].waited
+    assert not processes[0][2].terminated
     source=Path(__file__).resolve().parents[1].joinpath("src/lighting/halo_runtime.py").read_text().lower()
     assert "pyserial" not in source and "/dev/ttyusb" not in source
 
@@ -75,6 +81,22 @@ def test_ola_client_rejects_empty_or_oversized_frames():
     output=OLAUniverseClient(1, popen_factory=lambda *_args, **_kwargs: None)
     with pytest.raises(ValueError): output.send(b"")
     with pytest.raises(ValueError): output.send(bytes(513))
+
+
+def test_ola_client_forces_exit_only_after_graceful_drain_times_out():
+    class Stdin:
+        def close(self): pass
+    class StuckProcess:
+        def __init__(self): self.stdin=Stdin(); self.returncode=None; self.terminated=False
+        def poll(self): return self.returncode
+        def wait(self, timeout=None):
+            if not self.terminated: raise subprocess.TimeoutExpired("ola_streaming_client", timeout)
+            return self.returncode
+        def terminate(self): self.terminated=True; self.returncode=0
+        def kill(self): self.returncode=-9
+    process=StuckProcess()
+    OLAUniverseClient._close_process(process)
+    assert process.terminated and process.returncode == 0
 
 
 def test_provisioning_matches_rpi05_and_resolves_dynamic_ola_id_by_serial():
