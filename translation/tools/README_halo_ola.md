@@ -29,6 +29,8 @@ in `ola_dev_info`, and patches its current output port to universe 1. OLA device
 numbers are dynamic and never hard-coded. Override the deployment identity with
 `OLA_FTDI_SERIAL` and `OLA_UNIVERSE` when needed; `OLA_CONFIG_DIR` is available
 only for an explicitly verified alternative daemon configuration directory.
+Adapter serial is provisioning-owned rather than a runtime lighting-policy key;
+the running application addresses the already-patched OLA universe only.
 
 Test independently, then run the runtime:
 

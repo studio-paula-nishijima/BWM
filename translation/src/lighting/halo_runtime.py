@@ -19,7 +19,6 @@ class HaloLightingController:
         self.blackout = Halo60xState(0, self.base.cct_kelvin)
         self.address = int(self.config.get("start_address", 1))
         self.universe = int(self.config.get("universe", 1))
-        self.adapter_serial = str(self.config.get("adapter_serial", "BG03CXL2"))
         self.interval = float(self.config.get("frame_interval_seconds", .1))
         self._ola = ola_client
         self._next_frame = 0.0

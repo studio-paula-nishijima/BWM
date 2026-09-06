@@ -187,9 +187,11 @@ ola_streaming_client -> system olad -> FTDI DMX plugin -> fixture`. `olad`
 exclusively owns the FTDI adapter; the application never opens `/dev/ttyUSB*`.
 The client receives successive frames on stdin, sized only through the Halo's
 final configured slot, and remains the
-runtime's single source on its configured universe, sending a blackout before
-withdrawal. Deployment patches the expected FTDI serial to the universe without
-relying on OLA's dynamic device number.
+runtime's single source on its configured universe. At shutdown it withdraws
+that source, then uses the hardware-proven bounded one-shot client to latch
+blackout in `olad`. Deployment owns adapter identity separately: provisioning
+patches the configured FTDI serial to the runtime universe without relying on
+OLA's dynamic device number.
 OLA failure is isolated with bounded retry; it cannot block semantic ingress, GPIO quiescence,
 or shutdown. No persistent selector diagnostics are enabled by default. Future
 actual-actuation-frequency selection/base-light modulation is deliberately not

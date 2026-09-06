@@ -52,19 +52,11 @@ class OLAUniverseClient:
         self._closed = True
         with self._frame_lock:
             blackout = bytes(len(self._frame))
-            self._frame[:] = blackout
-        # Stop the refresh loop before the final write so no older frame can be
-        # emitted after blackout.
+        # Withdraw the continuous source first.  On the validated rpi05 OLA
+        # stack, a frame written immediately before EOF did not remain as the
+        # output state; the completed one-shot below is the blackout authority.
         self._stop.set()
         process = self._process
-        if process is not None and process.poll() is None:
-            try:
-                with self._write_lock:
-                    process.stdin.write(self._payload(blackout))
-                    process.stdin.flush()
-                    process.stdin.close()
-            except Exception:
-                pass
         self._close_process(process)
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout=0.5)
@@ -142,9 +134,8 @@ class OLAUniverseClient:
             pass
         try:
             if process.poll() is None:
-                # EOF lets ola_streaming_client consume the final blackout,
-                # submit it to olad, and withdraw normally.  Terminating first
-                # can kill it before that last stdin frame is processed.
+                # Give the persistent client a bounded graceful EOF/exit before
+                # falling back to termination.
                 process.wait(timeout=0.5)
                 return
         except subprocess.TimeoutExpired:

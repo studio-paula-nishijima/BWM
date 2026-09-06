@@ -34,7 +34,7 @@ def test_failure_and_disabled_lighting_are_non_fatal_without_serial():
     assert controller._retry_at > 0
     disabled=HaloLightingController(config(enabled=False), clock=clock, ola_client=broken); disabled.activate(); disabled.step()
 
-def test_ola_client_keeps_one_packaged_cli_source_and_blackouts_on_close():
+def test_ola_client_keeps_one_source_then_latches_blackout_on_close():
     class Stdin:
         def __init__(self): self.writes=[]; self.closed=False
         def write(self, value): self.writes.append(value); return len(value)
@@ -74,8 +74,7 @@ def test_ola_client_keeps_one_packaged_cli_source_and_blackouts_on_close():
 
     assert len(processes) == 1
     assert processes[0][0] == ["ola_streaming_client", "-u", "1"]
-    assert len(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == 3
-    assert set(processes[0][2].stdin.writes[-1].decode().strip().split(",")) == {"0"}
+    assert processes[0][2].stdin.writes[-1] == b"3,4,0\n"
     assert processes[0][2].waited
     assert not processes[0][2].terminated
     assert one_shots[0][0] == ["ola_streaming_client", "-u", "1", "-d", "0,0,0"]
@@ -119,12 +118,11 @@ def test_ola_one_shot_blackout_failure_is_non_fatal():
 def test_provisioning_matches_rpi05_and_resolves_dynamic_ola_id_by_serial():
     root=Path(__file__).resolve().parents[1]
     script=root.joinpath("scripts/configure-ola-halo.sh").read_text()
-    runtime=root.joinpath("configs/runtime.yaml").read_text()
     docs=root.joinpath("tools/README_halo_ola.md").read_text()
     assert "config_dir=${OLA_CONFIG_DIR:-/etc/ola}" in script
     assert "/var/lib/ola" not in script
     assert 'ola-usbserial.conf" enabled false' in script
     assert 'awk -v serial="$adapter_serial"' in script
     assert 'ola_patch -d "$1" -p "$2" -u "$universe"' in script
-    assert "adapter_serial: BG03CXL2" in runtime
+    assert "adapter_serial=${OLA_FTDI_SERIAL:-BG03CXL2}" in script
     assert "ola-python" not in docs
