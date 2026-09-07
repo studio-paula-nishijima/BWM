@@ -100,8 +100,18 @@ class ArecordSource(AudioSource):
 
 
     def close(self):
-
-        if self.proc:
-
-            self.proc.terminate()
-            self.proc = None
+        """Stop arecord synchronously so a recovery cannot retain its device pipe."""
+        proc, self.proc = self.proc, None
+        if not proc:
+            return
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=2)
+        finally:
+            if proc.stdout:
+                proc.stdout.close()
