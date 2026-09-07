@@ -37,6 +37,7 @@ from configs.whisper import (
     DETECTOR_PROFILES,
     LIVE_DIAGNOSTIC_LOGGING,
     SILERO_RESPONSE_SELECTION,
+    AUDIO_HEALTH,
 
     RMS_MIN,
     RMS_MAX,
@@ -94,6 +95,7 @@ from whisper.profiles import PROFILE_NAMES, TemporalProfilePolicy
 
 from audio.wav_source import WavSource
 from audio.arecord_source import ArecordSource
+from audio.capture_health import CaptureHealthConfig, CaptureHealthSupervisor
 from src.audio.ring_buffer import AudioRingBuffer
 from audio.utterance_capture import CapturePolicy, UtteranceCaptureController
 from live.asr_worker import ASRWorkerConfig, PersistentASRWorker
@@ -150,6 +152,7 @@ voice_mqtt = None
 voice_uart = None
 interaction_servo = None
 voice_session = None
+audio_health = None
 interaction_button = None
 interaction_publisher = None
 button_presses = queue.SimpleQueue()
@@ -239,7 +242,7 @@ def shutdown():
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button, interaction_publisher
+    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button, interaction_publisher, audio_health
 
     if not _begin_shutdown():
         return
@@ -298,7 +301,13 @@ def shutdown():
             traceback.print_exc()
 
 
-    if source:
+    if audio_health:
+        try:
+            audio_health.close()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+    elif source:
 
         try:
 
@@ -349,7 +358,7 @@ def main():
     global run_configuration_summary
     global asr_coordinator
     global oracle_interaction
-    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button, interaction_publisher
+    global voice_mqtt, voice_uart, interaction_servo, voice_session, interaction_button, interaction_publisher, audio_health
 
     args = parse_arguments()
     asr_config = load_asr_config().get("asr", {})
@@ -539,36 +548,29 @@ def main():
         )
 
 
-        source = WavSource(
-
-            args.wav,
-
-            SAMPLE_RATE,
-
-            FRAME_SIZE
-
-        )
+        source_factory = lambda: WavSource(args.wav, SAMPLE_RATE, FRAME_SIZE)
 
 
     else:
 
-        source = ArecordSource(
+        source_factory = lambda: ArecordSource(DEVICE, SAMPLE_RATE, FRAME_SIZE)
 
-            DEVICE,
-
-            SAMPLE_RATE,
-
-            FRAME_SIZE
-
-        )
-
-
-    source.open()
+    health_config = CaptureHealthConfig(
+        enabled=bool(AUDIO_HEALTH.get("enabled", True)) and not bool(args.wav),
+        unhealthy_window_seconds=float(AUDIO_HEALTH.get("unhealthy_window_seconds", 8)),
+        recovery_verify_seconds=float(AUDIO_HEALTH.get("recovery_verify_seconds", 3)),
+        reboot_cooldown_seconds=float(AUDIO_HEALTH.get("reboot_cooldown_seconds", 3600)),
+    )
+    def reset_audio_stream_boundary():
+        detector.reset()
+        profile_policy.reset()
+    audio_health = CaptureHealthSupervisor(source_factory, health_config,
+                                           on_source_reopened=reset_audio_stream_boundary)
+    source = audio_health.open()
 
     # A source open (including a new WAV replay or live-source restart) is a
     # stream boundary, never an ordinary frame boundary.
-    detector.reset()
-    profile_policy.reset()
+    reset_audio_stream_boundary()
 
     if actuation_enabled:
         actuation_config = {"channel": CHANNEL, "frequency": FREQUENCY, "min_pulse": MIN_PULSE, "max_pulse": MAX_PULSE, "home_pulse": HOME_PULSE, "cooldown_seconds": COOLDOWN_SECONDS}
@@ -733,6 +735,12 @@ def main():
             frame_number = (
                 audio_frame.frame_number
             )
+
+            # Health is an AudioSource concern.  It receives microphone frames
+            # before detector/ASR work and is suspended during quiescence.
+            audio_health.set_active(not voice_session.quiescent)
+            audio_health.observe(frame)
+            source = audio_health.source
 
 
 

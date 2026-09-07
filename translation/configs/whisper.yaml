@@ -2,6 +2,15 @@ sample_rate: 16000
 frame_ms: 30
 device: "plughw:2,0"
 
+# Live-source liveness only: this is not a silence or detector-health test.
+# It recognises sustained raw-int16 0/-1-style streams seen on rpi02, performs
+# one clean arecord restart, verifies variation, then has a reboot backstop.
+audio_health:
+  enabled: true
+  unhealthy_window_seconds: 8
+  recovery_verify_seconds: 3
+  reboot_cooldown_seconds: 3600
+
 # Independent of processing_mode and classifier selection.
 detector_profile: temporal_v2_context
 detector_profiles:

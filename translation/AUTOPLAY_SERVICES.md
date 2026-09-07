@@ -85,6 +85,23 @@ journalctl -u play-events.service -n 200
 
 ## Pi validation
 
+### rpi02 capture-health mitigation
+
+`whisper-runtime.service` remains `Restart=on-failure`; capture health is
+handled in the runtime rather than by a systemd watchdog.  The service runs as
+root under the existing unit, so its bounded escalation invokes
+`/bin/systemctl reboot`.  Before enabling this on rpi02, ensure the service
+account can create `/var/lib/bwm/` for the persistent reboot cooldown record.
+The normal unit has no `User=`, so no service-unit change is needed.
+
+The production device remains `plughw:2,0`.  In a maintenance window, verify
+quiet-room operation has no recovery, then use the automated fake-source tests
+to exercise the pathological `0/-1` stream and close/reopen path.  Do not wait
+for the actual hardware fault to recur.  A controlled reboot escalation should
+only be tested when it is safe to interrupt the exhibition; after boot confirm
+systemd returns Voice normally and that the persistent one-hour cooldown
+prevents a reboot loop.
+
 On rpi02, confirm `whisper-runtime.service` is active, `whisper_runtime.py` is
 running, Voice reaches its normal local operational state without network, and
 the journal updates live.  Deliberately terminate the process to confirm the

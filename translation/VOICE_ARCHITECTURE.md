@@ -110,6 +110,30 @@ runtime behaviour.
 
 ## Capture and ASR result boundary
 
+### Capture health and bounded recovery
+
+Capture health is an **AudioSource concern**, positioned between the live
+source and the speech/Whisper pipeline.  On rpi02 the retained production
+device is `plughw:2,0`.  The monitor does not interpret quietness, low RMS,
+speech/Whisper detections, or detector output as failure.  It only recognises
+a sustained narrow raw-int16 signature matching the observed stuck capture:
+at most two values, all in `{0, -1}`, range at most one raw count, and standard
+deviation at most 0.5 raw counts.
+
+The default observation window is eight seconds.  A confirmed fault closes and
+recreates the `arecord` source once, then requires three continuous seconds of
+meaningful sample variation before reporting recovery.  A successful open is
+not recovery.  If verification fails (or reopen fails), Voice requests a
+controlled system reboot; persistent wall-clock cooldown bookkeeping permits
+only one automatic reboot in 3600 seconds, including across a service restart.
+This mitigates the observed liveness failure; it does not identify an ALSA,
+kernel, codec, hardware, or power root cause.
+
+Health state is `healthy -> suspect -> recovering -> verifying -> healthy`.
+Health observation is reset and suspended while Voice is quiescent, and starts
+fresh after reactivation.  It neither restarts ASR nor changes Voice lifecycle,
+semantic messaging, Translation, detector semantics, or servo behaviour.
+
 An accepted trigger uses the existing conservative capture controller: four
 seconds of pre-roll and a fixed twelve-second maximum capture.  Audio-source
 details remain upstream concerns.  The completed capture is submitted without
