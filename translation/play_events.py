@@ -1,5 +1,6 @@
 import signal
 import sys
+import threading
 from copy import deepcopy
 from pathlib import Path
 
@@ -17,19 +18,31 @@ from events.playback_selection import rebase_playback_time, select_random_segmen
 
 shutdown_hooks = []
 _shutdown_in_progress = False
+_shutdown_lock = threading.Lock()
 
 
 def register_shutdown_hook(fn):
-    shutdown_hooks.append(fn)
+    """Register cleanup safely while optional startup runs concurrently."""
+    with _shutdown_lock:
+        close_immediately = _shutdown_in_progress
+        if not close_immediately:
+            shutdown_hooks.append(fn)
+    if close_immediately:
+        try:
+            fn()
+        except Exception as exc:
+            print(f"[SHUTDOWN ERROR] {exc}")
 
 
 def shutdown():
     global _shutdown_in_progress
-    if _shutdown_in_progress:
-        return
-    _shutdown_in_progress = True
+    with _shutdown_lock:
+        if _shutdown_in_progress:
+            return
+        _shutdown_in_progress = True
+        hooks = list(shutdown_hooks)
     print("\n[SHUTDOWN] Cleaning up hardware...")
-    for fn in shutdown_hooks:
+    for fn in hooks:
         try:
             fn()
         except Exception as exc:
@@ -84,6 +97,21 @@ def run_session_runtime(runtime, sleep_resolution):
             runtime.wait_for_change(sleep_resolution)
 
 
+def start_optional_initializers(initializers, *, thread_factory=threading.Thread, emit=print):
+    """Start independent optional adapters without placing them on the core runtime path."""
+    threads = []
+    for name, initialize in initializers:
+        def run(label=name, initializer=initialize):
+            try:
+                initializer()
+            except Exception as exc:
+                emit(f"[{label}] Unavailable; core Translation runtime continues: {exc}")
+        thread = thread_factory(target=run, name=f"translation-{name.lower()}-startup", daemon=True)
+        thread.start()
+        threads.append(thread)
+    return threads
+
+
 def main():
     from configs.runtime_config import (PROJECT_ROOT, get_backup_button_pin, get_solenoid_pin_map,
                                         load_voice_reactions_config)
@@ -130,34 +158,37 @@ def main():
         activation_publisher = TranslationActivationPublisher()
         runtime.set_activation_publisher(activation_publisher)
         register_shutdown_hook(lighting.shutdown)
-        local_input = LocalActivationInput(get_backup_button_pin(), runtime)
-        register_shutdown_hook(local_input.close)
-        # Semantic ingress exists even if a particular optional transport is
-        # unavailable; UART/BLE must not depend on MQTT startup succeeding.
+        # Transport-neutral ingress exists before optional adapters.  The
+        # default topic names are sufficient for UART/BLE handle_event(); MQTT
+        # creates a configured-topic view over the same deduplication cache.
+        from shared.messaging.deduplication import RecentEventIds
         from shared.messaging.topics import TopicNamespace
-        try:
-            from shared.messaging.config import load_mqtt_settings
-            _, topic_base = load_mqtt_settings(REPOSITORY_ROOT)
-        except Exception:
-            topic_base = "bwm"
-        topics = TopicNamespace(topic_base)
+        recent_ids = RecentEventIds()
+        topics = TopicNamespace()
         ingress = TranslationMQTTAdapter(runtime, topics.installation_activation,
-                                         topics.whisper_state, topics.whisper_interaction)
-        # MQTT is an optional semantic input. Failure to import/connect leaves
-        # this persistent GPIO17-capable runtime untouched.
-        try:
+                                         topics.whisper_state, topics.whisper_interaction,
+                                         recent_ids=recent_ids)
+
+        def initialize_local_input():
+            local_input = LocalActivationInput(get_backup_button_pin(), runtime)
+            register_shutdown_hook(local_input.close)
+
+        def initialize_mqtt():
             from shared.messaging.config import load_mqtt_settings
             from shared.messaging.mqtt_client import SemanticMQTTClient
             mqtt_settings, topic_base = load_mqtt_settings(REPOSITORY_ROOT)
             topics = TopicNamespace(topic_base)
             activation_topic, whisper_state_topic, whisper_interaction_topic = topics.installation_activation, topics.whisper_state, topics.whisper_interaction
+            mqtt_ingress = TranslationMQTTAdapter(
+                runtime, activation_topic, whisper_state_topic, whisper_interaction_topic,
+                recent_ids=recent_ids,
+            )
             mqtt_client = SemanticMQTTClient(
-                mqtt_settings, lambda topic, event: ingress.handle(topic, event, transport="mqtt"))
+                mqtt_settings, lambda topic, event: mqtt_ingress.handle(topic, event, transport="mqtt"))
             mqtt_client.start([activation_topic, whisper_state_topic, whisper_interaction_topic])
             register_shutdown_hook(mqtt_client.close)
-        except Exception as exc:
-            print(f"[MQTT] Unavailable; continuing with local activation: {exc}")
-        try:
+
+        def initialize_uart():
             from shared.messaging.config import load_uart_settings
             from shared.messaging.uart import SemanticUARTTransport
             # UART ingress is local-only: an inbound UART activation must not
@@ -171,9 +202,8 @@ def main():
                 activation_publisher.set_uart_transport(uart_client)
                 runtime.publish_current_activation()
             register_shutdown_hook(uart_client.close)
-        except Exception as exc:
-            print(f"[UART] Unavailable; continuing without UART: {exc}")
-        try:
+
+        def initialize_ble():
             from shared.messaging.ble import SemanticBLETransport
             from shared.messaging.config import load_ble_settings
             ble_client = SemanticBLETransport(
@@ -182,8 +212,16 @@ def main():
             )
             if ble_client.start():
                 register_shutdown_hook(ble_client.close)
-        except Exception as exc:
-            print(f"[BLE] Unavailable; continuing without BLE: {exc}")
+
+        # Optional device and transport startup is never on the main runtime
+        # path.  Slow or failed peers cannot stall Halo fade frames or the
+        # fixed solenoid-admission deadline.
+        start_optional_initializers((
+            ("GPIO17", initialize_local_input),
+            ("MQTT", initialize_mqtt),
+            ("UART", initialize_uart),
+            ("BLE", initialize_ble),
+        ))
         run_session_runtime(runtime, playback_cfg["sleep_resolution"])
     finally:
         shutdown()

@@ -26,6 +26,18 @@ later sessions and deployment, but neither is a prerequisite for basic
 runtime operation. `initially_active: false` is an optional explicit
 deployment configuration, not the default architectural posture.
 
+At initial service startup the authoritative runtime becomes active and enters
+its stepping loop before optional GPIO17, MQTT, UART, or BLE adapters finish
+initializing. Each optional adapter initializes independently. A slow probe,
+import, network connection, missing device, or failed adapter therefore cannot
+stall Halo fade frames or the fixed activation deadline for solenoid playback.
+The configured Halo activation-fade duration remains the artistic solenoid
+admission delay, but neither successful OLA output nor any optional transport
+is a prerequisite for admission. UART publishes the then-current authoritative
+activation state when it becomes available; that best-effort synchronization
+does not authorize or roll back local startup. Later activation from
+quiescence retains the same runtime activation path and configured fade delay.
+
 `installation.activation` controls Translation session semantics where it is
 used; it does not define process availability. In particular, a missing,
 delayed, or disconnected activation transport is not an implicit `inactive`.

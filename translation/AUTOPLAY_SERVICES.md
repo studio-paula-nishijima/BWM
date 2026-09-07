@@ -15,6 +15,12 @@ Translation availability, or Voice availability.  Transport setup failures are
 handled by the runners as isolated degradation, so each process can start and
 perform its local function independently.
 
+Inside `play-events.service`, the active core runtime and Halo fade also begin
+stepping without waiting for optional GPIO17, MQTT, UART, or BLE initialization.
+Those adapters start independently. Their failure or a 10--20 second startup
+delay cannot postpone the configured four-second solenoid-admission deadline,
+and OLA/DMX success is never an admission condition.
+
 ## Paths and service behaviour
 
 The Pi checkout location is `/home/raspi/BWM`.  Both units use
