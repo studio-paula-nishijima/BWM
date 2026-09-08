@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 
@@ -16,6 +17,12 @@ class HaloLightingController:
         self.config, self.clock, self.sleep, self.emit = dict(config or {}), clock, sleep, emit
         self.enabled = bool(self.config.get("enabled", False))
         self.base = Halo60xState(float(self.config.get("active_brightness_percent", 60)), float(self.config.get("active_cct_kelvin", 2700)))
+        self._runoff_config = dict(self.config.get("runoff_brightness", {}))
+        self._runoff_enabled = bool(self._runoff_config.get("enabled", False))
+        self._runoff_activity = None
+        self._runoff_target = self.base.brightness_percent
+        self._last_smoothing_at = self.clock()
+        self._policy_active = False
         self.blackout = Halo60xState(0, self.base.cct_kelvin)
         self.address = int(self.config.get("start_address", 1))
         self.universe = int(self.config.get("universe", 1))
@@ -31,7 +38,10 @@ class HaloLightingController:
         self._fade_worker = None
 
     def activate(self):
-        self._base_fade = (self.clock(), self._current, self.base, float(self.config.get("activation_fade_seconds", 4.0)))
+        now = self.clock()
+        self._policy_active = True
+        self._last_smoothing_at = now
+        self._base_fade = ("activation", now, self._current, float(self.config.get("activation_fade_seconds", 4.0)))
         self._gesture_started = None
 
     @property
@@ -40,8 +50,25 @@ class HaloLightingController:
         return float(self.config.get("activation_fade_seconds", 4.0)) if self.enabled else 0.0
 
     def deactivate(self):
+        now = self.clock()
+        self._advance_runoff_base(now)
+        self._policy_active = False
         self._gesture_started = None
-        self._base_fade = (self.clock(), self._current, self.blackout, float(self.config.get("deactivation_fade_seconds", 4.0)))
+        self._base_fade = ("deactivation", now, self._current, float(self.config.get("deactivation_fade_seconds", 4.0)))
+
+    def set_runoff_activity(self, activity):
+        """Update the lighting target from a read-only normalized runoff mean."""
+        activity = min(1.0, max(0.0, float(activity)))
+        low = 100.0 * float(self._runoff_config.get("min_brightness", 0.50))
+        high = 100.0 * float(self._runoff_config.get("max_brightness", 0.70))
+        self._runoff_activity = activity
+        self._runoff_target = low + activity * (high - low)
+        if self._runoff_enabled and not self._policy_active:
+            # Before activation there is no visible output to smooth.  Seed the
+            # startup fade with the selected session's current runoff state.
+            self.base = Halo60xState(self._runoff_target, self.base.cct_kelvin)
+        LOG.debug("Halo runoff activity=%.4f target=%.2f%% current=%.2f%%",
+                  activity, self._runoff_target, self.base.brightness_percent)
 
     def deactivate_async(self):
         """Continue a normal fade after the session loop enters idle."""
@@ -90,10 +117,12 @@ class HaloLightingController:
         self._send(self.blackout)
 
     def _state_at(self, now):
+        self._advance_runoff_base(now)
         base = self.base
         if self._base_fade:
-            started, start, end, duration = self._base_fade
+            kind, started, start, duration = self._base_fade
             progress = 1.0 if duration == 0 else min(1.0, (now - started) / duration)
+            end = self.base if kind == "activation" else self.blackout
             base = self._interpolate(start, end, progress)
             if progress >= 1:
                 self._base_fade = None
@@ -106,6 +135,17 @@ class HaloLightingController:
         amount = 1.0 - abs(2.0 * phase - 1.0)  # symmetric triangular smooth pulse
         target = Halo60xState(float(gesture.get("target_brightness_percent", 50)), float(gesture.get("target_cct_kelvin", 6500)))
         return self._interpolate(base, target, amount)
+
+    def _advance_runoff_base(self, now):
+        if not self._runoff_enabled or not self._policy_active or self._runoff_activity is None:
+            self._last_smoothing_at = now
+            return
+        elapsed = max(0.0, now - self._last_smoothing_at)
+        self._last_smoothing_at = now
+        smoothing = float(self._runoff_config.get("smoothing_seconds", 5.0))
+        amount = 1.0 if smoothing <= 0 else -math.expm1(-elapsed / smoothing)
+        brightness = self.base.brightness_percent + (self._runoff_target - self.base.brightness_percent) * amount
+        self.base = Halo60xState(brightness, self.base.cct_kelvin)
 
     @staticmethod
     def _interpolate(start, end, amount):

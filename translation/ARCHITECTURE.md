@@ -189,10 +189,21 @@ drop/no-queue and inactive Translation does not react.
 Halo lighting is a Translation-side sibling policy, separate from GPIOBackend,
 RuntimeSafety, and solenoid modulation. Halo 60x Profile 1 uses DMX channels
 1 intensity, 2 CCT (2700–6500 K), and 3 strobe, structurally fixed at zero.
-The base defaults to 60%/2700 K and fades from/to blackout over 4 s on
+ART-2 stores a compact `runoff_state.npz` read-only timeline alongside the
+immutable base score. It is calculated from the arithmetic mean of the same
+per-channel normalized/shaped values supplied to frequency scheduling, never
+from emitted pulses or GPIO dispatch. Session selection carries the score-time
+origin into a read-only timeline view; it does not alter event schema or timing.
+The mean maps linearly from 0–1 to a configurable 50–70% base brightness and a
+configurable first-order wall-clock filter (5 s default time constant) prevents
+visible steps. CCT remains 2700 K. The base fades from/to blackout over 4 s on
 activation/startup and deactivation/timeout/shutdown. Eligible detector or
 button occurrences start three smooth 7 s pulses toward 50%/6500 K, then return
-to the current base. Lighting cooldown affects lighting only.
+to the latest evolving base. Lighting cooldown affects lighting only.
+
+`play_events.py --no-actuation` replaces only the solenoid backend with a
+lifecycle-compatible sink. Score progression and runoff-driven Halo lighting
+continue, while no GPIO devices are initialized or pulsed.
 
 Halo is an OLA client: `HaloLightingController -> persistent packaged
 ola_streaming_client -> system olad -> FTDI DMX plugin -> fixture`. `olad`
@@ -205,9 +216,8 @@ blackout in `olad`. Deployment owns adapter identity separately: provisioning
 patches the configured FTDI serial to the runtime universe without relying on
 OLA's dynamic device number.
 OLA failure is isolated with bounded retry; it cannot block semantic ingress, GPIO quiescence,
-or shutdown. No persistent selector diagnostics are enabled by default. Future
-actual-actuation-frequency selection/base-light modulation is deliberately not
-implemented.
+or shutdown. Runoff tuning values use debug logging only, so no per-step
+diagnostics are enabled by default.
 
 ## Stage 7 Voice-state interaction
 

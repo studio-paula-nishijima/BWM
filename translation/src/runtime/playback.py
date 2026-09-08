@@ -43,6 +43,13 @@ class PlaybackEngine:
     def elapsed_time(self): return self._elapsed_time
 
     @property
+    def current_playback_time(self):
+        """Read the logical score position without changing event admission."""
+        if self.is_running:
+            return self._clock.now() - self._started_at
+        return self._elapsed_time
+
+    @property
     def is_running(self): return self._state == self.RUNNING
 
     @property

@@ -1,7 +1,9 @@
+import argparse
 import signal
 import sys
 import threading
 from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -56,7 +58,13 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-def prepare_events(events, playback_cfg):
+@dataclass(frozen=True)
+class PreparedSessionData:
+    events: list
+    runoff_activity: object = None
+
+
+def prepare_events_with_origin(events, playback_cfg):
     # The loaded .npy score is session source data.  Selection/rebasing below
     # intentionally works on private copies only.
     events = deepcopy(list(events))
@@ -69,8 +77,14 @@ def prepare_events(events, playback_cfg):
     events = sorted(events, key=lambda event: event["playback_time"])
     if playback_cfg["random_segment"]:
         events = select_random_segment(events, playback_cfg["segment_minutes"] * 60)
+        t0 += events[0]["playback_time"]
         events = rebase_playback_time(events)
-    return events
+    return events, t0
+
+
+def prepare_events(events, playback_cfg):
+    """Preserve the public Stage 1 preparation result and selection semantics."""
+    return prepare_events_with_origin(events, playback_cfg)[0]
 
 
 def log_dispatched_event(event):
@@ -112,30 +126,52 @@ def start_optional_initializers(initializers, *, thread_factory=threading.Thread
     return threads
 
 
-def main():
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--no-actuation", action="store_true",
+        help="Run playback and Halo policy without initializing or pulsing solenoid GPIO",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
     from configs.runtime_config import (PROJECT_ROOT, get_backup_button_pin, get_solenoid_pin_map,
                                         load_voice_reactions_config)
     from runtime.clock import RealtimeClock
-    from runtime.gpio_backend import GPIOBackend
+    from runtime.gpio_backend import GPIOBackend, NoActuationBackend
     from runtime.local_activation_input import LocalActivationInput
     from runtime.mqtt_adapter import TranslationMQTTAdapter
     from runtime.activation_publication import TranslationActivationPublisher
     from runtime.router import EventRouter
     from runtime.session import PlaybackSessionRuntime
     from lighting.halo_runtime import HaloLightingController
+    from lighting.runoff_activity import RunoffActivityTimeline, SessionRunoffActivity
+
+    args = parse_args(argv)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     playback_cfg = RUNTIME_CONFIG["playback"]
     source_events = list(np.load(PROJECT_ROOT / RUNTIME_CONFIG["files"]["events_file"], allow_pickle=True))
     print(f"Loaded raw events: {len(source_events)}")
+    runoff_config = RUNTIME_CONFIG.get("lighting", {}).get("runoff_brightness", {})
+    runoff_timeline = None
+    if runoff_config.get("enabled", False):
+        runoff_timeline = RunoffActivityTimeline.load(
+            PROJECT_ROOT / RUNTIME_CONFIG["files"]["runoff_state_file"]
+        )
+        print(f"Loaded runoff states: {len(runoff_timeline.activity)} across {len(runoff_timeline.channel_names)} channels")
 
     def fresh_session_events():
-        events = prepare_events(source_events, playback_cfg)
+        events, source_origin = prepare_events_with_origin(source_events, playback_cfg)
         print(f"Session events after filtering: {len(events)}")
-        return events
+        activity = None if runoff_timeline is None else SessionRunoffActivity(runoff_timeline, source_origin)
+        return PreparedSessionData(events, activity)
     solenoid_pin_map = get_solenoid_pin_map()
-    solenoid_backend = GPIOBackend(solenoid_pin_map)
+    if runoff_timeline is not None and runoff_timeline.channel_names != tuple(solenoid_pin_map):
+        raise ValueError("runoff timeline channels do not match configured solenoids")
+    solenoid_backend = NoActuationBackend() if args.no_actuation else GPIOBackend(solenoid_pin_map)
     register_shutdown_hook(solenoid_backend.shutdown)
     try:
         voice_reactions = load_voice_reactions_config()

@@ -39,6 +39,7 @@ class PlaybackSessionRuntime:
         self._changed = threading.Condition()
         self._active = False
         self._activation_publisher = activation_publisher
+        self._runoff_activity = None
         self._engine = self._modulation = self._started_at = self._playback_starts_at = None
         if initially_active:
             # Startup is locally authoritative.  Its optional later UART
@@ -86,8 +87,11 @@ class PlaybackSessionRuntime:
             begin_session = getattr(self._dispatcher, "begin_session", None)
             if begin_session is not None:
                 begin_session()
+            session_data = self._events_factory()
+            events = getattr(session_data, "events", session_data)
+            self._runoff_activity = getattr(session_data, "runoff_activity", None)
             modulation = RuntimeModulationEngine(self._clock, self._safety)
-            engine = PlaybackEngine(self._events_factory(), self._clock,
+            engine = PlaybackEngine(events, self._clock,
                                     due_event_handler=modulation.process,
                                     event_logger=self._event_logger)
             modulation.bind_playback_control(engine)
@@ -95,6 +99,7 @@ class PlaybackSessionRuntime:
             self._started_at, self._active = self._clock.now(), True
             self._playback_starts_at = self._started_at
             if self._lighting:
+                self._update_runoff_lighting(0.0)
                 self._lighting.activate()
                 self._playback_starts_at += float(getattr(self._lighting, "activation_delay_seconds", 0.0))
                 self._lighting.step()
@@ -210,6 +215,7 @@ class PlaybackSessionRuntime:
                 self._changed.notify_all()
                 return 0
             if self._lighting:
+                self._update_runoff_lighting(self._engine.current_playback_time)
                 self._lighting.step()
             if self._engine.state == PlaybackEngine.READY:
                 if self._clock.now() < self._playback_starts_at:
@@ -238,6 +244,7 @@ class PlaybackSessionRuntime:
         """Single teardown path: close admission, clear session work, quiesce, idle."""
         print(f"[Session] TEARDOWN: {reason}; closing session admission")
         self._active = False
+        self._runoff_activity = None
         self._external_reaction_busy = False
         self._modulation.cancel()
         self._engine.stop()
@@ -259,3 +266,7 @@ class PlaybackSessionRuntime:
         if self._external_reaction_busy and not self._modulation.external_busy:
             self._external_reaction_busy = False
             print("[WhisperInteraction] external reaction complete; busy cleared")
+
+    def _update_runoff_lighting(self, playback_time):
+        if self._runoff_activity is not None:
+            self._lighting.set_runoff_activity(self._runoff_activity.activity_at(playback_time))

@@ -1,3 +1,4 @@
+import argparse
 import sys
 from pathlib import Path
 
@@ -30,6 +31,8 @@ from preprocess.peak_preservation import (
     apply_window_max
 )
 
+from lighting.runoff_activity import RunoffActivityTimeline
+
 
 def normalize_percentile(x):
 
@@ -54,16 +57,13 @@ def normalize_linear(x):
         1
     )
 
-def run():
-
-    with (PROJECT_ROOT / "configs" / "channels.yaml").open(encoding="utf-8") as f:
-
-        config = yaml.safe_load(f)
-
+def build_translation(config, *, include_events=True):
+    """Build the immutable score and its read-only aligned runoff timeline."""
     all_events = []
+    channel_controls = {}
 
     for name, ch in config["channels"].items():
-
+        ch = dict(ch)
         print(f"Loading {name}")
 
         timestamps, raw = next(
@@ -80,7 +80,6 @@ def run():
         )
 
         timestamps = timestamps[mask]
-
         raw = raw[mask]
 
         dt_seconds = (
@@ -88,77 +87,63 @@ def run():
         ).astype("timedelta64[s]").astype(float)
 
         active = raw >= ch["threshold"]
-        
-        peak_cfg = ch.get(
-            "peak_preservation",
-            {}
-        )
-        
-        if peak_cfg.get(
-            "enabled",
-            False
-        ):
-        
+
+        peak_cfg = ch.get("peak_preservation", {})
+        if peak_cfg.get("enabled", False):
             if len(timestamps) > 1:
-        
-                playback_dt = (
-                    timestamps[1] - timestamps[0]
-                ) / np.timedelta64(1, "s")
-                
-                playback_dt = float(playback_dt)
+                playback_dt = float((timestamps[1] - timestamps[0]) / np.timedelta64(1, "s"))
                 playback_dt /= ch["time_scale"]
-        
                 raw = apply_window_max(
-        
-                    raw,
-                    playback_dt,
-                    ch["freq_max"],
-                    ch["time_scale"],
-                    1.0
+                    raw, playback_dt, ch["freq_max"], ch["time_scale"], 1.0
                 )
 
-        # u = normalize_percentile(raw)
+        # This is the canonical scheduler control signal: normalized first,
+        # then shaped with the configured per-channel frequency curve.
         u = normalize_linear(raw)
-        
         u = apply_frequency_shaping(
-            u,        
-            ch.get(
-                "frequency_shaping",
-                "none"
-            ),        
-            ch.get(
-                "frequency_gamma",
-                1.0
-            )
+            u, ch.get("frequency_shaping", "none"), ch.get("frequency_gamma", 1.0)
         )
 
-        ch["channel_name"] = name
+        scaled_dt = dt_seconds / ch["time_scale"]
+        channel_controls[name] = {
+            "timestamps": timestamps,
+            "playback_times": np.arange(len(u), dtype=float) * scaled_dt,
+            "values": u,
+        }
 
-        events = generate_events(
-            timestamps,
-            u,
-            active,
-            dt_seconds,
-            ch
-        )
+        if include_events:
+            ch["channel_name"] = name
+            all_events.extend(generate_events(timestamps, u, active, dt_seconds, ch))
 
-        all_events.extend(events)
-
-    events = sorted(
-        all_events,
-        key=lambda e: e["playback_time"]
-    )
-
+    timeline = RunoffActivityTimeline.from_channels(channel_controls)
+    if not include_events:
+        return None, timeline
+    events = sorted(all_events, key=lambda e: e["playback_time"])
     events = enforce_solenoid_safety(events, RUNTIME_CONFIG.get("safety"))
+    return events, timeline
 
-    np.save(
-        PROJECT_ROOT / RUNTIME_CONFIG["files"]["events_file"],
-        np.array(events, dtype=object)
-    )
 
-    print(f"Saved {len(events)} events")
+def run(*, runoff_state_only=False):
+
+    with (PROJECT_ROOT / "configs" / "channels.yaml").open(encoding="utf-8") as f:
+
+        config = yaml.safe_load(f)
+
+    events, timeline = build_translation(config, include_events=not runoff_state_only)
+    timeline.save(PROJECT_ROOT / RUNTIME_CONFIG["files"]["runoff_state_file"])
+    print(f"Saved {len(timeline.activity)} runoff states")
+    if events is not None:
+        np.save(
+            PROJECT_ROOT / RUNTIME_CONFIG["files"]["events_file"],
+            np.array(events, dtype=object)
+        )
+        print(f"Saved {len(events)} events")
 
 
 if __name__ == "__main__":
-
-    run()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--runoff-state-only", action="store_true",
+        help="Generate the read-only Halo runoff timeline without rewriting events.npy",
+    )
+    run(runoff_state_only=parser.parse_args().runoff_state_only)

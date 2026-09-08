@@ -6,6 +6,8 @@ files:
 
   events_file: "events.npy"
 
+  runoff_state_file: "runoff_state.npz"
+
 playback:
 
   # Deliberate default exhibition/test posture: boot active to demonstrate
@@ -113,6 +115,11 @@ lighting:
   retry_seconds: 5.0
   active_brightness_percent: 60
   active_cct_kelvin: 2700
+  runoff_brightness:
+    enabled: true
+    min_brightness: 0.50
+    max_brightness: 0.70
+    smoothing_seconds: 5.0
   activation_fade_seconds: 4.0
   deactivation_fade_seconds: 4.0
   whisper_gesture:

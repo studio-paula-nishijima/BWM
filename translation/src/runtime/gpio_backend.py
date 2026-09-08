@@ -5,6 +5,25 @@ import threading
 import time
 
 
+class NoActuationBackend:
+    """Lifecycle-compatible sink used by play-events --no-actuation."""
+
+    def pulse(self, channel, duration):
+        return False
+
+    def begin_session(self):
+        pass
+
+    def quiesce(self):
+        pass
+
+    def is_idle(self):
+        return True
+
+    def shutdown(self):
+        pass
+
+
 class GPIOBackend:
     def __init__(self, pin_map, device_factory=None, sleep_fn=time.sleep):
         if device_factory is None:
