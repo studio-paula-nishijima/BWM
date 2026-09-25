@@ -37,9 +37,21 @@ class UART:
 
 class GPIOInput:
     def __init__(self, _pin, *, pull_up, bounce_time):
-        self.pull_up, self.bounce_time, self.when_deactivated = pull_up, bounce_time, None
+        self.pull_up, self.bounce_time = pull_up, bounce_time
+        self.when_activated, self.when_deactivated = None, None
     def close(self):
         pass
+
+
+class MonotonicClock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+    def advance(self, seconds):
+        self.now += seconds
 
 
 def runtime(*, initially_active=True, publisher=None):
@@ -102,14 +114,16 @@ class AuthoritativeActivationPublicationTests(unittest.TestCase):
         self.assertTrue(app.is_active)
         self.assertEqual(len(uart.events), 1)
 
-    def test_gpio17_toggle_preserves_point_four_second_debounce_and_publishes_both_states(self):
+    def test_gpio17_press_debounce_preserves_publication_path(self):
         uart = UART()
         app = runtime(initially_active=True,
                       publisher=TranslationActivationPublisher(uart, emit=lambda _: None))
-        gpio = LocalActivationInput(17, app, input_factory=GPIOInput)
-        self.assertEqual(gpio._device.bounce_time, 0.4)
-        gpio._device.when_deactivated()
-        gpio._device.when_deactivated()
+        clock = MonotonicClock()
+        gpio = LocalActivationInput(17, app, input_factory=GPIOInput, monotonic_clock=clock)
+        self.assertIsNone(gpio._device.bounce_time)
+        gpio._device.when_activated()
+        clock.advance(0.4)
+        gpio._device.when_activated()
         self.assertEqual([event.payload["state"] for event in uart.events], ["inactive", "active"])
 
 

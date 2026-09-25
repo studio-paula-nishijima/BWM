@@ -99,6 +99,13 @@ is its threshold a certified hardware temperature limit.
 GPIO17 remains the local installation activation adapter. It calls the same
 transport-independent controller surface that a future MQTT adapter may use:
 
+The rpi03 backup button is active-low (`released=1`, `pressed=0`) with the
+internal pull-up enabled. `LocalActivationInput` accepts the falling press
+edge and toggles immediately through the existing runtime surface. It then
+applies a 0.4-second monotonic post-acceptance dead-time, so release never
+toggles and a brief press does not need to be held for the debounce interval.
+The GPIOZero backend debounce is intentionally disabled for this input.
+
 `person detector -> shared semantic MQTT activation -> TranslationMQTTAdapter -> PlaybackSessionRuntime -> PlaybackEngine -> RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> hardware`
 
 `GPIO17 -> LocalActivationInput -> same PlaybackSessionRuntime -> PlaybackEngine -> RuntimeModulationEngine -> RuntimeSafety -> EventRouter -> hardware`

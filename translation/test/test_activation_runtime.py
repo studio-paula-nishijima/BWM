@@ -30,11 +30,30 @@ class FakeInput:
 
     def __init__(self, pin, pull_up, bounce_time):
         self.pin, self.pull_up, self.bounce_time = pin, pull_up, bounce_time
-        self.when_deactivated, self.closed = None, False
+        self.when_activated, self.when_deactivated, self.closed = None, None, False
         self.instances.append(self)
 
     def close(self):
         self.closed = True
+
+    def emit_press(self):
+        if self.when_activated is not None:
+            self.when_activated()
+
+    def emit_release(self):
+        if self.when_deactivated is not None:
+            self.when_deactivated()
+
+
+class FakeMonotonicClock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+    def advance(self, seconds):
+        self.now += seconds
 
 
 class ActivationRuntimeTests(unittest.TestCase):
@@ -93,17 +112,62 @@ class ActivationRuntimeTests(unittest.TestCase):
         self.assertEqual(self.engine.state, PlaybackEngine.STOPPED)
         self.assertEqual(self.engine.step(), 0)
 
-    def test_gpio_adapter_uses_the_same_controller_and_toggle_semantics(self):
-        local_input = LocalActivationInput(17, self.controller, FakeInput)
+    def test_gpio_adapter_short_press_toggles_on_press_not_release(self):
+        clock = FakeMonotonicClock()
+        local_input = LocalActivationInput(
+            17, self.controller, FakeInput, monotonic_clock=clock,
+        )
         device = FakeInput.instances[-1]
         self.assertEqual(device.pin, 17)
-        self.assertEqual(device.bounce_time, 0.4)
-        device.when_deactivated()
-        self.assertFalse(self.controller.is_active)
-        device.when_deactivated()
+        self.assertTrue(device.pull_up)
+        self.assertIsNone(device.bounce_time)
+        self.assertIsNotNone(device.when_activated)
+        self.assertIsNone(device.when_deactivated)
+
+        # Initial released/high state invokes no callback.
         self.assertTrue(self.controller.is_active)
+
+        # A short active-low press toggles immediately; its release does not.
+        device.emit_press()
+        self.assertFalse(self.controller.is_active)
+        clock.advance(0.1)
+        device.emit_release()
+        self.assertFalse(self.controller.is_active)
         local_input.close()
         self.assertTrue(device.closed)
+
+    def test_gpio_adapter_long_press_toggles_once(self):
+        clock = FakeMonotonicClock()
+        local_input = LocalActivationInput(
+            17, self.controller, FakeInput, monotonic_clock=clock,
+        )
+        device = FakeInput.instances[-1]
+        device.emit_press()
+        self.assertFalse(self.controller.is_active)
+        clock.advance(1.0)
+        device.emit_release()
+        self.assertFalse(self.controller.is_active)
+        local_input.close()
+
+    def test_gpio_adapter_uses_point_four_second_post_acceptance_dead_time(self):
+        clock = FakeMonotonicClock()
+        local_input = LocalActivationInput(
+            17, self.controller, FakeInput, monotonic_clock=clock,
+        )
+        device = FakeInput.instances[-1]
+        device.emit_press()
+        self.assertFalse(self.controller.is_active)
+
+        clock.advance(0.2)
+        device.emit_release()
+        device.emit_press()
+        self.assertFalse(self.controller.is_active)
+
+        clock.advance(0.2)
+        device.emit_release()
+        device.emit_press()
+        self.assertTrue(self.controller.is_active)
+        local_input.close()
 
     def test_initially_inactive_engine_does_not_step(self):
         engine = PlaybackEngine([event(0, "first")], self.clock, self.dispatcher)
