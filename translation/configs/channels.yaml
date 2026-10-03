@@ -18,8 +18,8 @@ channels:
     frequency_gamma: 1.4
 
     t_on: 0.15
-    freq_min: 0.08
-    freq_max: 3.5
+    freq_min: 0.05
+    freq_max: 3
     
     time_scale: 182800
     
@@ -43,8 +43,8 @@ channels:
     frequency_shaping: "power"
     frequency_gamma: 1.3
     t_on: 0.15
-    freq_min: 0.10
-    freq_max: 3.3
+    freq_min: 0.08
+    freq_max: 3.1
     
     time_scale: 182800
     
@@ -68,8 +68,8 @@ channels:
     frequency_shaping: "power"
     frequency_gamma: 1.2
     t_on: 0.15
-    freq_min: 0.10
-    freq_max: 3.3
+    freq_min: 0.06
+    freq_max: 2.9
     
     time_scale: 182800
     
@@ -93,8 +93,8 @@ channels:
     frequency_shaping: "power"
     frequency_gamma: 1.2
     t_on: 0.15
-    freq_min: 0.07
-    freq_max: 3.4
+    freq_min: 0.06
+    freq_max: 3.2
     
     time_scale: 182800
     
@@ -118,8 +118,8 @@ channels:
     frequency_shaping: "power"
     frequency_gamma: 1.3
     t_on: 0.15
-    freq_min: 0.11
-    freq_max: 3.5
+    freq_min: 0.07
+    freq_max: 2.5
     
     time_scale: 182800
     
@@ -143,8 +143,8 @@ channels:
     frequency_shaping: "power"
     frequency_gamma: 1.15
     t_on: 0.15
-    freq_min: 0.06
-    freq_max: 3.2
+    freq_min: 0.05
+    freq_max: 2.9
     
     time_scale: 182800
     

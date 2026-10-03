@@ -151,7 +151,7 @@ trigger_ratio: 0.6
 
 # Existing trigger/cooldown settings; unchanged by classifier selection.
 whisper_frames_required: 10
-cooldown_seconds: 7
+cooldown_seconds: 60
 run_duration_seconds: 6000
 
 # Artistic physical-response selection, latched from the detector's existing
