@@ -145,10 +145,11 @@ channels:
     t_on: 0.15
     freq_min: 0.05
     freq_max: 2.9
-    
+
     time_scale: 182800
     
     peak_preservation:
       enabled: true
       mode: "window_max"
       
+
