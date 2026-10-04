@@ -139,7 +139,7 @@ FRAME_SIZE = int(
 source = None
 
 last_trigger_time = 0
-startup_trigger_deadline = time.monotonic() + STARTUP_COOLDOWN_SECONDS
+startup_trigger_deadline = float("inf")
 
 whisper_count = 0
 
@@ -169,6 +169,13 @@ def detector_trigger_admitted(*, crossing, monotonic_now, wall_now,
         and monotonic_now >= startup_deadline
         and wall_now - last_emitted_at > cooldown_seconds
     )
+
+
+def reset_startup_trigger_cooldown(monotonic=time.monotonic):
+    """Begin a fresh detector-only startup gate for one Voice active period."""
+    global startup_trigger_deadline
+    startup_trigger_deadline = monotonic() + STARTUP_COOLDOWN_SECONDS
+    return startup_trigger_deadline
 
 
 audio_buffer = AudioRingBuffer(
@@ -633,6 +640,7 @@ def main():
         active_period_seconds=voice_config.get("active_period_seconds", 600),
         initially_active=voice_config.get("initially_active", True),
         stop_asr_when_quiescent=voice_config.get("stop_asr_when_quiescent", True),
+        on_active_period_started=reset_startup_trigger_cooldown,
     )
     # The policy is Voice-local; it does not observe Translation or transport state.
     asr_coordinator._interaction_admission = lambda: voice_session.admitting_interactions

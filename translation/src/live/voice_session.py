@@ -9,13 +9,15 @@ from live.voice_runtime import VoiceState
 class VoiceSessionController:
     """Keep Voice process/resources policy separate from interaction lifecycle."""
     def __init__(self, coordinator, *, active_period_seconds=600, initially_active=True,
-                 stop_asr_when_quiescent=True, emit=print, timer_factory=threading.Timer):
+                 stop_asr_when_quiescent=True, on_active_period_started=None,
+                 emit=print, timer_factory=threading.Timer):
         if active_period_seconds <= 0:
             raise ValueError("Voice active_period_seconds must be positive")
         self.coordinator = coordinator
         self.active_period_seconds = float(active_period_seconds)
         self.initially_active = initially_active
         self.stop_asr_when_quiescent = stop_asr_when_quiescent
+        self._on_active_period_started = on_active_period_started or (lambda: None)
         self.emit, self._timer_factory = emit, timer_factory
         self._timer = None
         self.quiescence_requested = not initially_active
@@ -28,6 +30,7 @@ class VoiceSessionController:
 
     def start(self):
         if self.initially_active:
+            self._on_active_period_started()
             self.coordinator.start()
             self._arm_timer("active")
         else:
@@ -35,6 +38,7 @@ class VoiceSessionController:
 
     def activation_received(self, state, _event=None):
         if state == "active":
+            self._on_active_period_started()
             if self.quiescent:
                 self.emit("[WhisperSession] quiescent -> active reason=translation_active; reinitializing")
                 self.quiescent = self.quiescence_requested = False

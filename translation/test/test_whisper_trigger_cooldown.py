@@ -8,7 +8,7 @@ sys.path.insert(0, str(ROOT))
 
 from configs.whisper import COOLDOWN_SECONDS, STARTUP_COOLDOWN_SECONDS
 import whisper_runtime
-from whisper_runtime import detector_trigger_admitted
+from whisper_runtime import detector_trigger_admitted, reset_startup_trigger_cooldown
 
 
 def admitted(*, startup_now, wall_now, startup_deadline=30, last_emitted_at=0,
@@ -46,6 +46,25 @@ def test_startup_and_inter_trigger_cooldowns_are_independent():
 
 def test_zero_startup_cooldown_preserves_immediate_detector_admission():
     assert admitted(startup_now=0, wall_now=100, startup_deadline=0)
+
+
+def test_active_period_boundary_resets_monotonic_startup_deadline():
+    deadline = reset_startup_trigger_cooldown(monotonic=lambda: 100.0)
+    assert deadline == 100.0 + STARTUP_COOLDOWN_SECONDS
+    assert not admitted(startup_now=deadline - .001, wall_now=1000, startup_deadline=deadline)
+    assert admitted(startup_now=deadline, wall_now=1000, startup_deadline=deadline)
+
+
+def test_active_period_reset_does_not_mutate_last_emitted_trigger(monkeypatch):
+    monkeypatch.setattr(whisper_runtime, "last_trigger_time", 123.0)
+    reset_startup_trigger_cooldown(monotonic=lambda: 200.0)
+    assert whisper_runtime.last_trigger_time == 123.0
+
+
+def test_zero_configured_startup_cooldown_is_immediate_after_period_reset(monkeypatch):
+    monkeypatch.setattr(whisper_runtime, "STARTUP_COOLDOWN_SECONDS", 0)
+    deadline = reset_startup_trigger_cooldown(monotonic=lambda: 200.0)
+    assert admitted(startup_now=200.0, wall_now=1000, startup_deadline=deadline)
 
 
 def test_non_crossing_is_never_promoted_by_either_time_gate():

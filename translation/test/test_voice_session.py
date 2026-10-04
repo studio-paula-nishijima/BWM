@@ -40,11 +40,41 @@ class FakeInput:
 
 
 class VoiceSessionTests(unittest.TestCase):
-    def make(self):
+    def make(self, on_active_period_started=None):
         timers, events, coordinator = [], [], FakeCoordinator()
         session = VoiceSessionController(coordinator, active_period_seconds=600, emit=events.append,
+            on_active_period_started=on_active_period_started,
             timer_factory=lambda seconds, callback: timers.append(FakeTimer(seconds, callback)) or timers[-1])
         return session, coordinator, timers, events
+
+    def test_initially_active_start_reports_active_period_boundary(self):
+        starts = []
+        session, _, _, _ = self.make(lambda: starts.append("started"))
+        session.start()
+        self.assertEqual(starts, ["started"])
+
+    def test_quiescent_reactivation_reports_fresh_active_period_boundary(self):
+        boundary_states = []
+        session, coordinator, timers, _ = self.make(lambda: boundary_states.append(session.quiescent))
+        session.start()
+        timers[-1].callback()
+        self.assertEqual(coordinator.started, 1)
+        self.assertEqual(coordinator.quiesced, 1)
+        self.assertEqual(boundary_states, [False])
+
+        session.activation_received("active")
+        self.assertEqual(coordinator.reactivated, 1)
+        self.assertEqual(boundary_states, [False, True])
+
+    def test_active_timer_reset_reports_fresh_active_period_boundary(self):
+        starts = []
+        session, coordinator, timers, _ = self.make(lambda: starts.append("started"))
+        session.start()
+        first_timer = timers[-1]
+        session.activation_received("active")
+        self.assertEqual(coordinator.reactivated, 0)
+        self.assertTrue(first_timer.cancelled)
+        self.assertEqual(starts, ["started", "started"])
 
     def test_boots_active_and_arms_own_timer(self):
         session, coordinator, timers, events = self.make()
