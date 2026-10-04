@@ -34,14 +34,14 @@ strategies:
       - {type: simultaneous, targets: [solenoid_1, solenoid_2, solenoid_3]}
       - {type: wait, duration_seconds: 2.0}
       - {type: simultaneous, targets: [solenoid_4, solenoid_5, solenoid_6]}
-      - {type: wait, duration_seconds: 1.0}
+      - {type: wait, duration_seconds: 2.0}
 
   voice_double_tap:
     type: repeat_transform
     event: {type: solenoid, duration: 0.15, playback_time: 0}
-    duration_seconds: 4.0
+    duration_seconds: 3.0
     repeat_count: 2
-    tap_spacing_seconds: 0.2
+    tap_spacing_seconds: 0.4
 
 policy:
   mode: weighted
