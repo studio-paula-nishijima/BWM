@@ -149,8 +149,9 @@ whisper_classifier:
 decision_window: 10
 trigger_ratio: 0.6
 
-# Existing trigger/cooldown settings; unchanged by classifier selection.
+# Trigger/cooldown settings; independent of classifier selection.
 whisper_frames_required: 10
+startup_cooldown_seconds: 30
 cooldown_seconds: 60
 run_duration_seconds: 6000
 

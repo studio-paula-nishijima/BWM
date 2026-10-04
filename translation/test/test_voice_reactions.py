@@ -2,6 +2,8 @@ import sys
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "translation" / "src"))
@@ -25,6 +27,112 @@ class Dispatcher:
 
 
 class VoiceReactionTests(unittest.TestCase):
+    def configured_voice_runtime(self, events):
+        with open(ROOT / "translation" / "configs" / "voice_reactions.yaml", encoding="utf-8") as stream:
+            reactions = yaml.safe_load(stream)
+        with open(ROOT / "translation" / "configs" / "runtime.yaml", encoding="utf-8") as stream:
+            whisper_config = yaml.safe_load(stream)["whisper_interaction"]
+        reactions["policies"] = {
+            "voice_default": reactions["policy"],
+            **reactions["policies"],
+        }
+        targets = [f"solenoid_{index}" for index in range(1, 7)]
+        self.clock, self.dispatcher = SimulatedClock(), Dispatcher()
+        runtime = PlaybackSessionRuntime(
+            lambda: events,
+            self.clock,
+            self.dispatcher,
+            30,
+            reaction_policy_config=reactions,
+            whisper_interaction_config=whisper_config,
+            reaction_targets=targets,
+        )
+        runtime.activate()
+        return runtime, reactions
+
+    def test_configured_split_groups_and_voice_band_mappings(self):
+        runtime, reactions = self.configured_voice_runtime([event(10)])
+        strategy = reactions["strategies"]["voice_split_groups"]
+        self.assertEqual(strategy["event"], {"type": "solenoid", "duration": .15, "playback_time": 0})
+        self.assertEqual(strategy["initial_quiet_gap_seconds"], .5)
+        self.assertEqual(strategy["phases"], [
+            {"type": "simultaneous", "targets": ["solenoid_1", "solenoid_2", "solenoid_3"]},
+            {"type": "wait", "duration_seconds": 2.0},
+            {"type": "simultaneous", "targets": ["solenoid_4", "solenoid_5", "solenoid_6"]},
+            {"type": "wait", "duration_seconds": 1.0},
+        ])
+        self.assertIn("voice_triple_tap", reactions["strategies"])
+        self.assertEqual(
+            {name: policy["strategy"] for name, policy in reactions["policies"].items() if name.startswith("voice_band_")},
+            {
+                "voice_band_1": "voice_simultaneous_then_sequence",
+                "voice_band_2": "voice_cascade",
+                "voice_band_3": "voice_split_groups",
+                "voice_band_4": "voice_double_tap",
+                "voice_band_5": "voice_simultaneous_then_sequence",
+            },
+        )
+        runtime.deactivate()
+
+    def test_configured_band_3_dispatches_two_safe_simultaneous_groups_two_seconds_apart(self):
+        runtime, _ = self.configured_voice_runtime([event(.25), event(3.6)])
+        self.assertEqual(runtime.observe_whisper_interaction({
+            "source": "detector", "silero_selection_value": .01,
+        }), "triggered")
+        self.assertEqual(runtime.observe_whisper_interaction({
+            "source": "detector", "silero_selection_value": .01,
+        }), "ignored_busy")
+
+        self.clock.advance(.25)
+        runtime.step()
+        self.assertEqual(self.dispatcher.events, [])
+        self.clock.advance(.25)
+        runtime.step()
+        self.assertEqual(
+            [item["target"] for item in self.dispatcher.events],
+            ["solenoid_1", "solenoid_2", "solenoid_3"],
+        )
+        first_group_time = self.clock.now()
+        self.clock.advance(1.999)
+        runtime.step()
+        self.assertEqual(len(self.dispatcher.events), 3)
+        self.clock.advance(.001)
+        runtime.step()
+        self.assertEqual(
+            [item["target"] for item in self.dispatcher.events],
+            [
+                "solenoid_1", "solenoid_2", "solenoid_3",
+                "solenoid_4", "solenoid_5", "solenoid_6",
+            ],
+        )
+        self.assertEqual(self.clock.now() - first_group_time, 2.0)
+        self.assertEqual(len(runtime.safety.decisions), 6)
+        self.assertTrue(all(decision.accepted for decision in runtime.safety.decisions))
+        self.assertTrue(runtime.external_reaction_busy)
+
+        self.clock.advance(1.0)
+        runtime.step()
+        self.assertFalse(runtime.external_reaction_busy)
+        self.clock.advance(.1)
+        runtime.step()
+        self.assertEqual(self.dispatcher.events[-1]["target"], "base")
+
+    def test_configured_split_group_teardown_cancels_second_group(self):
+        runtime, _ = self.configured_voice_runtime([event(10)])
+        runtime.observe_whisper_interaction({"source": "detector", "silero_selection_value": .01})
+        self.clock.advance(.5)
+        runtime.step()
+        self.assertEqual(len(self.dispatcher.events), 3)
+        runtime.deactivate()
+        self.clock.advance(3)
+        runtime.step()
+        self.assertEqual(
+            [item["target"] for item in self.dispatcher.events],
+            ["solenoid_1", "solenoid_2", "solenoid_3"],
+        )
+        self.assertEqual(runtime.modulation.pending_count, 0)
+        self.assertFalse(runtime.external_reaction_busy)
+
     def test_configuration_validation_rejects_invalid_types_and_targets_at_startup(self):
         policies = {"voice_default": {"mode": "fixed", "strategy": "reaction"}}
         with self.assertRaisesRegex(ValueError, "unknown reaction type"):

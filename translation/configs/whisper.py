@@ -130,6 +130,10 @@ WHISPER_FRAMES_REQUIRED = (
     cfg["whisper_frames_required"]
 )
 
+STARTUP_COOLDOWN_SECONDS = (
+    cfg.get("startup_cooldown_seconds", 30)
+)
+
 COOLDOWN_SECONDS = (
     cfg["cooldown_seconds"]
 )

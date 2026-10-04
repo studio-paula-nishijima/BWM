@@ -26,6 +26,16 @@ strategies:
     repeat_count: 3
     tap_spacing_seconds: 0.2
 
+  voice_split_groups:
+    type: override_sequence
+    event: {type: solenoid, duration: 0.15, playback_time: 0}
+    initial_quiet_gap_seconds: 0.5
+    phases:
+      - {type: simultaneous, targets: [solenoid_1, solenoid_2, solenoid_3]}
+      - {type: wait, duration_seconds: 2.0}
+      - {type: simultaneous, targets: [solenoid_4, solenoid_5, solenoid_6]}
+      - {type: wait, duration_seconds: 1.0}
+
   voice_double_tap:
     type: repeat_transform
     event: {type: solenoid, duration: 0.15, playback_time: 0}
@@ -44,6 +54,6 @@ policy:
 policies:
   voice_band_1: {mode: fixed, strategy: voice_simultaneous_then_sequence}
   voice_band_2: {mode: fixed, strategy: voice_cascade}
-  voice_band_3: {mode: fixed, strategy: voice_triple_tap}
+  voice_band_3: {mode: fixed, strategy: voice_split_groups}
   voice_band_4: {mode: fixed, strategy: voice_double_tap}
   voice_band_5: {mode: fixed, strategy: voice_simultaneous_then_sequence}

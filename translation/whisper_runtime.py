@@ -51,6 +51,7 @@ from configs.whisper import (
     TRIGGER_RATIO,
 
     WHISPER_FRAMES_REQUIRED,
+    STARTUP_COOLDOWN_SECONDS,
     COOLDOWN_SECONDS,
 
     PROCESSING_MODE,
@@ -138,6 +139,7 @@ FRAME_SIZE = int(
 source = None
 
 last_trigger_time = 0
+startup_trigger_deadline = time.monotonic() + STARTUP_COOLDOWN_SECONDS
 
 whisper_count = 0
 
@@ -157,6 +159,16 @@ interaction_button = None
 interaction_publisher = None
 button_presses = queue.SimpleQueue()
 shutdown_started = False
+
+
+def detector_trigger_admitted(*, crossing, monotonic_now, wall_now,
+                              startup_deadline, last_emitted_at, cooldown_seconds):
+    """Apply the startup gate before the existing inter-trigger cooldown."""
+    return (
+        crossing
+        and monotonic_now >= startup_deadline
+        and wall_now - last_emitted_at > cooldown_seconds
+    )
 
 
 audio_buffer = AudioRingBuffer(
@@ -798,10 +810,17 @@ def main():
             triggered = False
             trigger_source = "detector"
 
+            startup_now = time.monotonic()
             now = time.time()
 
 
-            if profile_decision.trigger and now - last_trigger_time > COOLDOWN_SECONDS:
+            if detector_trigger_admitted(
+                    crossing=profile_decision.trigger,
+                    monotonic_now=startup_now,
+                    wall_now=now,
+                    startup_deadline=startup_trigger_deadline,
+                    last_emitted_at=last_trigger_time,
+                    cooldown_seconds=COOLDOWN_SECONDS):
                 triggered = True
                 detector.record_trigger()
                 last_trigger_time = now
@@ -820,8 +839,12 @@ def main():
                     interaction_servo.schedule(sequence=sequence)
             elif profile_decision.trigger:
                 # A threshold crossing is still logged, but it is not an
-                # emitted trigger while the actuator cooldown is active.
-                result.trigger_suppression_reason = "cooldown"
+                # emitted trigger while either independent gate is active.
+                result.trigger_suppression_reason = (
+                    "startup_cooldown"
+                    if startup_now < startup_trigger_deadline
+                    else "cooldown"
+                )
 
             # GPIO callbacks only enqueue.  Handle one logical press at the
             # same frame-boundary occurrence seam as a real emitted trigger.
