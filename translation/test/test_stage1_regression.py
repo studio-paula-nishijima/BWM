@@ -106,7 +106,7 @@ class Stage1RegressionTests(unittest.TestCase):
 
     def test_hardware_topology_is_dynamic_and_reserves_non_outputs(self):
         pin_map = get_solenoid_pin_map()
-        self.assertEqual(pin_map, {"solenoid_1": 18, "solenoid_2": 23, "solenoid_3": 24, "solenoid_4": 22, "solenoid_5": 25, "solenoid_6": 27})
+        self.assertEqual(pin_map, {"solenoid_1": 23, "solenoid_2": 24, "solenoid_3": 18, "solenoid_4": 22, "solenoid_5": 25, "solenoid_6": 27})
         self.assertEqual(get_backup_button_pin(), 17)
         self.assertNotIn(14, pin_map.values())
         self.assertNotIn(15, pin_map.values())

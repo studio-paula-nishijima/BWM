@@ -1,8 +1,8 @@
 # Hardware topology is configuration, not a fixed runtime channel count.
 solenoids:
-  solenoid_1: 18
-  solenoid_2: 23
-  solenoid_3: 24
+  solenoid_1: 23
+  solenoid_2: 24
+  solenoid_3: 18
   solenoid_4: 22
   solenoid_5: 25
   solenoid_6: 27
