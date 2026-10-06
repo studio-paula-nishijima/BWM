@@ -11,8 +11,8 @@ and the semantic UART link to Whisper. BLE, MQTT, UART, and local input all feed
 one validation/deduplication path. Transport loss never changes installation
 state.
 
-Arduino/PlatformIO is retained deliberately. The live-tested fallback already
-proves this framework, XIAO board definition, GPIO initialization sequence,
+Arduino/PlatformIO is retained deliberately. The separate live-tested XIAO
+fallback provides low-level evidence for the GPIO initialization sequence,
 static flash table, and non-blocking millisecond scheduler. ESP32 Arduino also
 provides BLE central, Wi-Fi/MQTT, Preferences/NVS, hardware UART, and the IDF
 watchdog used here. Moving the proven actuator path to ESP-IDF would add porting
@@ -20,23 +20,34 @@ risk without improving exhibition behavior.
 
 ## Hardware profiles
 
-All signals are 3.3 V logic. The UART is 115200 baud, 8-N-1. XIAO actuator pins
-are identical to the tested fallback.
+The only full-controller target is ESP32-S3-DevKitC-1 with an
+ESP32-S3-WROOM-1-N16R8 module: 16 MB Quad-SPI flash and 8 MB Octal-SPI PSRAM.
+All signals are 3.3 V logic. The Whisper UART is 115200 baud, 8-N-1.
 
-| Function | XIAO ESP32-S3 Sense | Generic ESP32-S3 DevKitC |
-|---|---:|---:|
-| Solenoid 1 | GPIO1 / D0 | GPIO4 |
-| Solenoid 2 | GPIO2 / D1 | GPIO5 |
-| Solenoid 3 | GPIO4 / D3 | GPIO6 |
-| Solenoid 4 | GPIO5 / D4 | GPIO7 |
-| Solenoid 5 | GPIO6 / D5 | GPIO15 |
-| Solenoid 6 | GPIO7 / D8 | GPIO16 |
-| Active-low local button | GPIO8 / D9 | GPIO17 |
-| UART TX to Whisper RX | GPIO43 / D6 | GPIO18 |
-| UART RX from Whisper TX | GPIO44 / D7 | GPIO8 |
+| Function | DevKitC-1 header GPIO |
+|---|---:|
+| Solenoid 1 | GPIO4 |
+| Solenoid 2 | GPIO5 |
+| Solenoid 3 | GPIO6 |
+| Solenoid 4 | GPIO7 |
+| Solenoid 5 | GPIO15 |
+| Solenoid 6 | GPIO16 |
+| Active-low local button | GPIO17 |
+| UART TX to Whisper RX | GPIO18 |
+| UART RX from Whisper TX | GPIO8 |
 
-The XIAO camera and microphone are unused. GPIO3/D2 is avoided because it is a
-strapping pin. USB pins and Sense camera-internal signals are not assigned.
+This contiguous J1-header allocation is independent of Raspberry Pi BCM and
+XIAO pin numbering. It avoids strapping GPIO0/3/45/46, native USB/JTAG
+GPIO19/20, USB-to-UART/programming GPIO43/44, JTAG GPIO39-42, revision-dependent
+RGB LED GPIO38/48, and flash/Octal-PSRAM GPIO26-37. The dedicated PlatformIO
+board definition selects `qio_opi`, `default_16MB.csv`, `BOARD_HAS_PSRAM`, and
+the 16 MB upload geometry. Firmware also refuses to operate unless runtime
+flash is exactly 16 MB and allocator-visible PSRAM confirms the 8 MB capacity
+class (Arduino reports slightly less than the raw device size).
+
+The XIAO ESP32-S3 Sense remains only the independent minimal Tuesday fallback
+under `esp32_tuesday_fallback/`; this full-controller project does not build a
+XIAO image.
 
 Software cannot guarantee LOW before firmware executes. Effective external
 MOSFET gate pull-downs, common control ground, backfeed checks, and the staged
@@ -160,9 +171,11 @@ The main controller task is registered with the ESP task watchdog at 8 seconds.
 Watchdog/reset safety still depends on external gate pull-downs until the
 earliest firmware LOW sequence runs.
 
-USB diagnostics are summary-only every 30 seconds plus transitions/faults; no
-per-pulse logging is enabled. They include session/reaction/transport state,
-accepted/rejected pulses, invalid/duplicate messages, and fault status.
+Serial diagnostics are connection-gated and summary-only every 30 seconds plus
+transitions/faults; an absent serial consumer can never block the watchdog.
+No per-pulse logging is enabled. Summaries include session/reaction/transport
+state, BLE notification and complete-message counters, accepted/rejected
+pulses, invalid/duplicate messages, and fault status.
 
 ## Build and test
 
@@ -170,10 +183,9 @@ accepted/rejected pulses, invalid/duplicate messages, and fault status.
 # Host exporter/simulation tests, from translation/
 & 'C:\Users\mail\Documents\ChatGPT\New project\BWM-review\translation\translation_venv\Scripts\python.exe' -m pytest -q esp32_translation\tests esp32_tuesday_fallback\tests
 
-# Portable C++ core tests and both firmware profiles, from esp32_translation/
+# Portable C++ core tests and the N16R8 firmware, from esp32_translation/
 & 'C:\Users\mail\.platformio\penv\Scripts\pio.exe' test -e native
-& 'C:\Users\mail\.platformio\penv\Scripts\pio.exe' run -e xiao_esp32s3
-& 'C:\Users\mail\.platformio\penv\Scripts\pio.exe' run -e esp32s3_devkitc
+& 'C:\Users\mail\.platformio\penv\Scripts\pio.exe' run -e devkitc_n16r8
 ```
 
 The safety simulation runs the complete filtered canonical score and every
@@ -184,9 +196,9 @@ current reaction repeatedly across that score. See `generated/safety_report.md`.
 Halo/DMX is not implemented. The Pi's OLA/olad/FTDI path requires Linux and an
 external USB adapter; no theoretical DMX or RS-485 replacement is included.
 
-The existing observed hardware baseline is the XIAO fallback driving all six
-live solenoid channels stably. This full controller has host tests and firmware
-build verification only until flashed. Session transitions/random selection,
+The separate observed hardware baseline is the XIAO fallback driving all six
+live solenoid channels stably. This full controller targets only the DevKitC-1
+/ WROOM-1-N16R8. Session transitions/random selection,
 button input, reaction timing/cancellation, BLE central, UART, optional MQTT,
 watchdog recovery, and long-duration integrated operation still require the
 targeted hardware validation described in the implementation brief. If any

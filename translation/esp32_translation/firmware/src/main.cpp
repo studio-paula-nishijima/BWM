@@ -51,6 +51,8 @@ struct ScheduledPulse {
 };
 
 struct SemanticFrame { char bytes[kMaxSemanticFrame + 1]; };
+SemanticFrame incoming_frame{};
+SemanticFrame ble_queue_frame{};
 
 ScheduledPulse pulse_queue[256];
 size_t reaction_pending = 0;
@@ -65,6 +67,10 @@ uint32_t dropped_busy = 0;
 uint32_t generation = 0;
 uint32_t planned_free_ms[kChannelCount]{};
 bool fault_latched = false;
+bool hardware_target_valid = false;
+volatile bool ble_connected = false;
+volatile uint32_t ble_notifications = 0;
+volatile uint32_t ble_messages = 0;
 bool last_button = true;
 uint32_t button_dead_until = 0;
 char last_whisper_state[32] = "unknown";
@@ -98,7 +104,7 @@ void clearPulseQueue() {
 
 void enterFault(const char* reason) {
   if (!fault_latched) {
-    Serial.printf("[FAULT] %s\n", reason);
+    if (Serial) Serial.printf("[FAULT] %s\n", reason);
     fault_latched = true;
   }
   clearPulseQueue();
@@ -215,11 +221,13 @@ void activate(bool publish) {
   clearPulseQueue();
   reaction_window_active = false;
   reaction_busy_until = 0;
-  Serial.printf("[Session] ACTIVE source=%lu..%lu ms events=%u admission=%lu ms\n",
-                static_cast<unsigned long>(selection.source_start_ms),
-                static_cast<unsigned long>(selection.source_end_ms),
-                static_cast<unsigned>(selection.end - selection.begin),
-                static_cast<unsigned long>(bwm::kSolenoidAdmissionDelayMs));
+  if (Serial) {
+    Serial.printf("[Session] ACTIVE source=%lu..%lu ms events=%u admission=%lu ms\n",
+                  static_cast<unsigned long>(selection.source_start_ms),
+                  static_cast<unsigned long>(selection.source_end_ms),
+                  static_cast<unsigned>(selection.end - selection.begin),
+                  static_cast<unsigned long>(bwm::kSolenoidAdmissionDelayMs));
+  }
   if (publish) publishAuthoritative("active");
 }
 
@@ -230,7 +238,7 @@ void teardown(bool publish, const char* reason) {
   reaction_window_active = false;
   reaction_busy_until = 0;
   safety.forceAllOff(millis());
-  Serial.printf("[Session] IDLE reason=%s outputs=LOW\n", reason);
+  if (Serial) Serial.printf("[Session] IDLE reason=%s outputs=LOW\n", reason);
   if (publish) publishAuthoritative("inactive");
 }
 
@@ -295,8 +303,10 @@ void triggerReaction(bwm::Reaction reaction) {
       reaction_busy_until = now + bwm::kDoubleWindowMs;
       break;
   }
-  Serial.printf("[Reaction] started type=%u busy_until=%lu\n", static_cast<unsigned>(reaction),
-                static_cast<unsigned long>(reaction_busy_until));
+  if (Serial) {
+    Serial.printf("[Reaction] started type=%u busy_until=%lu\n", static_cast<unsigned>(reaction),
+                  static_cast<unsigned long>(reaction_busy_until));
+  }
 }
 
 bool validTimestamp(const char* value) {
@@ -420,12 +430,14 @@ void serviceNetwork(uint32_t now) {
 bwm::BleFragmentFramer<4096> ble_reassembler;
 
 void bleNotify(NimBLERemoteCharacteristic*, uint8_t* data, size_t length, bool) {
+  ++ble_notifications;
   const bwm::FrameResult result = ble_reassembler.feed(data, length);
   if (result == bwm::FrameResult::kComplete && ble_frames) {
-    SemanticFrame frame{};
-    memcpy(frame.bytes, ble_reassembler.data(), ble_reassembler.size());
-    frame.bytes[ble_reassembler.size()] = 0;
-    xQueueSend(ble_frames, &frame, 0);
+    // Keep the 8 KiB queue item off the BLE task stack. The callback is
+    // serialized by NimBLE and xQueueSend copies this staging buffer.
+    memcpy(ble_queue_frame.bytes, ble_reassembler.data(), ble_reassembler.size());
+    ble_queue_frame.bytes[ble_reassembler.size()] = 0;
+    if (xQueueSend(ble_frames, &ble_queue_frame, 0) == pdTRUE) ++ble_messages;
   } else if (result == bwm::FrameResult::kMalformed || result == bwm::FrameResult::kOversized) {
     ++invalid_messages;
   }
@@ -445,9 +457,12 @@ void bleTask(void*) {
         NimBLERemoteService* service = client->getService(kBleServiceUuid);
         NimBLERemoteCharacteristic* characteristic = service ? service->getCharacteristic(kBleCharacteristicUuid) : nullptr;
         if (characteristic && characteristic->canNotify() && characteristic->subscribe(true, bleNotify)) {
+          ble_connected = true;
           while (client->isConnected()) vTaskDelay(pdMS_TO_TICKS(500));
+          ble_connected = false;
         }
       }
+      ble_connected = false;
       if (client->isConnected()) client->disconnect();
       NimBLEDevice::deleteClient(client);
       break;
@@ -478,8 +493,12 @@ void serviceButton(uint32_t now) {
 void logDiagnostics(uint32_t now) {
   if (!bwm::reached(now, next_diagnostic)) return;
   next_diagnostic = now + 30000;
-  Serial.printf("[Status] session=%s reaction_busy=%s ble_queue=%u mqtt=%s uart=ready accepted=%lu rejected=%lu dup=%lu invalid=%lu fault=%s\n",
+  if (!Serial) return;
+  Serial.printf("[Status] session=%s reaction_busy=%s ble=%s ble_notifications=%lu ble_messages=%lu ble_queue=%u mqtt=%s uart=ready accepted=%lu rejected=%lu dup=%lu invalid=%lu fault=%s\n",
                 session.active() ? "active" : "idle", reactionBusy(now) ? "yes" : "no",
+                ble_connected ? "connected" : "scanning",
+                static_cast<unsigned long>(ble_notifications),
+                static_cast<unsigned long>(ble_messages),
                 static_cast<unsigned>(uxQueueMessagesWaiting(ble_frames)), mqtt.connected() ? "up" : "down",
                 static_cast<unsigned long>(accepted_pulses), static_cast<unsigned long>(rejected_pulses),
                 static_cast<unsigned long>(duplicate_messages), static_cast<unsigned long>(invalid_messages),
@@ -501,10 +520,26 @@ void setup() {
   whisper_uart.begin(115200, SERIAL_8N1, bwm::kBoard.uart_rx, bwm::kBoard.uart_tx);
   esp_task_wdt_init(8, true);
   esp_task_wdt_add(nullptr);
+  const uint32_t flash_bytes = ESP.getFlashChipSize();
+  const uint32_t psram_bytes = ESP.getPsramSize();
+  if (Serial) {
+    Serial.printf("BWM target board=%s flash=%lu psram=%lu\n", bwm::kBoard.name,
+                  static_cast<unsigned long>(flash_bytes),
+                  static_cast<unsigned long>(psram_bytes));
+  }
+  // getPsramSize() reports allocator-visible bytes, slightly below the raw
+  // 8 MiB device capacity. A 7 MiB floor distinguishes R8 from R2 cleanly.
+  if (flash_bytes != 16UL * 1024UL * 1024UL || !psramFound() ||
+      psram_bytes < 7UL * 1024UL * 1024UL) {
+    enterFault("target requires 16 MB flash and an 8 MB PSRAM device");
+    return;
+  }
+  hardware_target_valid = true;
   loadDeploymentConfig();
   mqtt.setServer(mqtt_host.c_str(), mqtt_port);
   mqtt.setCallback(mqttCallback);
   mqtt.setBufferSize(kMaxSemanticFrame + 1);
+  mqtt.setSocketTimeout(2);  // Keep broker failure below the 8 s task-watchdog window.
   if (wifi_ssid.length()) {
     WiFi.mode(WIFI_STA);
     WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
@@ -512,9 +547,11 @@ void setup() {
   }
   ble_frames = xQueueCreate(4, sizeof(SemanticFrame));
   xTaskCreatePinnedToCore(bleTask, "bwm-ble-central", 8192, nullptr, 1, nullptr, 0);
-  Serial.printf("BWM autonomous Translation %s reset=%d board=%s score=%u sha=%s\n",
-                kFirmwareVersion, static_cast<int>(esp_reset_reason()), bwm::kBoard.name,
-                static_cast<unsigned>(bwm::kScoreEventCount), bwm::kScoreSourceSha256);
+  if (Serial) {
+    Serial.printf("BWM autonomous Translation %s reset=%d board=%s score=%u sha=%s\n",
+                  kFirmwareVersion, static_cast<int>(esp_reset_reason()), bwm::kBoard.name,
+                  static_cast<unsigned>(bwm::kScoreEventCount), bwm::kScoreSourceSha256);
+  }
   if (bwm::kInitiallyActive) activate(false);
   // Startup synchronization is best effort and never gates local operation.
   publishAuthoritative(session.active() ? "active" : "inactive");
@@ -523,10 +560,14 @@ void setup() {
 void loop() {
   const uint32_t now = millis();
   esp_task_wdt_reset();
+  if (!hardware_target_valid) {
+    safety.forceAllOff(now);
+    delay(10);
+    return;
+  }
   serviceUart();
-  SemanticFrame frame{};
-  while (xQueueReceive(ble_frames, &frame, 0) == pdTRUE)
-    processSemanticEvent(frame.bytes, strlen(frame.bytes), false, "ble");
+  while (xQueueReceive(ble_frames, &incoming_frame, 0) == pdTRUE)
+    processSemanticEvent(incoming_frame.bytes, strlen(incoming_frame.bytes), false, "ble");
   serviceNetwork(now);
   serviceButton(now);
   if (session.timedOut(now)) teardown(true, "timeout");
