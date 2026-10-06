@@ -1,0 +1,9 @@
+#pragma once
+
+// Copy to deployment_config.h for a deployment-specific build. This file is
+// intentionally untracked by .gitignore. Empty values keep Wi-Fi/MQTT disabled;
+// BLE, UART, local input, and score playback continue independently.
+#define BWM_WIFI_SSID ""
+#define BWM_WIFI_PASSWORD ""
+#define BWM_MQTT_HOST ""
+#define BWM_MQTT_PORT 1883

@@ -1,0 +1,3 @@
+firmware/include/deployment_config.h
+.pio/
+__pycache__/
