@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -44,8 +45,16 @@ class SemanticMessagingTests(unittest.TestCase):
     def test_envelope_round_trip_and_validation(self):
         event = installation_activation("person_detector", "active")
         self.assertEqual(SemanticEvent.from_json(event.to_json()), event)
+        self.assertEqual(SemanticEvent.from_json(event.to_json().encode("utf-8")), event)
         with self.assertRaises(EventValidationError):
             SemanticEvent.from_json('{"type":"installation.activation"}')
+        with self.assertRaises(EventValidationError):
+            SemanticEvent.from_json(b"\xff\xfe\xfa")
+        utf32_style_corruption = b"\x00\x00\x00{\x00\x11\x00\x00"
+        with self.assertRaises(UnicodeDecodeError):
+            json.loads(utf32_style_corruption)
+        with self.assertRaises(EventValidationError):
+            SemanticEvent.from_json(utf32_style_corruption)
         with self.assertRaises(EventValidationError):
             installation_activation("person_detector", "toggle")
 

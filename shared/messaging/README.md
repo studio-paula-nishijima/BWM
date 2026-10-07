@@ -111,9 +111,10 @@ Translation's shared ingress then deduplicates MQTT-first and BLE-first
 delivery. For UUIDs, framing, and a hardware diagnostic, see
 `person_detector/BLE_ACTIVATION_CONTRACT.md`.
 
-UART frames are compact UTF-8 JSON followed by a newline: default 115200 8N1,
-0.25-second read timeout, and 8192-byte maximum. Partial/multiple frames work;
-malformed or oversized frames are discarded through their next newline and
+UART frames are explicitly decoded as compact UTF-8 JSON followed by a newline:
+default 115200 8N1, 0.25-second read timeout, and 8192-byte maximum.
+Partial/multiple frames work; malformed, non-UTF-8, or oversized frames are
+discarded at their newline boundary without terminating the transport, and
 parsing recovers. GPIO14/15 resolve dynamically from DT alias `uart0`, never
 `/dev/serial0`. The observed Pi 5 result is `/dev/ttyAMA0`; `/dev/serial0` can
 be debug `/dev/ttyAMA10`. Startup rejects kernel-console or serial-getty

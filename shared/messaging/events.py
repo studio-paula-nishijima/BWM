@@ -79,8 +79,10 @@ class SemanticEvent:
     @classmethod
     def from_json(cls, raw: str | bytes) -> "SemanticEvent":
         try:
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8")
             return cls.from_dict(json.loads(raw))
-        except (TypeError, json.JSONDecodeError) as exc:
+        except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise EventValidationError("Event payload is not valid JSON") from exc
 
 
